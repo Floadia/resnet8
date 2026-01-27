@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Conversion
 
-- [ ] **CONV-01**: Convert Keras .h5 model to ONNX format using tf2onnx
-- [ ] **CONV-02**: Verify ONNX model structure (input shape, output shape, layer count)
-- [ ] **CONV-03**: Log conversion progress and any warnings
+- [x] **CONV-01**: Convert Keras .h5 model to ONNX format using tf2onnx
+- [x] **CONV-02**: Verify ONNX model structure (input shape, output shape, layer count)
+- [x] **CONV-03**: Log conversion progress and any warnings
 
 ### Evaluation
 
@@ -51,9 +51,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONV-01 | Phase 1 | Pending |
-| CONV-02 | Phase 1 | Pending |
-| CONV-03 | Phase 1 | Pending |
+| CONV-01 | Phase 1 | Complete |
+| CONV-02 | Phase 1 | Complete |
+| CONV-03 | Phase 1 | Complete |
 | EVAL-01 | Phase 2 | Pending |
 | EVAL-02 | Phase 2 | Pending |
 | EVAL-03 | Phase 2 | Pending |
