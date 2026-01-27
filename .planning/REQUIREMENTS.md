@@ -15,9 +15,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Evaluation
 
-- [ ] **EVAL-01**: Evaluate ONNX model on CIFAR-10 test set using ONNX Runtime
-- [ ] **EVAL-02**: Report per-class accuracy breakdown (10 classes)
-- [ ] **EVAL-03**: Achieve >85% overall accuracy on CIFAR-10 test set
+- [x] **EVAL-01**: Evaluate ONNX model on CIFAR-10 test set using ONNX Runtime
+- [x] **EVAL-02**: Report per-class accuracy breakdown (10 classes)
+- [x] **EVAL-03**: Achieve >85% overall accuracy on CIFAR-10 test set
 
 ## v2 Requirements
 
@@ -54,9 +54,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONV-01 | Phase 1 | Complete |
 | CONV-02 | Phase 1 | Complete |
 | CONV-03 | Phase 1 | Complete |
-| EVAL-01 | Phase 2 | Pending |
-| EVAL-02 | Phase 2 | Pending |
-| EVAL-03 | Phase 2 | Pending |
+| EVAL-01 | Phase 2 | Complete |
+| EVAL-02 | Phase 2 | Complete |
+| EVAL-03 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 6 total
