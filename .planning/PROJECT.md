@@ -1,12 +1,12 @@
-# ResNet8 PyTorch Evaluation
+# ResNet8 ONNX Evaluation
 
 ## What This Is
 
-A PyTorch implementation of ResNet8 for CIFAR-10 evaluation, ported from the MLCommons TinyMLPerf Keras implementation. Converts pretrained Keras weights to PyTorch and validates accuracy on CIFAR-10 test set.
+ONNX-based evaluation of ResNet8 for CIFAR-10, converted from the MLCommons TinyMLPerf Keras implementation. Converts pretrained Keras model to ONNX and validates accuracy on CIFAR-10 test set using ONNX Runtime.
 
 ## Core Value
 
-Accurate weight conversion — PyTorch model must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
+Accurate Keras→ONNX conversion — ONNX model must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
 
 ## Requirements
 
@@ -16,9 +16,10 @@ Accurate weight conversion — PyTorch model must produce equivalent results to 
 
 ### Active
 
-- [ ] PyTorch ResNet8 model matching Keras architecture exactly
-- [ ] Weight converter: Keras .h5 → PyTorch .pt
-- [ ] CIFAR-10 evaluation script with accuracy reporting
+- [ ] Keras .h5 → ONNX conversion using tf2onnx
+- [ ] ONNX model verification (structure, shapes)
+- [ ] CIFAR-10 evaluation with ONNX Runtime
+- [ ] Per-class accuracy breakdown
 - [ ] Accuracy >85% on CIFAR-10 test set
 
 ### Out of Scope
@@ -27,6 +28,7 @@ Accurate weight conversion — PyTorch model must produce equivalent results to 
 - TFLite/quantized model support — only full-precision evaluation
 - Performance benchmarking — accuracy only, not inference speed
 - Custom datasets — CIFAR-10 only
+- PyTorch conversion — ONNX only for v1 (PyTorch deferred to v2)
 
 ## Context
 
@@ -50,7 +52,8 @@ Accurate weight conversion — PyTorch model must produce equivalent results to 
 
 ## Constraints
 
-- **Framework**: PyTorch (target), TensorFlow/Keras (source for weights)
+- **Framework**: ONNX Runtime (target), TensorFlow/Keras (source)
+- **Conversion tool**: tf2onnx for Keras→ONNX
 - **Dataset**: CIFAR-10 (included in reference project)
 - **Accuracy target**: >85% to validate successful conversion
 
@@ -58,8 +61,9 @@ Accurate weight conversion — PyTorch model must produce equivalent results to 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Separate model/converter/eval scripts | Reusability and clarity | — Pending |
-| Match Keras layer ordering exactly | Weight conversion requires 1:1 mapping | — Pending |
+| ONNX instead of PyTorch | User plans future ONNX evaluation work | — Pending |
+| tf2onnx for conversion | Standard tool for Keras→ONNX, well-maintained | — Pending |
+| Separate converter/eval scripts | Reusability and clarity | — Pending |
 
 ---
 *Last updated: 2025-01-27 after initialization*
