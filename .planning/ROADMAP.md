@@ -93,10 +93,10 @@ Plans:
   2. Calibration utility script (`scripts/calibration_utils.py`) exists and loads samples correctly
   3. Calibration preprocessing exactly matches evaluation preprocessing (raw pixels 0-255, no normalization)
   4. Sample distribution verification shows balanced class representation
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 05-01-PLAN.md — Create calibration data loader with stratified sampling and verification
 
 #### Phase 6: ONNX Runtime Quantization
 **Goal**: ONNX models quantized to int8/uint8 with evaluated accuracy vs baseline
@@ -153,11 +153,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Accuracy Evaluation | v1.0 | 1/1 | Complete | 2026-01-27 |
 | 3. PyTorch Conversion | v1.1 | 1/1 | Complete | 2026-01-27 |
 | 4. PyTorch Evaluation | v1.1 | 1/1 | Complete | 2026-01-27 |
-| 5. Calibration Infrastructure | v1.2 | 0/TBD | Not started | - |
+| 5. Calibration Infrastructure | v1.2 | 0/1 | Planned | - |
 | 6. ONNX Runtime Quantization | v1.2 | 0/TBD | Not started | - |
 | 7. PyTorch Quantization | v1.2 | 0/TBD | Not started | - |
 | 8. Comparison and Analysis | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-28 with v1.2 PTQ Evaluation phases*
+*Last updated: 2026-01-28 with Phase 5 plan*
