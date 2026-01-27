@@ -4,17 +4,17 @@
 
 See: .planning/PROJECT.md (updated 2026-01-27)
 
-**Core value:** Accurate Keras→ONNX conversion — ONNX model must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** Milestone v1.1 complete
+**Core value:** Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
+**Current focus:** Milestone v1.2 PTQ Evaluation
 
 ## Current Position
 
-Phase: 4 of 4 (PyTorch Evaluation)
-Plan: 1 of 1 in phase
-Status: Milestone complete
-Last activity: 2026-01-27 — Completed 04-01-PLAN.md
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-28 — Milestone v1.2 started
 
-Progress: [████████████████████] 100%
+Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -61,11 +61,11 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-27 11:30:00 UTC
-Stopped at: Completed milestone v1.1 (PyTorch Conversion)
+Last session: 2026-01-28
+Stopped at: Starting milestone v1.2 (PTQ Evaluation)
 Resume file: None
-Next step: Milestone complete - all v1.1 phases verified
+Next step: Define requirements and create roadmap
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-27*
+*Last updated: 2026-01-28*
