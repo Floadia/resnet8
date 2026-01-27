@@ -1,419 +1,838 @@
-# Domain Pitfalls: Keras to PyTorch Model Conversion
+# Pitfalls Research: Post-Training Quantization (PTQ) for ResNet8
 
-**Domain:** Deep learning model conversion (Keras H5 to PyTorch)
-**Researched:** 2026-01-27
-**Confidence:** MEDIUM (based on community discussions and technical documentation)
+**Domain:** Adding static PTQ to existing CNN model evaluation
+**Context:** ResNet8 CIFAR-10 (87.19% full-precision baseline), ONNX Runtime + PyTorch quantization
+**Researched:** 2026-01-28
+**Confidence:** HIGH (Context7, official documentation, recent community discussions)
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause incorrect inference results or require complete rework.
-
-### Pitfall 1: Channel Order Mismatch (NHWC vs NCHW)
-**What goes wrong:** Keras uses channels_last format (NHWC: batch, height, width, channels) while PyTorch uses channels_first (NCHW: batch, channels, height, width). Weight tensors are loaded without transposition, causing silently incorrect computations.
-
-**Why it happens:** Both frameworks accept 4D tensors, so no error is raised. The model runs but produces garbage outputs because spatial dimensions are interpreted as channels and vice versa.
-
-**Consequences:**
-- Model produces random predictions (near-chance accuracy)
-- No error messages — silent failure
-- Debugging is difficult because layer shapes appear correct
-- For Conv2D layers, Keras weights are (height, width, input_channels, output_channels) while PyTorch expects (output_channels, input_channels, height, width)
-
-**Prevention:**
-1. Always transpose Conv2D weights from Keras (H, W, C_in, C_out) to PyTorch (C_out, C_in, H, W)
-2. For Dense/Linear layers, transpose from Keras (output, input) to PyTorch (input, output)
-3. Do NOT transpose bias vectors — they remain the same
-4. Write unit tests comparing single-layer outputs between Keras and PyTorch
-5. Verify the first Conv2D layer output matches exactly (within 1e-5) between frameworks
-
-**Detection:**
-- Accuracy near random chance (10% for CIFAR-10)
-- Weight tensor shapes are permutations of expected shapes
-- Intermediate layer activations have vastly different statistics
-- First convolutional layer output differs by orders of magnitude
-
-**Phase:** Architecture Translation phase — must verify weight shapes during initial model definition
+Mistakes that cause incorrect quantized models, severe accuracy degradation, or require complete rework.
 
 ---
 
-### Pitfall 2: BatchNormalization Mode Confusion
-**What goes wrong:** Model is not switched to evaluation mode before inference, causing BatchNorm to use batch statistics instead of learned running statistics. Accuracy drops significantly, especially on small batches or single images.
+### Pitfall 1: Random or Insufficient Calibration Data
+
+**What goes wrong:** Using random data for calibration or too few calibration samples produces incorrect quantization parameters (scale and zero_point), causing severe accuracy drops (20-70% degradation).
 
 **Why it happens:**
-- PyTorch requires explicit `model.eval()` call
-- Keras automatically handles training/inference mode based on context
-- Developers forget this is a stateful change, not a per-call parameter
+- Code examples use random data for convenience (`torch.randn(...)`)
+- Developers don't understand that calibration determines fixed quantization ranges for all future inputs
+- Insufficient calibration samples fail to capture activation distribution
+- Calibration dataset doesn't match inference distribution
 
 **Consequences:**
-- Validation accuracy 5-15% lower than expected
-- Results are inconsistent across different batch sizes
-- Single-image inference produces wildly incorrect results
-- Running mean/variance from training data are ignored
+- Quantized model accuracy drops from 87.19% to 10-50% (near-random or severely degraded)
+- int8/uint8 ranges are incorrectly computed, causing clipping or poor utilization
+- Quantization parameters don't generalize to test set
+- PyTorch: Observers collect incorrect statistics
+- ONNX Runtime: Calibration table contains wrong scale/zero_point values
 
 **Prevention:**
-1. Always call `model.eval()` before any inference or validation
-2. Use context manager pattern for inference:
+1. **NEVER use random data** — always use real CIFAR-10 samples
+2. Use **100+ mini-batches** for calibration (PyTorch recommendation: ~100, minimum 32)
+3. Draw calibration data from training set (not test set to avoid data leakage)
+4. Ensure calibration data is **representative** of inference distribution
+5. For CIFAR-10: Use 1000-3200 images (100 batches × 32 batch_size, or 32 batches × 100 batch_size)
+6. Apply exact same preprocessing as inference (raw pixels 0-255, no normalization)
+7. Verify calibration statistics make sense (check min/max ranges per layer)
+
+**Detection:**
+- Quantized accuracy drops below 60% (expected: 85-87%)
+- Activation ranges in calibration table show unusual values (all zeros, extreme outliers)
+- Different calibration runs produce wildly different accuracy
+- First quantized layer has scale/zero_point that clips most inputs
+
+**Phase to address:** Calibration Data Preparation phase — create proper calibration subset before quantization
+
+**Warning signs:**
+- Calibration code uses `torch.randn()` or `np.random.randn()`
+- Calibration loop iterates fewer than 32 times
+- Calibration uses different preprocessing than evaluation
+- No verification of calibration data distribution
+
+---
+
+### Pitfall 2: Model Not in Eval Mode During Calibration
+
+**What goes wrong:** Calibrating in training mode causes BatchNorm layers to update running statistics instead of using frozen statistics, producing incorrect quantization ranges and poor accuracy.
+
+**Why it happens:**
+- Developers forget `model.eval()` is required before calibration
+- Confusion between training/eval mode in PyTorch
+- Copy-paste from training code where `.train()` is set
+- Assuming calibration is "training the quantization"
+
+**Consequences:**
+- BatchNorm uses batch statistics during calibration instead of learned running mean/variance
+- Quantization observers collect wrong activation ranges
+- Quantized model accuracy degrades by 10-20%
+- Results are inconsistent across calibration runs
+- Small calibration batches cause catastrophic BatchNorm instability
+
+**Prevention:**
+1. **Always call `model.eval()`** before calibration:
    ```python
-   with torch.no_grad():
-       model.eval()
-       outputs = model(inputs)
+   model.eval()  # CRITICAL: Must be before prepare()
+   model_prepared = torch.quantization.prepare(model, inplace=False)
    ```
-3. Verify BatchNorm momentum parameter matches between frameworks (Keras default: 0.99, PyTorch default: 0.1)
-4. Check that running_mean and running_var are loaded correctly from Keras
-5. Test on single images — if results are unstable, BatchNorm mode is likely wrong
+2. Verify model mode: `assert not model.training, "Model must be in eval mode"`
+3. Use `torch.no_grad()` context during calibration (prevents gradient computation)
+4. Document this requirement prominently in calibration script
+5. Test with single-image input — if results vary, mode is wrong
 
 **Detection:**
-- Validation accuracy drops when batch size changes
-- Single-image predictions are random
-- Intermediate BatchNorm layer statistics change during inference
-- Model output varies across multiple forward passes with same input
+- Quantized accuracy varies significantly between runs
+- Single-image predictions from quantized model are unstable
+- BatchNorm layers show changing statistics during calibration
+- Calibration with batch_size=1 produces very different results than batch_size=32
 
-**Phase:** Weight Loading phase — verify BatchNorm statistics transfer correctly; Evaluation phase — ensure eval() mode is set
+**Phase to address:** Quantization Preparation phase — set eval mode before prepare()
+
+**Warning signs:**
+- No `model.eval()` call before `torch.quantization.prepare()`
+- Calibration loop doesn't use `with torch.no_grad():`
+- Model mode check not asserted
 
 ---
 
-### Pitfall 3: L2 Regularization vs Weight Decay Confusion
-**What goes wrong:** Keras L2 regularization (λ=1e-4 in this project) is not equivalent to PyTorch weight_decay parameter. Direct value transfer causes different effective regularization strength, subtly altering inference behavior.
+### Pitfall 3: Forgetting Module Fusion for Conv-BatchNorm-ReLU
+
+**What goes wrong:** Not fusing Conv→BatchNorm→ReLU sequences before quantization causes incorrect quantization boundaries, missing optimization opportunities, and accuracy degradation.
 
 **Why it happens:**
-- Keras adds L2 penalty to the loss function: `loss += λ * sum(w²)`
-- PyTorch weight_decay in most optimizers implements L2 regularization, not true weight decay
-- Mathematical difference: L2 regularization has a factor of 2 difference from weight decay
-- For adaptive optimizers (Adam, RMSprop), behavior diverges significantly
+- Developers skip fusion step in quantization workflow
+- Unfamiliarity with `fuse_modules()` requirement
+- Assumption that quantization handles this automatically
+- Module fusion requires explicit module names, causing confusion
 
 **Consequences:**
-- Converted model produces slightly different inference results (1-3% accuracy difference)
-- Weight magnitudes drift from Keras values during any fine-tuning
-- Model behavior is subtly incorrect but not obviously broken
+- BatchNorm cannot be quantized standalone — quantization fails or skips BatchNorm
+- Quantization/dequantization operations inserted between Conv-BatchNorm, causing numerical errors
+- Performance is degraded (extra quant/dequant ops)
+- Accuracy drops by 3-10% due to accumulated quantization errors
+- ONNX Runtime: Model optimization may warn about unfused patterns
 
 **Prevention:**
-1. **For inference only** (this project): L2 regularization doesn't affect inference, only training. Skip this entirely for pretrained model evaluation.
-2. **For fine-tuning**: Convert Keras L2 parameter (λ) to PyTorch by dividing by 2: `weight_decay = λ / 2.0`
-3. If using Adam/AdamW for fine-tuning, use `torch.optim.AdamW` with true weight decay, not L2 regularization
-4. Document the conversion factor prominently in code comments
+1. **Fuse modules BEFORE quantization**:
+   ```python
+   # Fusion must happen before prepare()
+   model = torch.quantization.fuse_modules(model, [
+       ['conv1', 'bn1', 'relu1'],      # Initial conv block
+       ['stack1.0.conv1', 'stack1.0.bn1', 'stack1.0.relu1'],  # Residual blocks
+       # ... list all Conv-BN-ReLU sequences
+   ], inplace=False)
+   ```
+2. Fusion order must be: **Conv → BatchNorm → ReLU** (not ReLU → BatchNorm)
+3. Supported fusion patterns: `[Conv, ReLU]`, `[Conv, BatchNorm]`, `[Conv, BatchNorm, ReLU]`, `[Linear, ReLU]`
+4. For ResNet8: Fuse main path and shortcut projection paths separately
+5. Verify fusion worked: `print(model)` should show fused modules
+6. ONNX Runtime: Use `onnxruntime.quantization.shape_inference` and model optimizer before quantization
 
 **Detection:**
-- Small but consistent accuracy differences (85% vs 83%)
-- Weight norms differ between frameworks
-- Gradient magnitudes are slightly off during fine-tuning
+- BatchNorm layers appear separately in quantized model
+- Extra QuantizeLinear/DequantizeLinear pairs between Conv and BatchNorm
+- Warning: "Cannot quantize BatchNormalization by itself"
+- Accuracy significantly lower than expected (3-10% drop)
+- Quantized model is slower than expected
 
-**Phase:** Not applicable for inference-only conversion; becomes critical if fine-tuning is added later
+**Phase to address:** Model Preparation phase — fuse modules before quantization workflow
+
+**Warning signs:**
+- No `fuse_modules()` call before `prepare()`
+- Module names are not explicitly listed
+- Fusion patterns don't match ResNet8 architecture
 
 ---
 
-### Pitfall 4: Weight Initialization Mismatch Ignored
-**What goes wrong:** Developers assume initialization doesn't matter when loading pretrained weights. But missing or incorrectly initialized layers (e.g., shortcuts, projection layers) cause accuracy drops.
+### Pitfall 4: Skip Connections Not Prepared for Quantization
+
+**What goes wrong:** Residual addition operations (`out = x + residual`) fail during quantization or produce incorrect results because they aren't quantization-aware.
 
 **Why it happens:**
-- Keras uses Glorot/Xavier Uniform by default
-- PyTorch defaults vary by layer type (Linear uses Kaiming, Conv2d uses custom)
-- When weight loading is incomplete or partial, uninitialized layers use framework defaults
-- Shortcut 1x1 convolutions are sometimes forgotten during weight transfer
+- Standard Python `+` operator doesn't support quantization
+- torch.nn.Identity is not inserted for activation quantization tracking
+- Developers don't know to use `torch.nn.quantized.FloatFunctional`
+- ResNet shortcuts seem to "just work" in floating point
 
 **Consequences:**
-- Model accuracy is 10-20% lower than expected
-- Some layers have random weights despite "successful" weight loading
-- Residual connections produce incorrect outputs
+- Runtime error: "Cannot add quantized and non-quantized tensors"
+- No activation quantization for skip connection additions
+- Erroneous quantization calibration (observers miss skip connection statistics)
+- Silent failure: addition works but produces incorrect results
+- Accuracy drops by 5-15% due to quantization range mismatch
 
 **Prevention:**
-1. Explicitly verify ALL layers have loaded weights, not just convolutions
-2. Print weight tensor statistics (min, max, mean, std) for each layer after loading
-3. Compare PyTorch weight statistics to Keras weight statistics layer-by-layer
-4. For shortcut/projection layers, ensure they're included in the weight mapping
-5. Write assertions that fail if any layer's weight tensor contains initialization values
+1. **Replace `+` with FloatFunctional** for skip connections:
+   ```python
+   # WRONG: out = x + residual
+   # RIGHT:
+   self.skip_add = torch.nn.quantized.FloatFunctional()
+   out = self.skip_add.add(x, residual)
+   ```
+2. Insert `torch.nn.Identity()` before additions to flag activation quantization
+3. Apply this to ALL residual blocks (3 stacks × 2 blocks = 6 additions in ResNet8)
+4. Test each residual block independently after quantization
+5. Use QuantStub at model input and DeQuantStub at model output
 
 **Detection:**
-- Weight tensors have suspicious statistics (e.g., all zeros, unit variance)
-- Specific layers (often shortcuts) have very different magnitudes than Keras
-- Layer-by-layer output comparison shows divergence at specific blocks
-- Model accuracy is much worse than expected but better than random
+- Error during quantization: "Cannot quantize add operation"
+- Quantized model output differs significantly from float model on same input
+- Residual blocks show no observers for addition operations
+- Calibration warnings about skip connections
 
-**Phase:** Weight Loading phase — validate ALL weights are loaded, not just primary pathway
+**Phase to address:** Model Architecture Modification phase — update residual blocks before quantization
+
+**Warning signs:**
+- Residual blocks use standard `+` operator
+- No `FloatFunctional` imports or instances in model code
+- Model definition wasn't modified for quantization
 
 ---
 
-### Pitfall 5: Residual Connection Dimension Mismatch
-**What goes wrong:** Shortcut connections in residual blocks fail to match dimensions when spatial size changes (stride=2) or channel count increases. Addition operation fails or produces incorrect results.
+### Pitfall 5: Observer Mismatch Between QConfig and Backend
+
+**What goes wrong:** Using incompatible QConfig for the target backend (CPU, GPU, CUDA) causes silent failures, numerical saturation, or wrong inference results.
 
 **Why it happens:**
-- Keras automatically broadcasts in some cases; PyTorch is stricter
-- 1x1 projection convolutions on shortcuts are implemented differently
-- Stride handling differs: Keras may use stride in projection, PyTorch may use different patterns
-- Channel dimension mismatch is not always caught by shape checks
+- Default QConfig doesn't match target hardware
+- OneDNN backend on non-VNNI CPUs causes saturation
+- Per-tensor vs per-channel observer mismatch
+- uint8 vs int8 activation dtype mismatch
 
 **Consequences:**
-- Runtime error: "RuntimeError: The size of tensor a (32) must match the size of tensor b (64)"
-- Or worse: silent broadcasting produces incorrect results
-- Residual blocks fail to learn proper shortcuts
+- **OneDNN backend without AVX-512 VNNI**: Silent numeric saturation, model outputs are wrong
+- Per-tensor quantization on efficient models (like MobileNet) causes severe accuracy drops
+- Quantization config is ignored, operators remain float32
+- Runtime error: "Backend does not support this quantization configuration"
 
 **Prevention:**
-1. For each residual block, verify input and output shapes match before addition
-2. Implement shortcut projection layers with exact Keras architecture:
-   - 1x1 Conv with stride matching the residual path stride
-   - BatchNorm on projection path
-   - No activation on shortcut (only on residual path output)
-3. Test each residual block independently with known inputs
-4. Log tensor shapes before addition operations during initial testing
-5. Specifically verify stride=2 blocks where spatial dimensions halve
+1. **Choose QConfig matching backend**:
+   ```python
+   # CPU inference (most compatible)
+   model.qconfig = torch.quantization.get_default_qconfig('fbgemm')  # x86
+   # or
+   model.qconfig = torch.quantization.get_default_qconfig('qnnpack')  # ARM
+   ```
+2. For ResNet8 on x86 CPU: Use `fbgemm` backend (Facebook GEMM)
+3. Verify backend support: Check `torch.backends.quantized.supported_engines`
+4. For OneDNN: Check CPU flags for AVX-512 VNNI support, or avoid OneDNN
+5. Use per-channel quantization for weights, per-tensor for activations (ResNet standard)
+6. ONNX Runtime: Verify execution provider supports quantized operators
 
 **Detection:**
-- Shape mismatch errors during forward pass
-- Residual blocks produce outputs with wrong spatial dimensions
-- Manual shape inspection shows input/output dimension discrepancy
-- Specific stacks (Stack 2, Stack 3 in ResNet8) fail while Stack 1 works
+- Model outputs are saturated (all same value, NaN, or inf)
+- CPU without VNNI shows wrong results but VNNI CPU is correct
+- Quantized model accuracy is 0-10% (catastrophic failure)
+- Logs show: "qconfig ignored for operator X"
+- ONNX Runtime error: "Unsupported quantized operator for execution provider"
 
-**Phase:** Architecture Translation phase — verify residual block structure matches Keras exactly
+**Phase to address:** Quantization Configuration phase — select correct QConfig before prepare()
+
+**Warning signs:**
+- QConfig is default without backend specification
+- Code doesn't check hardware capabilities
+- Using OneDNN on older CPUs
 
 ---
 
-### Pitfall 6: Numerical Precision Drift
-**What goes wrong:** Accumulation of small floating-point differences causes output to diverge from Keras results, even with correct architecture and weights.
+### Pitfall 6: ONNX Runtime Quantization Without Model Optimization
+
+**What goes wrong:** Quantizing ONNX model without pre-processing optimization causes unsupported operator errors, missed fusion opportunities, and accuracy degradation.
 
 **Why it happens:**
-- Keras saves weights as float64, PyTorch typically uses float32
-- Different operation ordering (addition is not associative in floating point)
-- BLAS/CUDA library implementations differ between TensorFlow and PyTorch
-- BatchNorm epsilon values differ (Keras default: 1e-3, PyTorch default: 1e-5)
+- Developers skip `onnxruntime.quantization.shape_inference` step
+- Model optimizer not run before quantization
+- ONNX graph contains patterns that cannot be quantized
+- BatchNorm not fused with Conv before quantization
 
 **Consequences:**
-- Outputs differ by small amounts (1e-3 to 1e-5 range)
-- Accuracy drops 1-2% due to decision boundary shifts
-- Exact reproducibility is impossible
+- Error: "Cannot quantize BatchNormalization by itself"
+- Unsupported Conv nodes cannot be quantized
+- Missing tensor shape information prevents quantization
+- Quantization silently skips operators, leaving them in float32
+- Zero padding causes accuracy errors if zero cannot be represented uniquely
 
 **Prevention:**
-1. Accept that exact bit-level reproducibility is impossible
-2. Set BatchNorm epsilon to match Keras: `torch.nn.BatchNorm2d(..., eps=1e-3)`
-3. Use float32 consistently (Keras will truncate float64 to float32 during loading)
-4. Validate that output differences are small (< 1e-4) for known inputs
-5. Focus on accuracy metrics, not exact output matching
+1. **Run symbolic shape inference first**:
+   ```python
+   from onnxruntime.quantization import shape_inference
+   model_with_shapes = shape_inference.quant_pre_process(
+       input_model_path='resnet8.onnx',
+       output_model_path='resnet8_inferred.onnx'
+   )
+   ```
+2. Use model optimizer to fuse Conv-BatchNorm-ReLU before quantization
+3. Verify all operators have shape information
+4. Check supported operators for execution provider (CPU, CUDA, TensorRT)
+5. For zero padding: Ensure zero is uniquely representable in quantization scheme
 
 **Detection:**
-- Layer outputs differ by small amounts (1e-3 range) even with correct implementation
-- Final predictions differ by tiny margins
-- Accuracy is close but not identical (84.5% vs 85.1%)
+- Error message: "Cannot quantize BatchNormalization"
+- Quantization log shows: "Unsupported operator X, skipping"
+- Quantized model has mix of quantized and float32 operators
+- Accuracy severely degraded (>20% drop)
 
-**Phase:** Validation phase — establish acceptable tolerance thresholds
+**Phase to address:** ONNX Model Preparation phase — pre-process before quantization
+
+**Warning signs:**
+- No shape inference call before quantization
+- ONNX model loaded directly into quantization without preprocessing
+- Quantization warnings about missing shape information
+
+---
+
+### Pitfall 7: Incorrect Calibration Data Preprocessing
+
+**What goes wrong:** Calibration uses different preprocessing than the original model or evaluation script, causing quantization ranges to be computed for the wrong input distribution.
+
+**Why it happens:**
+- Calibration script normalizes inputs (divides by 255, or applies mean/std normalization)
+- Evaluation script uses raw pixels (0-255)
+- Copy-paste from ImageNet example that uses normalization
+- Misunderstanding of what the model expects
+
+**Consequences:**
+- Quantization ranges are computed for normalized data (0-1) but inference uses raw pixels (0-255)
+- Activation clipping or extreme underutilization of quantization range
+- Quantized accuracy drops to 10-40% (worse than random)
+- First layer weights have completely wrong quantization scale
+
+**Prevention:**
+1. **Match preprocessing EXACTLY** between calibration and inference:
+   ```python
+   # Check evaluate_pytorch.py: images are float32 in [0, 255]
+   # Calibration MUST use same format
+   images = images.astype(np.float32)  # NO divide by 255
+   ```
+2. Review evaluation script preprocessing before writing calibration
+3. Test calibration with same images used in evaluation
+4. Verify input ranges: print min/max of calibration inputs
+5. Document preprocessing requirements in calibration script
+
+**Detection:**
+- Quantized first Conv layer has scale >> 1 or scale << 0.01
+- Calibration input stats differ from evaluation input stats
+- Quantized accuracy catastrophically low (<50%)
+- Activations are clipped (all at min or max quantization range)
+
+**Phase to address:** Calibration Data Preparation phase — verify preprocessing pipeline
+
+**Warning signs:**
+- Calibration code divides by 255, but evaluate_pytorch.py doesn't
+- Normalization transform applied in calibration but not evaluation
+- No documentation of expected input range
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays or require careful debugging but don't break the entire conversion.
-
-### Pitfall 7: Softmax Location Ambiguity
-**What goes wrong:** Unclear whether softmax is part of the model or should be applied externally during inference. Keras Dense layer can include softmax activation, but PyTorch Linear layer does not.
-
-**Why it happens:**
-- Keras combines final Dense layer with softmax activation in one layer definition
-- PyTorch typically separates Linear layer from softmax
-- Loss functions differ: CrossEntropyLoss includes softmax, NLLLoss requires manual softmax
-
-**Prevention:**
-1. Check Keras model definition: if final Dense has `activation='softmax'`, include it in PyTorch
-2. For inference, apply `torch.softmax(outputs, dim=1)` to get probabilities
-3. For accuracy calculation, softmax is unnecessary (argmax is the same)
-4. Document whether model outputs are logits or probabilities
-
-**Detection:**
-- Output values are not in [0, 1] range when probabilities are expected
-- Output values don't sum to 1.0
-- Predictions are different from Keras despite same argmax
-
-**Phase:** Architecture Translation and Evaluation phases
+Mistakes that cause delays, confusing errors, or require careful debugging but don't break the entire system.
 
 ---
 
-### Pitfall 8: Data Preprocessing Mismatch
-**What goes wrong:** CIFAR-10 preprocessing differs between Keras and PyTorch defaults. Images are normalized differently, causing accuracy drops despite correct model.
+### Pitfall 8: Calibration vs Inference Batch Size Mismatch
+
+**What goes wrong:** Calibrating with one batch size but evaluating with a different batch size causes unexpected behavior or performance issues.
 
 **Why it happens:**
-- Keras typically uses pixel values in [0, 1] range
-- PyTorch torchvision datasets may use different normalization
-- Mean/std normalization constants differ
-- Image loading order (RGB vs BGR) can differ in some pipelines
+- Calibration uses large batches (batch_size=128) for speed
+- Evaluation uses small batches (batch_size=32) or single images
+- Assumption that batch size doesn't matter for static quantization
+- Dynamic batch dimensions not handled correctly
+
+**Consequences:**
+- Minor accuracy variations (1-2%) between calibration and evaluation batch sizes
+- Runtime errors with fixed-size operators (rare for ResNet)
+- Confusion during debugging when results differ
+- Performance not optimized for target batch size
 
 **Prevention:**
-1. Verify exact preprocessing from Keras training script
-2. Match normalization exactly: divide by 255.0 if Keras used that
-3. Check if Keras used dataset-specific mean/std subtraction
-4. Test with a single known image and compare outputs
+1. Use **same batch size** for calibration and evaluation when possible
+2. For ResNet8 CIFAR-10: batch_size=32 or 100 is reasonable
+3. Document batch size in calibration script
+4. Test quantized model with multiple batch sizes
+5. For ONNX Runtime: Use dynamic batch dimension if varying batch sizes needed
 
 **Detection:**
-- Model accuracy is significantly lower than expected
-- First layer activations have very different magnitudes
-- Single-image predictions are random but multi-image batches are better
+- Accuracy varies slightly with batch size
+- Runtime warnings about batch dimension
+- Performance degrades with certain batch sizes
 
-**Phase:** Evaluation phase — verify data pipeline matches training preprocessing
+**Phase to address:** Calibration Configuration phase — align batch sizes
+
+**Warning signs:**
+- Calibration batch_size != evaluation batch_size
+- No testing with target batch size
 
 ---
 
-### Pitfall 9: Missing .eval() and torch.no_grad()
-**What goes wrong:** Forgetting `torch.no_grad()` context manager causes unnecessary gradient tracking, wasting memory and slowing inference. Combined with missing `.eval()`, causes incorrect results.
+### Pitfall 9: Not Validating Quantized Model Before Comparison
+
+**What goes wrong:** Jumping directly to accuracy comparison without validating that quantization succeeded, wasting time debugging accuracy when quantization failed silently.
 
 **Why it happens:**
-- PyTorch defaults to training mode with gradient tracking
-- Keras inference automatically disables training-specific behaviors
-- Developers new to PyTorch forget these are separate concerns
+- Eagerness to see accuracy results
+- Assumption that no error = success
+- Lack of quantization validation steps
+- Not checking for mixed float32/int8 operators
+
+**Consequences:**
+- Hours debugging accuracy when model isn't actually quantized
+- Some operators remain float32, giving false sense of quantization
+- Quantization silently failed but no error was raised
+- Comparison is invalid (float vs partially-quantized)
 
 **Prevention:**
-1. Always use both together for inference:
+1. **Validate quantization before accuracy testing**:
    ```python
-   model.eval()
-   with torch.no_grad():
-       outputs = model(inputs)
+   # Check model is actually quantized
+   print(quantized_model)  # Should show quantized operators
+
+   # PyTorch: Check for QuantStub/DeQuantStub
+   # ONNX: Check for QuantizeLinear/DequantizeLinear nodes
    ```
-2. Use `@torch.inference_mode()` decorator for inference functions (PyTorch 1.9+)
-3. Check memory usage — if it grows during inference, gradients are being tracked
+2. Verify operator types: Conv should be quantized, not float
+3. Check model size: int8 model should be ~4× smaller than float32
+4. Run single-image sanity test: output should be close to float model (within 5%)
+5. Log quantization statistics: scale, zero_point for each layer
 
 **Detection:**
-- High memory usage during inference
-- Inference is slower than expected
-- BatchNorm-related accuracy issues
+- Model size unchanged after quantization
+- Print shows float32 Conv2d instead of quantized operators
+- ONNX graph has no QuantizeLinear nodes
+- Single-image output identical to float (not approximately equal)
 
-**Phase:** Evaluation phase
+**Phase to address:** Quantization Validation phase — verify before evaluation
+
+**Warning signs:**
+- No validation step between quantization and accuracy evaluation
+- Model size not checked
+- Operator types not inspected
+
+---
+
+### Pitfall 10: Comparing Quantized Accuracy Without Baseline
+
+**What goes wrong:** Evaluating quantized model without re-running full-precision baseline, assuming 87.19% is still correct, but environment/code changes altered baseline.
+
+**Why it happens:**
+- Trusting documented baseline without verification
+- Assuming evaluation script didn't change
+- Not running baseline and quantized in same session
+- Data loading or preprocessing changed
+
+**Consequences:**
+- Reporting incorrect accuracy delta (e.g., "quantization dropped accuracy by 5%" when baseline also dropped)
+- Debugging accuracy issues that aren't related to quantization
+- False conclusions about quantization quality
+- Wasted effort optimizing quantization when problem is elsewhere
+
+**Prevention:**
+1. **Always run float baseline in same session**:
+   ```python
+   # Run both in same script
+   float_acc = evaluate_model(float_model, test_data)
+   quant_acc = evaluate_model(quant_model, test_data)
+   delta = float_acc - quant_acc
+   ```
+2. Use identical data loading, preprocessing, and evaluation code
+3. Document baseline accuracy with timestamp and commit hash
+4. Compare against freshly-computed baseline, not historical value
+5. Report delta as absolute percentage points (87.19% → 85.50% = 1.69pp drop)
+
+**Detection:**
+- Baseline accuracy doesn't match documented 87.19%
+- Quantized accuracy higher than baseline (impossible)
+- Debugging quantization when baseline is broken
+
+**Phase to address:** Evaluation phase — run paired float/quantized evaluation
+
+**Warning signs:**
+- Separate scripts for float and quantized evaluation
+- Baseline hardcoded as constant instead of computed
+- No freshness check on baseline
+
+---
+
+### Pitfall 11: PyTorch vs ONNX Runtime Calibration Format Mismatch
+
+**What goes wrong:** Preparing calibration data in PyTorch format (NCHW tensors) but ONNX Runtime expects different format or data loader interface.
+
+**Why it happens:**
+- PyTorch uses NCHW (batch, channels, height, width)
+- ONNX Runtime quantization expects data reader that yields batches
+- Different APIs for calibration data preparation
+- Copy-paste from PyTorch example to ONNX without adaptation
+
+**Consequences:**
+- Runtime error: "Expected data reader, got tensor"
+- Shape mismatch errors during calibration
+- Wrong axis interpreted as channels/spatial dimensions
+- Calibration fails or uses wrong data
+
+**Prevention:**
+1. **Use appropriate calibration API for each framework**:
+   ```python
+   # PyTorch: Direct tensor calibration
+   for batch in calibration_loader:
+       model(batch)
+
+   # ONNX Runtime: DataReader class
+   class CalibrationDataReader:
+       def __init__(self, data):
+           self.data = data
+       def get_next(self):
+           # Return dict: {input_name: numpy_array}
+           return {'input': next_batch}
+   ```
+2. ONNX Runtime expects dict with input names as keys
+3. PyTorch calibration uses standard forward pass
+4. Verify data shapes match model input: ResNet8 expects (N, 32, 32, 3) or (N, 3, 32, 32)
+5. Check channel order: ONNX may use NHWC, PyTorch uses NCHW
+
+**Detection:**
+- Type error: "Expected DataReader, got Tensor"
+- Shape mismatch during calibration
+- Error: "Input name not found in model"
+
+**Phase to address:** Calibration Implementation phase — use framework-specific API
+
+**Warning signs:**
+- Reusing exact same calibration code for both frameworks
+- Not checking calibration API documentation
+
+---
+
+### Pitfall 12: Missing QuantStub/DeQuantStub at Model Boundaries
+
+**What goes wrong:** PyTorch quantization fails to quantize inputs/outputs properly because QuantStub and DeQuantStub are missing.
+
+**Why it happens:**
+- Tutorials don't always emphasize this requirement
+- Developers expect automatic input/output quantization
+- Model definition not modified for quantization
+- Copy-paste of float model without stub insertion
+
+**Consequences:**
+- No quantization statistics collected for inputs
+- Input remains float32, first Conv receives float instead of int8
+- Output dequantization missing, returning int8 instead of float
+- Runtime error: "Expected quantized tensor, got float"
+
+**Prevention:**
+1. **Add stubs to model definition**:
+   ```python
+   class ResNet8(nn.Module):
+       def __init__(self):
+           super().__init__()
+           self.quant = torch.quantization.QuantStub()
+           self.dequant = torch.quantization.DeQuantStub()
+           # ... rest of model
+
+       def forward(self, x):
+           x = self.quant(x)  # Quantize input
+           # ... model computation
+           x = self.dequant(x)  # Dequantize output
+           return x
+   ```
+2. QuantStub at model entry, DeQuantStub at model exit
+3. Required for eager mode quantization in PyTorch
+4. Not needed for ONNX Runtime (handles automatically)
+
+**Detection:**
+- Error: "Expected quantized input"
+- Input/output quantization missing in prepared model
+- First layer doesn't have quantization observer
+
+**Phase to address:** Model Architecture Modification phase — add stubs before quantization
+
+**Warning signs:**
+- No QuantStub/DeQuantStub in model forward()
+- Model definition unchanged from float version
 
 ---
 
 ## Minor Pitfalls
 
-Mistakes that cause annoyance but are easily fixable.
-
-### Pitfall 10: Bias Loading Oversight
-**What goes wrong:** Bias vectors are not transposed like weight matrices, but developers apply transpose operation uniformly, causing shape mismatches.
-
-**Why it happens:** Copy-paste error from weight transposition code
-
-**Prevention:**
-1. Bias vectors are 1D — load them directly without modification
-2. Write separate loading logic for weights vs biases
-3. Assert bias shapes are 1D before loading
-
-**Detection:** Shape mismatch error when loading bias
-
-**Phase:** Weight Loading phase
+Mistakes that cause annoyance or confusion but are easily fixable.
 
 ---
 
-### Pitfall 11: Incorrect Weight File Path
-**What goes wrong:** Hardcoded paths to Keras .h5 file break when running from different directories or on different machines.
+### Pitfall 13: Quantized Model Saved Without State Dict
 
-**Why it happens:** Paths are not relative to script location
+**What goes wrong:** Saving quantized model using `torch.save(model, path)` instead of state dict, causing loading issues or non-portability.
+
+**Why it happens:**
+- Following float model saving pattern
+- Not understanding quantized model serialization requirements
+- Convenience of saving entire object
+
+**Consequences:**
+- Model file includes Python code, not portable across versions
+- Loading requires exact same model definition and imports
+- Fails with "module not found" errors
+- Larger file size than necessary
 
 **Prevention:**
-1. Use argparse to accept weight file path as command-line argument
-2. Use pathlib for cross-platform path handling
-3. Document expected file location in README
+1. **Use torchscript for quantized models**:
+   ```python
+   # For quantized models, use TorchScript
+   scripted = torch.jit.script(quantized_model)
+   scripted.save('resnet8_quantized.pt')
+   ```
+2. Or save state dict with architecture separately
+3. Document loading requirements
+4. Test loading in fresh Python session
 
-**Detection:** FileNotFoundError when loading weights
+**Detection:**
+- Import errors when loading model
+- Model fails to load in different environment
 
-**Phase:** All phases — fix during initial setup
+**Phase to address:** Model Serialization phase — use correct save format
+
+**Warning signs:**
+- Using `torch.save(model, path)` for quantized model
+- No TorchScript conversion
 
 ---
 
-### Pitfall 12: Missing Dependency Versions
-**What goes wrong:** Keras .h5 loading fails because h5py version is incompatible, or PyTorch version lacks needed features.
+### Pitfall 14: Logging/Reporting Confusion Between uint8 and int8
 
-**Why it happens:** Environment setup without explicit version pinning
+**What goes wrong:** Results documentation says "int8" but actual quantization used uint8, causing confusion during comparison.
+
+**Why it happens:**
+- PyTorch fbgemm backend uses uint8 for activations by default
+- Developers assume int8 because "8-bit quantization"
+- Logging doesn't distinguish signed/unsigned
+- Different frameworks use different defaults
+
+**Consequences:**
+- Confusion when comparing frameworks (PyTorch uint8 vs ONNX Runtime int8)
+- Inaccurate documentation
+- Wrong expectations about quantization range
+- Difficult to reproduce results
 
 **Prevention:**
-1. Pin PyTorch, TensorFlow/Keras, h5py versions in requirements.txt
-2. Document Python version requirement
-3. Test in clean virtual environment
+1. **Log actual dtypes used**:
+   ```python
+   # Check and log quantization dtypes
+   qconfig = model.qconfig
+   print(f"Activation dtype: {qconfig.activation.dtype}")
+   print(f"Weight dtype: {qconfig.weight.dtype}")
+   ```
+2. Document: "PyTorch fbgemm uses uint8 activations, int8 weights"
+3. ONNX Runtime: Check calibration table for data types
+4. Report both in results: "Quantized using uint8 (activations) and int8 (weights)"
 
-**Detection:** Import errors or loading failures
+**Detection:**
+- Documentation claims int8 but model uses uint8
+- Comparisons don't match expected ranges
 
-**Phase:** Setup phase
+**Phase to address:** Documentation phase — accurate reporting
+
+**Warning signs:**
+- Generic "int8 quantization" without specifying activation/weight dtypes
+- No dtype verification in code
+
+---
+
+### Pitfall 15: Hardcoded Model Paths Break Cross-Platform Reproducibility
+
+**What goes wrong:** Calibration or evaluation scripts hardcode paths like `/mnt/ext1/references/...`, breaking on other machines.
+
+**Why it happens:**
+- Copy-paste from evaluate_pytorch.py with hardcoded defaults
+- Not using argparse for paths
+- Assuming single-machine development
+
+**Consequences:**
+- Scripts fail on other machines
+- Collaborators cannot run quantization
+- CI/CD fails
+
+**Prevention:**
+1. **Use argparse with defaults**:
+   ```python
+   parser.add_argument(
+       '--data-dir',
+       default='/mnt/ext1/references/tiny/.../cifar-10-batches-py',
+       help='Path to CIFAR-10 data'
+   )
+   ```
+2. Support relative paths
+3. Document path requirements in README
+4. Check path exists, give helpful error
+
+**Detection:**
+- FileNotFoundError on other machines
+- Paths fail in CI
+
+**Phase to address:** All phases — use argparse from start
+
+**Warning signs:**
+- Absolute paths hardcoded
+- No path validation
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Architecture Definition | Channel order mismatch (NHWC vs NCHW) | Transpose Conv2D weights correctly; verify first layer output |
-| Architecture Definition | Residual dimension mismatch | Test each block independently; verify stride=2 blocks |
-| Weight Loading | BatchNorm statistics not loaded | Load running_mean, running_var, num_batches_tracked |
-| Weight Loading | Initialization mismatch for missing layers | Verify ALL layers loaded; print weight statistics |
-| Weight Loading | Bias transposition error | Load bias directly without transpose |
-| Evaluation Setup | Missing model.eval() | Always call before inference; use context manager |
-| Evaluation Setup | Data preprocessing mismatch | Match Keras preprocessing exactly (divide by 255.0) |
-| Evaluation Setup | Softmax location ambiguity | Check if Keras used softmax activation; apply if needed |
-| Validation | Numerical precision drift | Accept small differences; verify BatchNorm epsilon matches |
-| Validation | Accuracy threshold unclear | Define acceptable range (>85% for this project) |
+| Phase | Likely Pitfall | Priority | Mitigation |
+|-------|---------------|----------|------------|
+| **Calibration Data Preparation** | Random/insufficient calibration data | CRITICAL | Use 1000-3200 real CIFAR-10 images, 100+ batches |
+| **Calibration Data Preparation** | Preprocessing mismatch with evaluation | CRITICAL | Match evaluate_pytorch.py: raw pixels [0,255] |
+| **Model Architecture Modification** | Skip connections not quantization-aware | CRITICAL | Replace `+` with FloatFunctional.add |
+| **Model Architecture Modification** | Missing QuantStub/DeQuantStub | HIGH | Add stubs at model input/output |
+| **Model Preparation** | Module fusion not performed | CRITICAL | Fuse Conv-BN-ReLU before prepare() |
+| **Model Preparation** | Model not in eval mode | CRITICAL | Call model.eval() before prepare() |
+| **Quantization Configuration** | Observer/backend mismatch | CRITICAL | Use fbgemm (x86) or qnnpack (ARM) |
+| **ONNX Model Preparation** | No shape inference/optimization | HIGH | Run quant_pre_process before quantization |
+| **Quantization Validation** | Skipping quantization verification | HIGH | Check model size, operator types before evaluation |
+| **Evaluation** | No paired float baseline | MEDIUM | Run float and quantized in same session |
+| **Evaluation** | Batch size mismatch | MEDIUM | Use consistent batch size |
+| **Documentation** | uint8 vs int8 confusion | LOW | Log and report actual dtypes |
 
 ---
 
-## Validation Checklist
+## Quantization Workflow Checklist
 
-Use this checklist to avoid pitfalls:
+Use this checklist to avoid pitfalls when adding PTQ:
 
-**Architecture Translation:**
-- [ ] Conv2D weight shape transposed from (H,W,C_in,C_out) to (C_out,C_in,H,W)
-- [ ] Dense/Linear weight shape transposed from (out,in) to (in,out)
-- [ ] Bias vectors loaded without modification
-- [ ] BatchNorm epsilon set to 1e-3 (Keras default)
-- [ ] Residual shortcuts include projection layers where needed
-- [ ] First layer output compared between Keras and PyTorch (diff < 1e-5)
+### PyTorch Static Quantization
 
-**Weight Loading:**
-- [ ] All layers show loaded weights (print statistics: min, max, mean, std)
-- [ ] BatchNorm running_mean and running_var loaded
-- [ ] Shortcut/projection layers included in weight mapping
-- [ ] No layers show initialization patterns after loading
+**Pre-Quantization:**
+- [ ] Model architecture modified: FloatFunctional for skip connections
+- [ ] QuantStub at model input, DeQuantStub at output
+- [ ] Calibration data prepared: 1000-3200 real CIFAR-10 images
+- [ ] Calibration preprocessing matches evaluate_pytorch.py (raw pixels 0-255)
+- [ ] QConfig selected for backend (fbgemm for x86 CPU)
 
-**Evaluation Setup:**
-- [ ] model.eval() called before inference
-- [ ] torch.no_grad() context manager used
-- [ ] Data preprocessing matches Keras (check normalization)
-- [ ] Softmax applied if needed for probability output
+**Quantization:**
+- [ ] Model set to eval mode: `model.eval()`
+- [ ] Modules fused: `fuse_modules()` for Conv-BN-ReLU sequences
+- [ ] Model prepared: `torch.quantization.prepare(model)`
+- [ ] Calibration run with `torch.no_grad()` context
+- [ ] Model converted: `torch.quantization.convert(model)`
 
 **Validation:**
-- [ ] Test on single image — result should be stable
-- [ ] Test on small batch (10 images) — accuracy reasonable
-- [ ] Test on full test set — accuracy >85%
-- [ ] Compare intermediate layer outputs to Keras on same inputs
+- [ ] Quantized model inspected: operators show int8 types
+- [ ] Model size reduced by ~4× compared to float
+- [ ] Single-image test: output close to float (within 5%)
+- [ ] Quantization statistics logged (scale, zero_point)
+
+**Evaluation:**
+- [ ] Float baseline computed in same session
+- [ ] Quantized accuracy measured with same data/preprocessing
+- [ ] Accuracy delta reported (expected: 0-3pp drop for ResNet)
+- [ ] Per-class accuracy compared
+
+### ONNX Runtime Static Quantization
+
+**Pre-Quantization:**
+- [ ] ONNX model has shape information for all tensors
+- [ ] Symbolic shape inference run: `shape_inference.quant_pre_process()`
+- [ ] Model optimized: Conv-BN fused
+- [ ] Calibration data prepared: 1000-3200 real CIFAR-10 images
+- [ ] Calibration DataReader implemented
+
+**Quantization:**
+- [ ] CalibrationDataReader yields dict with correct input names
+- [ ] Calibration data in correct format (check NHWC vs NCHW)
+- [ ] QuantizationMode selected (IntegerOps or QLinearOps)
+- [ ] Activation type chosen (uint8 or int8)
+- [ ] Quantization performed: `quantize_static()`
+
+**Validation:**
+- [ ] Quantized ONNX model has QuantizeLinear/DequantizeLinear nodes
+- [ ] Model size reduced by ~4×
+- [ ] Netron visualization shows int8 operators
+- [ ] Calibration table saved and inspected
+
+**Evaluation:**
+- [ ] Float baseline computed with same ONNX Runtime session
+- [ ] Quantized accuracy measured with same preprocessing
+- [ ] Accuracy delta reported
+- [ ] Per-class accuracy compared
 
 ---
 
-## Sources
+## Expected Accuracy Ranges
 
-**Confidence: MEDIUM** — Based on community discussions and technical documentation. Specific issues verified across multiple sources.
+Based on ResNet8 CIFAR-10 baseline: 87.19%
+
+| Quantization Type | Expected Accuracy | Accuracy Drop | Concern Level |
+|-------------------|-------------------|---------------|---------------|
+| Float32 (baseline) | 87.19% | 0pp | — |
+| int8 (well-calibrated) | 85.5-87.0% | 0-1.7pp | ✓ Good |
+| int8 (decent calibration) | 83-85.5% | 1.7-4pp | ⚠ Acceptable |
+| int8 (poor calibration) | 70-83% | 4-17pp | ❌ Bad — check calibration |
+| int8 (broken quantization) | <70% | >17pp | ❌ Critical — quantization failed |
+
+**Debugging guide:**
+- **>85%**: Quantization successful
+- **80-85%**: Check calibration data size and preprocessing
+- **70-80%**: Calibration data likely wrong or insufficient
+- **50-70%**: Model not in eval mode, or observer mismatch
+- **<50%**: Preprocessing mismatch, or quantization completely failed
+
+---
+
+## Research Sources
 
 ### Critical Pitfalls (HIGH confidence)
-- [TensorFlow/Keras to PyTorch translation - PyTorch Forums](https://discuss.pytorch.org/t/tensorflow-keras-to-pytorch-translation/174083)
-- [Transferring weights from Keras to PyTorch - PyTorch Forums](https://discuss.pytorch.org/t/transferring-weights-from-keras-to-pytorch/9889)
-- [Pitfalls encountered porting models to Keras from PyTorch/TensorFlow/MXNet](https://shaoanlu.wordpress.com/2019/05/23/pitfalls-encountered-porting-models-to-keras-from-pytorch-and-tensorflow/)
-- [Load Keras Weight to PyTorch - Medium](https://medium.com/analytics-vidhya/load-keras-weight-to-pytorch-and-transform-keras-architecture-to-pytorch-easily-8ff5dd18b86b)
-- [How to Transfer a Simple Keras Model to PyTorch - The Hard Way](https://gereshes.com/2019/06/24/how-to-transfer-a-simple-keras-model-to-pytorch-the-hard-way/)
 
-### Channel Order Issues (HIGH confidence)
-- [TensorRT UFF Tensorflow NHWC to NCHW conversion buggy - NVIDIA Developer Forums](https://forums.developer.nvidia.com/t/tensorrt-uff-tensorflow-nhwc-channels-last-to-nchw-channels-first-conversion-buggy/69282)
-- [Channels Last Memory Format in PyTorch - PyTorch Tutorials](https://docs.pytorch.org/tutorials/intermediate/memory_format_tutorial.html)
+**Calibration Data:**
+- [Practical Quantization in PyTorch](https://pytorch.org/blog/quantization-in-practice/) — "About 100 mini-batches sufficient to calibrate observers"
+- [Master PyTorch Quantization: Tips, Tools, and Best Practices](https://medium.com/@noel.benji/beyond-the-basics-how-to-succeed-with-pytorch-quantization-e521ebb954cd) — "Using random data will result in bad quantization parameters"
+- [Static Quantization with Eager Mode in PyTorch](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html) — Official tutorial with calibration guidance
 
-### BatchNormalization (HIGH confidence)
-- [Different results for batchnorm with pytorch and tensorflow/keras - PyTorch Forums](https://discuss.pytorch.org/t/different-results-for-batchnorm-with-pytorch-and-tensorflow-keras/151691)
-- [What does model.eval() do for batchnorm layer? - PyTorch Forums](https://discuss.pytorch.org/t/what-does-model-eval-do-for-batchnorm-layer/7146)
-- [Keras BatchNormalization layer documentation](https://keras.io/api/layers/normalization_layers/batch_normalization/)
+**Module Fusion:**
+- [fuse_modules — PyTorch 2.9 documentation](https://docs.pytorch.org/docs/stable/generated/torch.ao.quantization.fuse_modules.fuse_modules.html) — Official fusion API
+- [Practical Quantization in PyTorch](https://pytorch.org/blog/quantization-in-practice/) — Fusion patterns and requirements
 
-### L2 Regularization vs Weight Decay (HIGH confidence)
-- [Weight decay vs L2 regularization](https://bbabenko.github.io/weight-decay/)
-- [Weight Decay is Not L2 Regularization - John Trimble](https://www.johntrimble.com/posts/weight-decay-is-not-l2-regularization/)
-- [Understanding the difference between weight decay and L2 regularization](https://www.paepper.com/blog/posts/understanding-the-difference-between-weight-decay-and-l2-regularization/)
-- [Weight decay vs L2 regularisation - PyTorch Forums](https://discuss.pytorch.org/t/weight-decay-vs-l2-regularisation/99186)
+**Skip Connections:**
+- [PyTorch Static Quantization - Lei Mao's Log Book](https://leimao.github.io/blog/PyTorch-Static-Quantization/) — "Replace + with FloatFunctional.add"
+- [Static Quantization — torchao 0.15 documentation](https://docs.pytorch.org/ao/stable/static_quantization.html) — QuantStub/DeQuantStub requirements
 
-### Numerical Precision (MEDIUM confidence)
-- [Numerical accuracy - PyTorch documentation](https://docs.pytorch.org/docs/stable/notes/numerical_accuracy.html)
-- [Loss of result precision from function converted from numpy/TFv1 to PyTorch - PyTorch Forums](https://discuss.pytorch.org/t/loss-of-result-precision-from-function-convereted-from-numpy-tfv1-to-pytorch/159275)
-- [Same accuracy but different loss between PyTorch and Keras - PyTorch Forums](https://discuss.pytorch.org/t/same-accuracy-but-different-loss-between-pytorch-and-keras/83664)
+**Accuracy Degradation:**
+- [Accuracy drop after model quantization - PyTorch Forums](https://discuss.pytorch.org/t/accuracy-drop-after-model-quantization/190715) — Common accuracy issues
+- [Static Quantized model accuracy varies greatly with Calibration data](https://github.com/pytorch/pytorch/issues/45185) — Calibration impact on accuracy
 
-### Weight Initialization (MEDIUM confidence)
-- [Keras Layer weight initializers documentation](https://keras.io/api/layers/initializers/)
-- [PyTorch Weight Initialization Techniques - TF Compare](https://apxml.com/courses/pytorch-for-tensorflow-developers/chapter-2-pytorch-nn-module-for-keras-users/weight-initialization-pytorch)
+**Observer/Backend:**
+- [Default qconfig for onednn backend silently causes numeric saturation](https://github.com/pytorch/pytorch/issues/103646) — Backend compatibility issues
+- [Quantization API Reference — PyTorch 2.10 documentation](https://docs.pytorch.org/docs/stable/quantization-support.html) — QConfig and backend configuration
 
-### Residual Connections (MEDIUM confidence)
-- [Add Residual connection - PyTorch Forums](https://discuss.pytorch.org/t/add-residual-connection/20148)
-- [ResNets fully explained with implementation from scratch using PyTorch - Medium](https://medium.com/@YasinShafiei/residual-networks-resnets-with-implementation-from-scratch-713b7c11f612)
+**ONNX Runtime:**
+- [Quantize ONNX models | ONNX Runtime](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) — Official quantization guide
+- [ONNX Runtime quantization README](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/quantization/README.md) — Calibration requirements
 
-### Model Validation (LOW confidence — general advice)
-- [Loss of accuracy in recognizing when exporting a trained model - PaddleOCR Discussion](https://github.com/PaddlePaddle/PaddleOCR/discussions/14927)
-- [Why do I get much worse results by using pytorch model than using keras - PyTorch Forums](https://discuss.pytorch.org/t/why-do-i-get-much-worse-results-by-using-pytorch-model-than-using-keras/16174)
+### Moderate Pitfalls (MEDIUM confidence)
+
+- [Neural Network Quantization in PyTorch | Practical ML](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/) — Best practices
+- [Quantization — PyTorch master documentation](https://glaringlee.github.io/quantization.html) — Comprehensive quantization guide
+- [PyTorch to Quantized ONNX Model](https://medium.com/@hdpoorna/pytorch-to-quantized-onnx-model-18cf2384ec27) — Cross-framework considerations
+
+### Domain Knowledge (HIGH confidence)
+
+**CNN Quantization:**
+- [Quantization of Convolutional Neural Networks: Model Quantization](https://www.edge-ai-vision.com/2024/02/quantization-of-convolutional-neural-networks-model-quantization/) — CNN-specific guidance
+- [Post training 4-bit quantization of convolutional networks](https://openreview.net/pdf?id=Syel64HxLS) — Accuracy degradation analysis
+- [Model Quantization: Concepts, Methods, and Why It Matters | NVIDIA](https://developer.nvidia.com/blog/model-quantization-concepts-methods-and-why-it-matters/) — Quantization fundamentals
+
+---
+
+**Confidence Assessment:** HIGH
+- Critical pitfalls verified with official documentation (PyTorch, ONNX Runtime)
+- Calibration requirements confirmed across multiple authoritative sources
+- Backend compatibility issues documented in PyTorch GitHub issues
+- CNN-specific quantization patterns validated with recent research (2024-2026)
+
+**Research Gaps:**
+- ResNet8-specific quantization accuracy (only ResNet50 benchmarks widely available)
+- CIFAR-10 quantization accuracy expectations (most research uses ImageNet)
+- ONNX Runtime uint8 vs int8 trade-offs for small CNNs
+
+These gaps should be addressed during quantization experiments by measuring actual results.

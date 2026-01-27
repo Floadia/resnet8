@@ -1,177 +1,272 @@
-# Feature Landscape: Keras→PyTorch Model Conversion
+# Feature Landscape: PTQ Evaluation
 
-**Domain:** Deep learning model conversion (Keras .h5 → PyTorch .pt)
-**Researched:** 2026-01-27
-**Confidence:** MEDIUM (WebSearch verified with community sources, some LOW confidence items flagged)
+**Domain:** Post-Training Quantization (PTQ) for ResNet8 CIFAR-10
+**Researched:** 2026-01-28
+**Context:** Adding PTQ evaluation to existing full-precision evaluation codebase (87.19% baseline accuracy)
 
 ## Table Stakes
 
-Features users expect. Missing = conversion fails or produces incorrect results.
+Features users expect for PTQ evaluation. Missing = incomplete PTQ assessment.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Architecture reconstruction** | Must replicate Keras model structure in PyTorch | Medium | Manual layer-by-layer mapping required; no reliable automated tools exist |
-| **Weight extraction from .h5** | Source of trained parameters | Low | Keras provides `model.load_weights()` API; straightforward file access |
-| **Weight shape transformation** | Keras and PyTorch use different tensor layouts | High | Conv2D: Keras (H,W,In,Out) → PyTorch (Out,In,H,W); Dense: Keras (Out,In) → PyTorch (In,Out) |
-| **BatchNorm parameter mapping** | Different ordering and naming conventions | Medium | Keras [gamma, beta, mean, var] → PyTorch [weight, bias, running_mean, running_var] |
-| **Layer name mapping** | Must correspond layers between frameworks | Medium | Manual mapping dictionary; naming conventions differ between frameworks |
-| **Numerical validation** | Verify conversion produces correct outputs | Medium | Compare predictions on same inputs; critical for detecting silent errors |
-| **Accuracy validation** | Confirm model performance post-conversion | Low | Run evaluation on test set; >85% accuracy threshold for this project |
+| **ONNX Runtime static quantization** | Industry-standard quantization path for ONNX models | Medium | Uses `quantize_static()` API with calibration data |
+| **PyTorch static quantization** | Native PyTorch quantization for converted models | Medium | New PT2E export-based approach recommended (88% model coverage) |
+| **int8 quantization support** | Standard 8-bit signed quantization, most common format | Low | Symmetric for weights, asymmetric for activations |
+| **uint8 quantization support** | Unsigned 8-bit quantization, hardware-dependent benefits | Low | Alternative to int8, may suit ReLU activations better |
+| **Calibration data preparation** | Required for static PTQ to compute scale/zero-point | Low | Subset of training/validation data (100-512 samples typical) |
+| **MinMax calibration method** | Simplest calibration method, baseline approach | Low | Uses min/max values from calibration data |
+| **Quantized model accuracy evaluation** | Must measure accuracy impact of quantization | Low | Reuses existing CIFAR-10 evaluation infrastructure |
+| **Per-class accuracy breakdown** | Identify which classes suffer most from quantization | Low | Already implemented for full-precision models |
+| **Accuracy delta reporting** | Quantified accuracy loss vs 87.19% baseline | Low | Critical for assessing quantization viability |
 
 ## Differentiators
 
-Features that improve conversion quality/reliability but aren't strictly required.
+Features that provide deeper insight. Not expected, but valuable.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **ONNX intermediate format** | Framework-agnostic conversion path | Medium | Keras→ONNX→PyTorch reduces direct mapping complexity; tools: tf2onnx, onnx2pytorch |
-| **Per-layer output comparison** | Detect exactly where conversion diverges | Medium | Forward pass both models, compare intermediate activations layer-by-layer |
-| **Automated test suite** | Catch regressions during conversion iterations | Low | Property tests: shape matching, weight count, output consistency |
-| **Weight freeze verification** | Ensure no accidental training during validation | Low | Check `requires_grad=False` or use `model.eval()` mode |
-| **Epsilon consistency checking** | Prevent accumulative errors in normalization | Medium | Verify BatchNorm/LayerNorm epsilon values match between frameworks |
-| **Conversion report generation** | Document what was converted and validation results | Low | Markdown/JSON report with layer mapping, accuracy metrics, warnings |
-| **Side-by-side inference comparison** | Visual/quantitative output comparison | Low | Run same images through both models, diff predictions |
-| **State dict serialization** | Save converted PyTorch weights | Low | `torch.save(model.state_dict(), 'model.pt')` for reusability |
+| **Multiple calibration methods** | Compare MinMax vs Entropy vs Percentile | Medium | ONNX Runtime supports 3 methods, helps find optimal calibration |
+| **Per-channel weight quantization** | Can improve accuracy for models with large weight ranges | Medium | ONNX Runtime supports this, may need reduce_range on AVX2/AVX512 |
+| **Calibration set size sensitivity** | Test 100 vs 256 vs 512 samples impact on accuracy | Low | Understand minimum viable calibration data |
+| **Symmetric vs asymmetric quantization** | Compare different quantization schemes | Medium | PyTorch allows configuring per-layer quantization schemes |
+| **Observer comparison (PyTorch)** | MinMax vs MovingAverageMinMax observers | Medium | Different observers for weights vs activations recommended |
+| **Quantization format comparison** | QDQ vs QOperator (ONNX Runtime) | Medium | QDQ more portable, QOperator potentially faster |
+| **Per-layer quantization sensitivity** | Identify which layers degrade accuracy most | High | Requires instrumentation, useful for mixed-precision exploration |
+| **Confusion matrix comparison** | Full-precision vs quantized confusion matrices | Low | Visualize which class confusions increase post-quantization |
 
-## Anti-Features
+## Anti-Features (Out of Scope)
 
-Features to explicitly NOT build. Common mistakes in this domain.
+Features to explicitly NOT build. Would expand scope beyond PTQ evaluation.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| **Fully automated conversion tools** | No reliable tools exist (2026); nn-transfer is archived/broken with latest versions | Manual architecture + weight mapping with validation |
-| **Training from scratch instead of converting** | Defeats purpose; requires labeled data, compute, hyperparameter tuning | Convert pretrained weights; only train if conversion fails validation |
-| **Channel order auto-detection** | Error-prone; NCHW vs NHWC differences cause silent failures | Explicitly document and handle (H,W,C) → (C,H,W) transformations |
-| **Skipping numerical validation** | Conversion bugs manifest as accuracy degradation (98%→60% reported) | Always validate outputs match on same inputs within tolerance |
-| **Global epsilon defaults** | Different frameworks use different defaults (1e-5 vs 1e-3); accumulates error | Explicitly set epsilon to match source model |
-| **Assuming layer ordering is consistent** | Keras uses different initialization and layer chaining than PyTorch | Manually verify each layer maps correctly; use named modules |
-| **Converting without understanding architecture** | Residual connections, shortcuts need manual attention | Study Keras model structure first; document residual paths |
-| **Using outdated conversion libraries** | pytorch2keras (2022), nn-transfer (archived) produce incorrect outputs | Use 2026-current manual conversion practices |
+| **Quantization-aware training (QAT)** | Different milestone, requires retraining pipeline | Focus on PTQ only, defer QAT to future work |
+| **Dynamic quantization** | Different quantization paradigm (weights-only) | Static quantization only per milestone scope |
+| **Performance benchmarking** | Milestone focuses on accuracy, not inference speed | Document accuracy only, defer latency/throughput measurement |
+| **Mixed-precision quantization** | Complex feature requiring per-layer sensitivity analysis | Uniform int8/uint8 only, defer mixed-precision |
+| **Custom quantization schemes** | Beyond standard int8/uint8 formats | Use built-in quantization formats only |
+| **Model architecture modification** | PTQ is post-training, no architecture changes | Use existing ResNet8 as-is |
+| **TFLite quantization** | Out of framework scope (ONNX RT + PyTorch only) | Stick to declared frameworks |
+| **Quantization for training** | Only evaluating inference quantization | Inference-only quantization |
+| **Advanced calibration algorithms** | Beyond standard MinMax/Entropy/Percentile | Use built-in calibration methods |
+
+## Expected Accuracy Impact
+
+### Typical PTQ Accuracy Loss for 8-bit INT8 on CNNs
+
+Based on research findings:
+
+**General expectation:**
+- INT8 PTQ on CNNs: **< 1% accuracy loss** on standard benchmarks (ImageNet)
+- ResNet architectures are relatively robust to quantization compared to efficient models like MobileNet
+- Smaller networks may experience slightly higher degradation than larger models
+
+**For ResNet8 on CIFAR-10 (87.19% baseline):**
+
+| Scenario | Expected Accuracy | Accuracy Loss | Confidence |
+|----------|------------------|---------------|------------|
+| **Best case** (optimal calibration) | 86.5-87.0% | 0.2-0.7% | MEDIUM |
+| **Typical case** (MinMax, 256 samples) | 85.5-86.5% | 0.7-1.7% | MEDIUM |
+| **Worst case** (poor calibration) | 83-85% | 2-4% | LOW |
+
+**Key factors affecting accuracy:**
+
+1. **Calibration quality**: Representative calibration data is critical
+   - 100-512 samples typical, must cover data distribution
+   - Random or non-representative data can cause severe degradation
+
+2. **Calibration method**: MinMax < Entropy ≈ Percentile
+   - MinMax is simplest but may be suboptimal
+   - Entropy/Percentile can improve accuracy by 0.5-1%
+
+3. **Quantization scheme**:
+   - Per-channel > Per-tensor (0.5-1% improvement possible)
+   - Symmetric for weights, asymmetric for activations (standard)
+
+4. **Model size**: Smaller models (like ResNet8) may lose more than larger ResNets
+   - ResNet8 is relatively small (8 layers)
+   - Expect upper end of 1-2% loss range
+
+### INT8 vs UINT8 Comparison
+
+| Aspect | INT8 (signed) | UINT8 (unsigned) |
+|--------|---------------|------------------|
+| **Range** | [-128, 127] | [0, 255] |
+| **Weight quantization** | Preferred (symmetric, centered at 0) | Not typical |
+| **Activation quantization** | Standard (asymmetric with zero-point) | Better for post-ReLU (always positive) |
+| **Hardware support** | Ubiquitous (INT8xINT8 acceleration) | Variable, some backends limited |
+| **Expected accuracy** | Baseline | Similar to INT8 for activations |
+| **Recommendation** | Default choice | Test as alternative for activations |
+
+**Practical guidance:**
+- Start with INT8 for both weights and activations (most compatible)
+- Test UINT8 for activations if INT8 accuracy is borderline
+- ResNet8 uses ReLU activations (always positive), so UINT8 may theoretically help
+- Hardware support varies: verify ONNX Runtime and PyTorch backends support UINT8
 
 ## Feature Dependencies
 
-```
-Weight Extraction (.h5 file)
-    ↓
-Architecture Reconstruction (PyTorch model definition)
-    ↓
-Layer Name Mapping (Keras layers → PyTorch modules)
-    ↓
-Weight Shape Transformation (tensor layout conversion)
-    ↓
-BatchNorm Parameter Mapping (specific to normalization layers)
-    ↓
-State Dict Loading (assign weights to PyTorch model)
-    ↓
-Numerical Validation (same inputs → same outputs?)
-    ↓
-Accuracy Validation (test set performance)
-```
+### Existing Features (Already Implemented)
 
-**Critical path:** Architecture must be recreated before weights can be loaded. Weight shapes must be transformed before assignment. Validation must happen after loading to catch errors.
+From milestone v1.0 and v1.1:
+- CIFAR-10 dataset loading and preprocessing
+- ONNX model loading and inference (ONNX Runtime)
+- PyTorch model loading and inference (converted via onnx2torch)
+- Per-class accuracy evaluation
+- 87.19% full-precision baseline established
 
-**Optional path (ONNX approach):**
+### New Feature Dependencies
+
 ```
-Keras .h5 Model
-    ↓ (tf2onnx)
-ONNX Intermediate Format
-    ↓ (onnx2pytorch)
-PyTorch Model
-    ↓
-Validation (same as manual path)
+Calibration Data Preparation
+  └─> MinMax Calibration (baseline)
+       ├─> ONNX Runtime Static Quantization (int8)
+       │    └─> Quantized ONNX Model Accuracy Evaluation
+       │         └─> Accuracy Delta Analysis
+       ├─> ONNX Runtime Static Quantization (uint8)
+       │    └─> Quantized ONNX Model Accuracy Evaluation
+       │         └─> Accuracy Delta Analysis
+       ├─> PyTorch Static Quantization (int8)
+       │    └─> Quantized PyTorch Model Accuracy Evaluation
+       │         └─> Accuracy Delta Analysis
+       └─> PyTorch Static Quantization (uint8)
+            └─> Quantized PyTorch Model Accuracy Evaluation
+                 └─> Accuracy Delta Analysis
+
+Optional (Differentiators):
+  Multiple Calibration Methods
+  Per-Channel Quantization
+  Calibration Set Size Sensitivity
 ```
 
 ## MVP Recommendation
 
-For MVP (ResNet8 CIFAR-10 conversion), prioritize:
+For milestone v1.2 PTQ evaluation, prioritize:
 
-1. **Architecture reconstruction** - Match Keras model exactly (Conv2D, BatchNorm, residual connections)
-2. **Weight shape transformation** - Handle Conv2D and Dense layer tensor layout differences
-3. **BatchNorm parameter mapping** - Critical for ResNet8 (uses BN after every conv)
-4. **Numerical validation** - Compare outputs on 10-100 test images (tolerance: 1e-5)
-5. **Accuracy validation** - Run full CIFAR-10 test set; target >85%
+### Phase 1: ONNX Runtime PTQ (Core)
+1. Calibration data preparation (256 CIFAR-10 samples)
+2. MinMax calibration method
+3. int8 quantization (weights + activations)
+4. Quantized model accuracy evaluation
+5. Accuracy delta reporting vs 87.19% baseline
 
-Defer to post-MVP (if needed):
+### Phase 2: PyTorch PTQ (Core)
+1. Reuse calibration data from Phase 1
+2. PT2E export-based quantization workflow
+3. int8 quantization (weights + activations)
+4. Quantized model accuracy evaluation
+5. Accuracy delta reporting vs 87.19% baseline
 
-- **ONNX conversion path**: Investigate only if manual conversion fails validation (reason: adds complexity, extra dependencies)
-- **Per-layer output comparison**: Use only for debugging if accuracy validation fails (reason: time-consuming, not needed if end-to-end works)
-- **Automated test suite**: Add after successful first conversion (reason: premature for one-time conversion)
-- **Conversion report generation**: Manual notes sufficient for single model (reason: overhead not justified)
+### Phase 3: uint8 Exploration (Optional)
+1. ONNX Runtime uint8 quantization
+2. PyTorch uint8 quantization
+3. Compare int8 vs uint8 accuracy
 
-## Domain-Specific Notes
+### Defer to Post-MVP
+- Multiple calibration methods (Entropy, Percentile)
+- Per-channel quantization
+- Calibration set size sensitivity
+- Observer comparison (PyTorch)
+- Quantization format comparison (QDQ vs QOperator)
+- Per-layer sensitivity analysis
+- Confusion matrix comparison
 
-### ResNet8 Conversion Considerations
+**Rationale:**
+- Phase 1+2 provide complete PTQ evaluation for both frameworks (milestone goal)
+- int8 is industry standard, most compatible format
+- MinMax is simplest calibration, sufficient for initial assessment
+- Phase 3 adds uint8 as bonus if time permits (ResNet8 has ReLU, may benefit)
+- Differentiators deferred: nice-to-have but not critical for initial PTQ evaluation
 
-This project converts a **ResNet8 with residual connections**. Key features specific to this architecture:
+## Implementation Notes
 
-1. **Residual/shortcut connections:** Must preserve exact layer connections (identity vs 1×1 conv shortcuts)
-2. **Strided convolutions in shortcuts:** Stack 2/3 use stride=2 convolutions for downsampling; shortcut must match
-3. **BatchNorm placement:** Keras places BN after Conv2D but before activation; PyTorch convention varies - must match exactly
-4. **L2 regularization:** Keras applies during training; not stored in weights, irrelevant for inference-only conversion
-5. **He normal initialization:** Used in training; not relevant for pretrained weight conversion
+### ONNX Runtime Static Quantization
 
-### Validation Strategy for This Project
+**API:** `onnxruntime.quantization.quantize_static()`
 
-Given the 85% accuracy target:
+**Key parameters:**
+- `model_input`: Path to full-precision ONNX model
+- `model_output`: Path to save quantized model
+- `calibration_data_reader`: Custom class providing calibration samples
+- `quant_format`: QDQ (portable) vs QOperator (potentially faster)
+- `activation_type`: QuantType.QUInt8 or QuantType.QInt8
+- `weight_type`: QuantType.QInt8 (typical)
+- `calibrate_method`: MinMax, Entropy, or Percentile
 
-- **Minimum viable validation:** Run converted model on CIFAR-10 test set (10k images); report accuracy
-- **If accuracy < 85%:** Implement per-layer output comparison to identify divergence point
-- **If accuracy ≈ 85%:** Conversion successful; no deeper validation needed
+**Gotchas:**
+- Zero-point must represent FP32 zero exactly (critical for zero-padding in CNNs)
+- AVX2/AVX512 U8S8 format may have saturation issues (use reduce_range)
+- Per-channel quantization may need reduce_range on x86-64
+- Some quantized models run slower than FP32 if backend doesn't support ops
 
-### Known Failure Modes
+### PyTorch Static Quantization
 
-Based on community reports (LOW confidence - unverified):
+**API:** New PT2E (PyTorch 2 Export) approach recommended
 
-1. **Padding mismatch:** Keras `padding='same'` vs PyTorch integer padding causes shape errors (98%→60% accuracy drop reported)
-2. **Stride inconsistencies:** Mismatched strides in Conv2D cause resolution mismatches
-3. **Weights loaded from wrong model:** Source model not actually loaded (e.g., untrained weights used)
-4. **BatchNorm epsilon differences:** Default epsilon differs; causes accumulative error over deep networks
-5. **Gradient state bleeding:** `model.train()` vs `model.eval()` mode affects BatchNorm; must use eval for inference
+**Workflow:**
+1. `torch.export.export()` - Capture model in graph mode
+2. `prepare_pt2e()` - Fold BatchNorm, insert observers
+3. Run calibration data through model
+4. `convert_pt2e()` - Produce quantized model
+
+**Key considerations:**
+- Calibration data quality critical (100 mini-batches typical)
+- Observer selection matters:
+  - Weights: Symmetric per-channel + MinMax observer
+  - Activations: Asymmetric per-tensor + MovingAverageMinMax observer
+- BatchNorm folding into Conv2d (automatic in prepare_pt2e)
+- Module naming must not overlap (causes erroneous calibration)
+
+**Gotchas:**
+- Random calibration data = bad quantization parameters (validate with real data)
+- Not all modules may be calibrated if model has dynamic control flow
+- Distribution drift may require re-calibration over time
+- Harder to debug than FP32 models (mismatched scale/zero-point issues)
+
+### Calibration Data Preparation
+
+**Size:** 100-512 samples (256 recommended starting point)
+
+**Sampling strategy:**
+- Random subset of training or validation set
+- Must be representative of inference distribution
+- Stratified sampling (equal samples per class) recommended for CIFAR-10
+
+**CIFAR-10 specific:**
+- 10 classes, 256 samples = ~25-26 samples per class
+- Use validation set (avoid test set for calibration)
+- Apply same preprocessing as full-precision model (raw pixel values 0-255)
 
 ## Sources
 
-**Conversion Tools & Methods:**
-- [nn-transfer: Convert trained PyTorch models to Keras (archived)](https://github.com/gzuidhof/nn-transfer) - MEDIUM confidence
-- [deep-learning-model-convertor: Multi-framework converter](https://github.com/ysh329/deep-learning-model-convertor) - MEDIUM confidence
-- [How to Transfer a Simple Keras Model to PyTorch - The Hard Way](https://gereshes.com/2019/06/24/how-to-transfer-a-simple-keras-model-to-pytorch-the-hard-way/) - MEDIUM confidence
+### High Confidence (Official Documentation)
+- [ONNX Runtime Quantization Documentation](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
+- [PyTorch 2 Export Post Training Quantization Tutorial](https://docs.pytorch.org/ao/stable/tutorials_source/pt2e_quant_ptq.html)
+- [PyTorch Static Quantization Documentation](https://docs.pytorch.org/ao/stable/static_quantization.html)
+- [PyTorch Quantization Overview](https://docs.pytorch.org/docs/stable/quantization.html)
 
-**Weight Mapping & Tensor Layouts:**
-- [Copying weight tensors from PyTorch to Tensorflow (and back)](https://www.adrian.idv.hk/2022-05-21-torch2tf/) - MEDIUM confidence
-- [Transferring weights from Keras to PyTorch - PyTorch Forums](https://discuss.pytorch.org/t/transferring-weights-from-keras-to-pytorch/9889) - MEDIUM confidence
-- [Load Keras Weight to PyTorch - Medium](https://medium.com/analytics-vidhya/load-keras-weight-to-pytorch-and-transform-keras-architecture-to-pytorch-easily-8ff5dd18b86b) - MEDIUM confidence
+### Medium Confidence (Verified Sources)
+- [Post-training Quantization Google AI Edge](https://ai.google.dev/edge/litert/models/post_training_quantization)
+- [Practical Quantization in PyTorch Blog](https://pytorch.org/blog/quantization-in-practice/)
+- [Neural Network Quantization in PyTorch](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/)
+- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html)
 
-**BatchNorm & Normalization:**
-- [Pitfalls encountered porting models to Keras from PyTorch/TensorFlow/MXNet](https://shaoanlu.wordpress.com/2019/05/23/pitfalls-encountered-porting-models-to-keras-from-pytorch-and-tensorflow/) - MEDIUM confidence
-- [Different results for batchnorm with pytorch and tensorflow/keras](https://discuss.pytorch.org/t/different-results-for-batchnorm-with-pytorch-and-tensorflow-keras/151691) - MEDIUM confidence
-- [Porting a pretrained ResNet from Pytorch to Tensorflow 2.0](https://dmolony3.github.io/Pytorch-to-Tensorflow.html) - MEDIUM confidence
-
-**ONNX Conversion:**
-- [The Complete Guide to Converting Machine Learning Models to ONNX Format in 2025](https://medium.com/@liutaurasog/the-complete-guide-to-converting-machine-learning-models-to-onnx-format-in-2025-54104cc4aa85) - MEDIUM confidence
-- [onnx2tf: Convert ONNX to TensorFlow/Keras](https://github.com/PINTO0309/onnx2tf) - MEDIUM confidence
-- [tensorflow-onnx: Convert TensorFlow/Keras to ONNX](https://github.com/onnx/tensorflow-onnx) - MEDIUM confidence
-- [Converting PyTorch Models to Keras via ONNX](https://www.codegenes.net/blog/onnx-pytorch-to-keras/) - MEDIUM confidence
-
-**Validation & Testing:**
-- [Reproducibly benchmarking Keras and PyTorch models](https://github.com/cgnorthcutt/benchmarking-keras-pytorch) - MEDIUM confidence
-- [Towards Reproducibility: Benchmarking Keras and PyTorch](https://l7.curtisnorthcutt.com/towards-reproducibility-benchmarking-keras-pytorch) - MEDIUM confidence
-- [Performance comparison of medical image classification systems using TensorFlow Keras, PyTorch, and JAX (2025)](https://arxiv.org/html/2507.14587v1) - MEDIUM confidence
-
-**Common Pitfalls:**
-- [TF-Keras to PyTorch Model conversion target and input size mismatch](https://discuss.pytorch.org/t/tf-keras-to-pytorch-model-conversion-target-and-input-size-mismatch/142379) - LOW confidence
-- [KERAS TO pytorch model conversion - PyTorch Forums](https://discuss.pytorch.org/t/keras-to-pytorch-model-conversion/155153) - LOW confidence
-- [Converting TensorFlow Model Weights to PyTorch Weights](https://www.codegenes.net/blog/how-to-convert-tensorflow-model-weights-to-pytorch-weights/) - MEDIUM confidence
+### Low Confidence (Research Papers and Forums)
+- [INT8 Quantization Fundamentals](https://apxml.com/courses/compiler-runtime-optimization-ml/chapter-8-quantization-low-precision-optimizations/quantization-fundamentals)
+- [Quantization Data Types Discussion](https://apxml.com/courses/practical-llm-quantization/chapter-1-foundations-model-quantization/integer-data-types)
+- [PyTorch Forums: Expected INT8 Accuracies](https://discuss.pytorch.org/t/expected-int8-accuracies-on-imagenet-1k-resnet-qat/187227)
+- [GitHub: Static Quantization Calibration Issues](https://github.com/pytorch/pytorch/issues/45185)
 
 ---
 
-**Confidence Assessment:**
+**Overall Confidence:** MEDIUM
 
-- **Table Stakes:** MEDIUM - Based on multiple community sources and documented conversion workflows; core requirements verified across sources
-- **Differentiators:** MEDIUM - Features mentioned in multiple conversion guides; ONNX approach verified via official repos
-- **Anti-Features:** MEDIUM-LOW - Based on community reports and archived project states; specific accuracy numbers (98%→60%) are LOW confidence
-- **Dependencies:** HIGH - Logical ordering derived from conversion process; verified against multiple sources
+- **HIGH** confidence on API workflows and official quantization methods (official docs verified)
+- **MEDIUM** confidence on expected accuracy impact (multiple sources agree on <1% for INT8, but ResNet8 is smaller than benchmarked models)
+- **LOW** confidence on specific ResNet8/CIFAR-10 accuracy expectations (extrapolated from larger models)
 
-**Gaps:**
-- No official PyTorch or Keras documentation specifically about cross-framework conversion (both assume native workflows)
-- Most sources are 2019-2024; no significant 2026-specific changes found
-- Specific epsilon values and accuracy degradation numbers are anecdotal (LOW confidence)
-- ONNX approach not tested for this specific ResNet8 architecture
+**Validation needed:**
+- Actual ResNet8 quantization accuracy (empirical testing required)
+- UINT8 hardware support in current ONNX Runtime/PyTorch versions
+- Optimal calibration method for this specific model (MinMax vs Entropy vs Percentile)
