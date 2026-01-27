@@ -1,0 +1,6 @@
+tensorflow>=2.20.0
+onnx>=1.17.0
+# Use latest tf2onnx from GitHub for Python 3.12 compatibility
+git+https://github.com/onnx/tensorflow-onnx.git
+numpy>=1.26.4,<2.0
+protobuf>=5.28.0
