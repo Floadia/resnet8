@@ -26,10 +26,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Conversion script logs show successful tf2onnx execution without errors
   3. ONNX model has correct input shape (1, 32, 32, 3), output shape (1, 10), and expected layer count
   4. Any conversion warnings are logged for review
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- (Plans will be added during plan-phase)
+- [ ] 01-01-PLAN.md — Convert Keras to ONNX and verify structure
 
 ### Phase 2: Accuracy Evaluation
 **Goal**: ONNX model achieves >85% accuracy on CIFAR-10 test set
@@ -52,7 +52,7 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Model Conversion | 0/? | Not started | - |
+| 1. Model Conversion | 0/1 | Planned | - |
 | 2. Accuracy Evaluation | 0/? | Not started | - |
 
 ---
