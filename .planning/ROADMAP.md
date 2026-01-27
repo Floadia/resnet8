@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 1 plan
 
 Plans:
-- [x] 01-01-PLAN.md — Convert Keras to ONNX and verify structure ✓
+- [x] 01-01-PLAN.md — Convert Keras to ONNX and verify structure
 
 ### Phase 2: Accuracy Evaluation
 **Goal**: ONNX model achieves >85% accuracy on CIFAR-10 test set
@@ -38,22 +38,22 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Evaluation script runs inference on all 10,000 CIFAR-10 test images using ONNX Runtime
   2. Per-class accuracy is reported for all 10 classes (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck)
-  3. Overall accuracy is ≥85% on CIFAR-10 test set
+  3. Overall accuracy is >=85% on CIFAR-10 test set
   4. Evaluation output includes total correct predictions, total samples, and percentage accuracy
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- (Plans will be added during plan-phase)
+- [ ] 02-01-PLAN.md — Evaluate ONNX model on CIFAR-10 and verify accuracy
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2
+Phases execute in numeric order: 1 -> 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Model Conversion | 1/1 | Complete | 2026-01-27 |
-| 2. Accuracy Evaluation | 0/? | Not started | - |
+| 2. Accuracy Evaluation | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
