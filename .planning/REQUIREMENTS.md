@@ -26,9 +26,9 @@
 
 ### PyTorch Evaluation
 
-- [ ] **PT-03**: Evaluate PyTorch model on CIFAR-10 test set
-- [ ] **PT-04**: Report per-class accuracy breakdown (10 classes)
-- [ ] **PT-05**: Achieve >85% overall accuracy on CIFAR-10 test set
+- [x] **PT-03**: Evaluate PyTorch model on CIFAR-10 test set
+- [x] **PT-04**: Report per-class accuracy breakdown (10 classes)
+- [x] **PT-05**: Achieve >85% overall accuracy on CIFAR-10 test set
 
 ## v2 Requirements
 
@@ -65,9 +65,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVAL-03 | Phase 2 | Complete |
 | PT-01 | Phase 3 | Complete |
 | PT-02 | Phase 3 | Complete |
-| PT-03 | Phase 4 | Pending |
-| PT-04 | Phase 4 | Pending |
-| PT-05 | Phase 4 | Pending |
+| PT-03 | Phase 4 | Complete |
+| PT-04 | Phase 4 | Complete |
+| PT-05 | Phase 4 | Complete |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
