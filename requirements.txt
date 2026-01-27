@@ -5,3 +5,7 @@ git+https://github.com/onnx/tensorflow-onnx.git
 numpy>=1.26.4,<2.0
 protobuf>=5.28.0
 onnxruntime>=1.23.2
+# PyTorch conversion
+torch>=2.0.0
+torchvision>=0.15.0
+onnx2torch>=1.5.15
