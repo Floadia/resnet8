@@ -21,8 +21,8 @@
 
 ### PyTorch Conversion
 
-- [ ] **PT-01**: Convert ONNX model to PyTorch using onnx2torch
-- [ ] **PT-02**: Verify PyTorch model structure matches ONNX source
+- [x] **PT-01**: Convert ONNX model to PyTorch using onnx2torch
+- [x] **PT-02**: Verify PyTorch model structure matches ONNX source
 
 ### PyTorch Evaluation
 
@@ -63,8 +63,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVAL-01 | Phase 2 | Complete |
 | EVAL-02 | Phase 2 | Complete |
 | EVAL-03 | Phase 2 | Complete |
-| PT-01 | Phase 3 | Pending |
-| PT-02 | Phase 3 | Pending |
+| PT-01 | Phase 3 | Complete |
+| PT-02 | Phase 3 | Complete |
 | PT-03 | Phase 4 | Pending |
 | PT-04 | Phase 4 | Pending |
 | PT-05 | Phase 4 | Pending |
