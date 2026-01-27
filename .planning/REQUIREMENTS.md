@@ -101,26 +101,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PT-03 | Phase 4 | Complete |
 | PT-04 | Phase 4 | Complete |
 | PT-05 | Phase 4 | Complete |
-| CAL-01 | TBD | Pending |
-| CAL-02 | TBD | Pending |
-| ORT-01 | TBD | Pending |
-| ORT-02 | TBD | Pending |
-| ORT-03 | TBD | Pending |
-| ORT-04 | TBD | Pending |
-| PTQ-01 | TBD | Pending |
-| PTQ-02 | TBD | Pending |
-| PTQ-03 | TBD | Pending |
-| PTQ-04 | TBD | Pending |
-| ANL-01 | TBD | Pending |
-| ANL-02 | TBD | Pending |
+| CAL-01 | Phase 5 | Pending |
+| CAL-02 | Phase 5 | Pending |
+| ORT-01 | Phase 6 | Pending |
+| ORT-02 | Phase 6 | Pending |
+| ORT-03 | Phase 6 | Pending |
+| ORT-04 | Phase 6 | Pending |
+| PTQ-01 | Phase 7 | Pending |
+| PTQ-02 | Phase 7 | Pending |
+| PTQ-03 | Phase 7 | Pending |
+| PTQ-04 | Phase 7 | Pending |
+| ANL-01 | Phase 8 | Pending |
+| ANL-02 | Phase 8 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
 - v1.2 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 (pending roadmap)
+- Mapped to phases: 12/12 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-01-28 after v1.2 milestone start*
+*Last updated: 2026-01-28 with v1.2 phase mappings*
