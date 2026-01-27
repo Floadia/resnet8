@@ -14,7 +14,7 @@ Plan: —
 Status: Defining requirements
 Last activity: 2026-01-27 — Milestone v1.1 started
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████░░░░░░░░░░] 50% (v1.0 complete, v1.1 starting)
 
 ## Performance Metrics
 
