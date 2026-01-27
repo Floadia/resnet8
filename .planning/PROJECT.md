@@ -1,26 +1,39 @@
-# ResNet8 ONNX Evaluation
+# ResNet8 Model Evaluation
 
 ## What This Is
 
-ONNX-based evaluation of ResNet8 for CIFAR-10, converted from the MLCommons TinyMLPerf Keras implementation. Converts pretrained Keras model to ONNX and validates accuracy on CIFAR-10 test set using ONNX Runtime.
+Multi-framework evaluation of ResNet8 for CIFAR-10, converted from the MLCommons TinyMLPerf Keras implementation. Supports ONNX Runtime and PyTorch inference with accuracy validation on CIFAR-10 test set.
 
 ## Core Value
 
-Accurate Keras→ONNX conversion — ONNX model must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
+Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
+
+## Current Milestone: v1.1 PyTorch Conversion
+
+**Goal:** Convert existing ONNX model to PyTorch and validate accuracy on CIFAR-10
+
+**Target features:**
+- ONNX → PyTorch conversion using onnx2torch
+- PyTorch model evaluation on CIFAR-10
+- Accuracy >85% (same threshold as ONNX)
 
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Keras .h5 → ONNX conversion using tf2onnx — v1.0
+- ✓ ONNX model verification (structure, shapes) — v1.0
+- ✓ CIFAR-10 evaluation with ONNX Runtime (87.19%) — v1.0
+- ✓ Per-class accuracy breakdown — v1.0
+- ✓ Accuracy >85% on CIFAR-10 test set — v1.0
 
 ### Active
 
-- [ ] Keras .h5 → ONNX conversion using tf2onnx
-- [ ] ONNX model verification (structure, shapes)
-- [ ] CIFAR-10 evaluation with ONNX Runtime
-- [ ] Per-class accuracy breakdown
-- [ ] Accuracy >85% on CIFAR-10 test set
+- [ ] ONNX → PyTorch conversion using onnx2torch
+- [ ] PyTorch model verification
+- [ ] CIFAR-10 evaluation with PyTorch
+- [ ] Per-class accuracy breakdown (PyTorch)
+- [ ] Accuracy >85% on CIFAR-10 test set (PyTorch)
 
 ### Out of Scope
 
@@ -28,7 +41,7 @@ Accurate Keras→ONNX conversion — ONNX model must produce equivalent results 
 - TFLite/quantized model support — only full-precision evaluation
 - Performance benchmarking — accuracy only, not inference speed
 - Custom datasets — CIFAR-10 only
-- PyTorch conversion — ONNX only for v1 (PyTorch deferred to v2)
+- Manual weight transfer — using onnx2torch for conversion
 
 ## Context
 
@@ -52,8 +65,8 @@ Accurate Keras→ONNX conversion — ONNX model must produce equivalent results 
 
 ## Constraints
 
-- **Framework**: ONNX Runtime (target), TensorFlow/Keras (source)
-- **Conversion tool**: tf2onnx for Keras→ONNX
+- **Frameworks**: ONNX Runtime, PyTorch (targets), TensorFlow/Keras (source)
+- **Conversion tools**: tf2onnx for Keras→ONNX, onnx2torch for ONNX→PyTorch
 - **Dataset**: CIFAR-10 (included in reference project)
 - **Accuracy target**: >85% to validate successful conversion
 
@@ -61,9 +74,11 @@ Accurate Keras→ONNX conversion — ONNX model must produce equivalent results 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| ONNX instead of PyTorch | User plans future ONNX evaluation work | — Pending |
-| tf2onnx for conversion | Standard tool for Keras→ONNX, well-maintained | — Pending |
-| Separate converter/eval scripts | Reusability and clarity | — Pending |
+| ONNX as intermediate | Standard interchange format, well-supported | ✓ Good |
+| tf2onnx for Keras→ONNX | Standard tool, well-maintained | ✓ Good |
+| Separate converter/eval scripts | Reusability and clarity | ✓ Good |
+| Raw pixel values (0-255) | Match Keras training preprocessing | ✓ Good |
+| onnx2torch for ONNX→PyTorch | Leverage existing ONNX model | — Pending |
 
 ---
-*Last updated: 2025-01-27 after initialization*
+*Last updated: 2026-01-27 after v1.1 milestone start*
