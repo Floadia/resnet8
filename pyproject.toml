@@ -1,0 +1,21 @@
+[project]
+name = "resnet8-cifar10"
+version = "1.2.0"
+description = "ResNet8 CIFAR-10 model with conversion and quantization support"
+requires-python = ">=3.12"
+
+dependencies = [
+    "tensorflow>=2.20.0",
+    "onnx>=1.17.0",
+    "tf2onnx @ git+https://github.com/onnx/tensorflow-onnx.git",
+    "numpy>=1.26.4,<2.0",
+    "protobuf>=5.28.0",
+    "onnxruntime>=1.23.2",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "onnx2torch>=1.5.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
