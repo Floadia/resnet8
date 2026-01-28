@@ -166,65 +166,291 @@ pytorch_model = convert(onnx_model)
 2. Evaluation runs in <10 minutes on CPU (10,000 images)
 3. All 10 classes evaluated correctly
 
+---
+
+# Milestone v1.2: PTQ (Post-Training Quantization) Stack Additions
+
+**Researched:** 2026-01-28
+**Confidence:** HIGH
+
+## Executive Summary
+
+**No new dependencies required.** Existing stack (onnxruntime 1.23.2, torch 2.0.0+) already includes PTQ capabilities. Quantization APIs are bundled in base packages.
+
+## Current Stack Analysis (v1.0-v1.1)
+
+Based on `requirements.txt`:
+- **onnxruntime** >=1.23.2 - Already includes `onnxruntime.quantization` module
+- **torch** >=2.0.0 - Already includes `torch.ao.quantization` module
+- **Python** 3.12 - Compatible with all quantization APIs
+
+## PTQ Capabilities: Already Available
+
+### ONNX Runtime Quantization (Built-in)
+
+**Module:** `onnxruntime.quantization` (no installation needed)
+
+**What it provides:**
+- `quantize_static()` API for static PTQ
+- Three calibration methods: MinMax, Entropy, Percentile
+- Support for int8 and uint8 data types
+- `CalibrationDataReader` interface for calibration datasets
+- Pre-processing utilities via `onnxruntime.quantization.shape_inference`
+
+**Requirements:**
+- Model must be ONNX opset 10+ (opset 13+ for per-channel quantization)
+- Calibration data: representative CIFAR-10 samples (100-1000 images typical)
+- CPU-optimized: int8 inference optimized for x86-64 with VNNI instructions
+
+**Version verified:** ONNX Runtime 1.23.2 released October 2025
+
+**Import pattern:**
+```python
+from onnxruntime.quantization import quantize_static, CalibrationDataReader, QuantType
+```
+
+**Sources:**
+- [ONNX Runtime Quantization Docs](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
+- [ONNX Runtime v1.23.2 Release](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2)
+- [Quantization Tools README](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/quantization/README.md)
+
+### PyTorch Quantization (Built-in)
+
+**Module:** `torch.ao.quantization` (no installation needed)
+
+**What it provides:**
+- Static quantization in eager mode (beta, stable)
+- Observer-based calibration for scale/zero-point computation
+- Support for int8 quantization
+- Backend: fbgemm (CPU quantization, built into torch on x86)
+- QConfig system for specifying quantization schemes
+
+**Requirements:**
+- Model must be in eval mode before quantization
+- Observers inserted during `prepare()` phase
+- Calibration via forward passes with representative CIFAR-10 data
+- CPU-only: PyTorch quantization currently supports CPUs only
+
+**Version verified:** PyTorch 2.0.0+ includes stable quantization APIs
+
+**Import pattern:**
+```python
+import torch
+from torch.ao.quantization import get_default_qconfig, prepare, convert
+```
+
+**Sources:**
+- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html)
+- [PyTorch Quantization API Reference](https://docs.pytorch.org/docs/stable/quantization.html)
+- [INT8 Quantization for x86 CPU](https://pytorch.org/blog/int8-quantization/)
+
+## Recommended Stack Changes
+
+### No Changes Required
+
+**Verdict:** Existing `requirements.txt` is sufficient for v1.2 PTQ milestone.
+
+Both onnxruntime and torch ship with quantization APIs as part of their base packages. No additional dependencies needed.
+
+## Optional Dependencies (NOT Recommended for v1.2)
+
+### torchao - DEFERRED
+
+**Library:** torchao (PyTorch Architecture Optimization)
+**Version:** 0.15+
+**Purpose:** Next-generation PyTorch quantization API
+
+**Why NOT adding now:**
+- `torch.ao.quantization` is being deprecated in favor of torchao (PyTorch 2.10+ timeline)
+- Current `torch.ao.quantization` APIs still fully functional and documented
+- Adds dependency complexity for minimal immediate benefit
+- Requires explicit pip install: `pip install torchao`
+- Python 3.10+ required (project uses 3.12, compatible)
+
+**Migration timeline:** PyTorch plans to remove `torch.ao.quantization` in version 2.10. Current requirements specify `torch>=2.0.0`, so no immediate pressure.
+
+**Recommendation:** Defer torchao adoption to future milestone when PyTorch 2.10+ becomes minimum version or when current APIs show instability.
+
+**Sources:**
+- [torch.ao.quantization Deprecation Tracker](https://github.com/pytorch/ao/issues/2259)
+- [torchao PyPI](https://pypi.org/project/torchao/)
+- [torchao Documentation](https://docs.pytorch.org/ao/stable/quantization_overview.html)
+
+## Calibration Configuration Recommendations
+
+### ONNX Runtime Static Quantization
+
+**Calibration method options:**
+1. **MinMax** - Simple min/max range, fast but can be suboptimal
+2. **Entropy** - KL divergence-based, better accuracy retention, slower
+3. **Percentile** - Uses percentiles to clip outliers, balanced approach
+
+**Recommendation:** Start with MinMax (fastest iteration), try Entropy if accuracy drop >2%.
+
+**Data type combinations:**
+- `(uint8, uint8)` - activations: uint8, weights: uint8 (most common for CNNs)
+- `(uint8, int8)` - activations: uint8, weights: int8 (alternative)
+
+**Recommendation:** Use (uint8, uint8) - standard for CNN quantization.
+
+**Calibration dataset size:** 500-1000 random CIFAR-10 training samples (sufficient for statistics).
+
+### PyTorch Static Quantization
+
+**Backend:**
+- **fbgemm** - CPU quantization (default), used for x86-64 processors
+- **qnnpack** - Mobile/ARM quantization (not needed for this project)
+
+**Recommendation:** Use fbgemm (default) for CPU evaluation.
+
+**Quantization scheme:**
+- Per-tensor quantization: simpler, slightly lower accuracy
+- Per-channel quantization for weights: better accuracy, requires ONNX opset 13+
+
+**Recommendation:** Per-channel for conv weights, per-tensor for activations (common CNN pattern).
+
+**Calibration dataset size:** Same 500-1000 CIFAR-10 samples (should match ONNX Runtime for fair comparison).
+
+## Integration Points
+
+### Shared Calibration Data
+
+**Critical:** Both frameworks should use identical calibration samples for fair accuracy comparison.
+
+**Implementation approach:**
+1. Create `scripts/prepare_calibration.py` - Select and save 500-1000 random CIFAR-10 training images
+2. ONNX Runtime: Implement `CalibrationDataReader` subclass reading from saved samples
+3. PyTorch: Load same samples for observer calibration during `prepare()` phase
+
+### Model Verification
+
+**ONNX model opset check:**
+```python
+import onnx
+model = onnx.load("models/resnet8.onnx")
+print(f"Opset version: {model.opset_import[0].version}")
+# Should be >=10, preferably >=13 for per-channel
+```
+
+**PyTorch backend check:**
+```python
+import torch
+print(torch.backends.quantized.engine)
+# Should print 'fbgemm' on x86-64
+```
+
+## Known Constraints
+
+### ONNX Runtime
+- **Opset requirement:** Model must be opset 10+ (13+ for per-channel weight quantization)
+- **CPU-only:** Quantized int8 inference optimized for x86-64 with VNNI instructions
+- **Calibration mandatory:** Static quantization requires calibration data (dynamic quantization does not)
+
+### PyTorch
+- **CPU-only:** PyTorch quantization APIs currently only support CPU inference
+- **Eager mode limitations:** Requires manual specification of which layers to fuse (conv-bn-relu)
+- **Backend availability:** fbgemm backend must be compiled into torch (standard in official binaries)
+
+### Common to Both
+- **Accuracy trade-off:** Expect 0-5% accuracy drop from 87.19% baseline (typical for int8 PTQ)
+- **Model structure:** Some architectures quantize better than others (ResNet family generally quantizes well)
+- **Calibration quality:** Poor calibration data (non-representative) degrades quantized accuracy significantly
+
+## Success Criteria for v1.2
+
+### Functional
+1. ONNX Runtime quantization produces valid int8/uint8 ONNX model
+2. PyTorch quantization produces valid int8 PyTorch model
+3. Both quantized models run inference without errors
+4. Accuracy evaluation completes for both frameworks
+
+### Quality
+1. Quantized accuracy within 5% of 87.19% baseline (i.e., >82% acceptable, >85% good)
+2. Calibration completes in <5 minutes on CPU
+3. Inference speedup observed (optional metric, not required for v1.2)
+
+### Documentation
+1. Calibration dataset preparation script
+2. Quantization scripts for both frameworks
+3. Accuracy comparison report (quantized vs baseline)
+
+## Implementation Phases
+
+**Recommended order:**
+
+1. **Phase 1: Calibration data preparation** (shared)
+   - Select 500-1000 random CIFAR-10 training samples
+   - Save to disk for reproducibility
+   - Document selection seed
+
+2. **Phase 2: ONNX Runtime quantization**
+   - Verify ONNX model opset version
+   - Implement CalibrationDataReader
+   - Run quantize_static() with MinMax
+   - Evaluate accuracy
+
+3. **Phase 3: PyTorch quantization**
+   - Load PyTorch model from .pt file
+   - Insert observers with get_default_qconfig()
+   - Run calibration with prepare()
+   - Convert to quantized model
+   - Evaluate accuracy
+
+4. **Phase 4: Analysis**
+   - Compare quantized vs baseline accuracy (87.19%)
+   - Document accuracy delta
+   - If needed, retry with Entropy calibration (ONNX Runtime)
+
 ## Sources
 
-### PyTorch & torchvision
-- [PyTorch Installation Guide](https://pytorch.org/get-started/locally/) - Latest stable: 2.10.0 (HIGH confidence)
-- [torchvision Documentation](https://docs.pytorch.org/vision/stable/index.html) - Version 0.25 (HIGH confidence)
-- [CIFAR10 Dataset Documentation](https://docs.pytorch.org/vision/main/generated/torchvision.datasets.CIFAR10.html) (HIGH confidence)
+### Official Documentation
+- [ONNX Runtime Quantization](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) - Static quantization APIs and calibration methods (HIGH confidence)
+- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html) - Eager mode PTQ implementation (HIGH confidence)
+- [PyTorch Quantization Overview](https://docs.pytorch.org/docs/stable/quantization.html) - API reference and quantization modes (HIGH confidence)
 
-### Conversion Libraries
-- [h5py PyPI](https://pypi.org/project/h5py/) - Version 3.15.1, Oct 2025 (HIGH confidence)
-- [ONNX GitHub Releases](https://github.com/onnx/onnx) - Version 1.20.1, Jan 2026 (HIGH confidence)
-- [tf2onnx PyPI](https://pypi.org/project/tf2onnx/) - Version 1.16.1, Jan 2024 (HIGH confidence)
-- [onnx2torch PyPI](https://pypi.org/project/onnx2torch/) - Version 1.5.15, Aug 2024 (HIGH confidence)
-- [Load Keras Weight to PyTorch (Medium)](https://medium.com/analytics-vidhya/load-keras-weight-to-pytorch-and-transform-keras-architecture-to-pytorch-easily-8ff5dd18b86b) - Manual conversion approach (MEDIUM confidence)
+### Technical Details
+- [ONNX Runtime Quantization Tools](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/quantization/README.md) - Implementation details (HIGH confidence)
+- [ONNX Opset Requirements](https://nvidia.github.io/TensorRT-Model-Optimizer/guides/windows_guides/_ONNX_PTQ_guide.html) - Opset version requirements for quantization (HIGH confidence)
+- [PyTorch INT8 Quantization Blog](https://pytorch.org/blog/int8-quantization/) - INT8 quantization performance details (HIGH confidence)
 
-### Conversion Strategy Research
-- [On the Challenge of Converting TensorFlow Models to PyTorch (Medium, Nov 2025)](https://chaimrand.medium.com/on-the-challenge-of-converting-tensorflow-models-to-pytorch-bd43a7704c62) - Discusses Keras3 and ONNX approaches (MEDIUM confidence)
-- [PyTorch Forums: Keras to PyTorch Conversion](https://discuss.pytorch.org/t/keras-to-pytorch-model-conversion/155153) - Community discussion (LOW confidence)
+### Version Information
+- [ONNX Runtime v1.23.2 Release](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) - October 2025 release notes (HIGH confidence)
+- [ONNX Runtime Releases](https://github.com/microsoft/onnxruntime/releases) - Version history (HIGH confidence)
 
-### MLCommons TinyMLPerf
-- [MLCommons Tiny GitHub - Keras Model](https://github.com/mlcommons/tiny/blob/master/benchmark/training/image_classification/keras_model.py) - ResNet8 implementation (HIGH confidence)
-- [MLPerf Tiny v1.3 Announcement (MLCommons, Sep 2025)](https://mlcommons.org/2025/09/mlperf-tiny-v1-3-tech/) - Benchmark details (HIGH confidence)
-
-### Evaluation & Testing
-- [torchmetrics GitHub Releases](https://github.com/Lightning-AI/torchmetrics/releases) - Version 1.8.2 (HIGH confidence)
-- [PyTorch CIFAR10 Tutorial](https://docs.pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html) - Updated Sep 2025 (HIGH confidence)
-- [PyTorch Lightning CIFAR10 Tutorial](https://lightning.ai/docs/pytorch/stable/notebooks/lightning_examples/cifar10-baseline.html) - 94% accuracy baseline (HIGH confidence)
-- [pytest vs unittest for PyTorch (CircleCI)](https://circleci.com/blog/testing-pytorch-model-with-pytest/) - Testing best practices (MEDIUM confidence)
-
-### Compatibility
-- [NumPy 2.0 Support - PyTorch Issue #107302](https://github.com/pytorch/pytorch/issues/107302) - NumPy compatibility status (MEDIUM confidence)
-- [TensorFlow: Save and Load Models](https://www.tensorflow.org/tutorials/keras/save_and_load) - H5 format documentation (HIGH confidence)
+### Migration Notes (Future Reference)
+- [torch.ao.quantization Deprecation Tracker](https://github.com/pytorch/ao/issues/2259) - Deprecation timeline and migration path (HIGH confidence)
+- [torchao PyPI](https://pypi.org/project/torchao/) - Next-gen quantization library (HIGH confidence)
+- [torchao Quantization Overview](https://docs.pytorch.org/ao/stable/quantization_overview.html) - Future migration target (HIGH confidence)
+- [Clarification of PyTorch Quantization Flow Support](https://dev-discuss.pytorch.org/t/clarification-of-pytorch-quantization-flow-support-in-pytorch-and-torchao/2809) - PyTorch 2.0+ quantization roadmap (MEDIUM confidence)
 
 ## Confidence Assessment
 
 | Component | Confidence | Rationale |
 |-----------|------------|-----------|
-| PyTorch/torchvision | HIGH | Official docs, verified latest versions |
-| h5py | HIGH | PyPI page, official releases |
-| ONNX pipeline | HIGH | All libraries verified on PyPI with recent releases |
-| Manual conversion | MEDIUM | Based on community patterns, not official converter |
-| NumPy compatibility | MEDIUM | Issue discussions suggest compatibility exists but edge cases possible |
-| Testing tools | HIGH | Official PyTorch wiki confirms pytest/unittest support |
+| ONNX Runtime quantization | HIGH | Official docs, verified v1.23.2 includes quantization module, widely used |
+| PyTorch quantization | HIGH | Official tutorials, torch.ao.quantization stable since PyTorch 1.8+ |
+| No new dependencies | HIGH | Both modules verified as built-in to base packages |
+| Calibration approach | HIGH | Standard practice documented in official sources |
+| Accuracy expectations | MEDIUM | ResNets quantize well typically, but 0-5% drop is estimate based on literature |
+| torchao migration timeline | MEDIUM | Deprecation announced but timeline subject to change |
 
 ## Risk Assessment
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Manual conversion errors | Medium | High | Implement numerical verification tests comparing outputs |
-| ONNX operator support gaps | Low | Medium | onnx2torch supports ResNet-class models per documentation |
-| NumPy version conflicts | Low | Medium | Pin numpy<2 if issues arise |
-| Accuracy degradation | Low | High | Target is 85%, Keras model likely exceeds this with margin |
-| Layer order mismatch | Medium | High | Use h5py to inspect exact layer names before mapping |
+| Accuracy drop >5% | Low | High | Retry with Entropy calibration, increase calibration samples to 2000 |
+| ONNX opset version <10 | Low | High | Reconvert from Keras with newer opset (already using tf2onnx) |
+| PyTorch backend unavailable | Very Low | High | fbgemm ships with official torch binaries on x86-64 |
+| Calibration data non-representative | Medium | Medium | Use stratified sampling ensuring all 10 classes represented |
+| torch.ao.quantization deprecated before v1.2 complete | Very Low | Low | PyTorch 2.10 not released yet, current APIs remain stable |
 
-## Next Steps for Implementation
+## Next Steps for v1.2 Implementation
 
-1. **Phase 1**: Inspect .h5 file structure with h5py, document layer names
-2. **Phase 2**: Implement PyTorch ResNet8 matching Keras architecture
-3. **Phase 3**: Write conversion script with numerical tests
-4. **Phase 4**: Implement CIFAR-10 evaluation script
-5. **Phase 5**: Validate ≥85% accuracy target
+1. **Verify requirements.txt** - Confirm onnxruntime and torch versions satisfy quantization needs (already >=1.23.2 and >=2.0.0)
+2. **Check ONNX model opset** - Load `models/resnet8.onnx` and verify opset >=10
+3. **Prepare calibration script** - Select 500-1000 CIFAR-10 training samples with seed for reproducibility
+4. **Implement ONNX Runtime quantization** - Create `scripts/quantize_onnx.py`
+5. **Implement PyTorch quantization** - Create `scripts/quantize_pytorch.py`
+6. **Evaluate and compare** - Run both quantized models through evaluation, compare to 87.19% baseline
 
-Each phase should have unit tests (pytest) validating correctness before proceeding.
+Each script should follow existing patterns in `scripts/` directory (argparse CLI, clear output logging).

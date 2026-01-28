@@ -8,14 +8,15 @@ Multi-framework evaluation of ResNet8 for CIFAR-10, converted from the MLCommons
 
 Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
 
-## Current Milestone: v1.1 PyTorch Conversion
+## Current Milestone: v1.2 PTQ Evaluation
 
-**Goal:** Convert existing ONNX model to PyTorch and validate accuracy on CIFAR-10
+**Goal:** Apply Post-Training Quantization (static) using both ONNX Runtime and PyTorch, evaluate int8 and uint8 model accuracy against full-precision baseline
 
 **Target features:**
-- ONNX → PyTorch conversion using onnx2torch
-- PyTorch model evaluation on CIFAR-10
-- Accuracy >85% (same threshold as ONNX)
+- ONNX Runtime static quantization (int8/uint8)
+- PyTorch static quantization (int8/uint8)
+- Calibration using CIFAR-10 samples
+- Accuracy comparison: quantized vs full-precision (87.19%)
 
 ## Requirements
 
@@ -26,22 +27,28 @@ Accurate model conversion across frameworks — converted models must produce eq
 - ✓ CIFAR-10 evaluation with ONNX Runtime (87.19%) — v1.0
 - ✓ Per-class accuracy breakdown — v1.0
 - ✓ Accuracy >85% on CIFAR-10 test set — v1.0
+- ✓ ONNX → PyTorch conversion using onnx2torch — v1.1
+- ✓ PyTorch model verification — v1.1
+- ✓ CIFAR-10 evaluation with PyTorch (87.19%) — v1.1
+- ✓ Per-class accuracy breakdown (PyTorch) — v1.1
+- ✓ Accuracy >85% on CIFAR-10 test set (PyTorch) — v1.1
 
 ### Active
 
-- [ ] ONNX → PyTorch conversion using onnx2torch
-- [ ] PyTorch model verification
-- [ ] CIFAR-10 evaluation with PyTorch
-- [ ] Per-class accuracy breakdown (PyTorch)
-- [ ] Accuracy >85% on CIFAR-10 test set (PyTorch)
+- [ ] ONNX Runtime static quantization (int8/uint8)
+- [ ] PyTorch static quantization (int8/uint8)
+- [ ] Calibration data preparation (CIFAR-10 subset)
+- [ ] Quantized model accuracy evaluation
+- [ ] Accuracy delta analysis (quantized vs 87.19% baseline)
 
 ### Out of Scope
 
 - Training from scratch — using pretrained weights only
-- TFLite/quantized model support — only full-precision evaluation
+- Quantization-aware training (QAT) — PTQ only
 - Performance benchmarking — accuracy only, not inference speed
 - Custom datasets — CIFAR-10 only
-- Manual weight transfer — using onnx2torch for conversion
+- Dynamic quantization — static quantization only
+- TFLite quantization — ONNX Runtime and PyTorch only
 
 ## Context
 
@@ -81,4 +88,4 @@ Accurate model conversion across frameworks — converted models must produce eq
 | onnx2torch for ONNX→PyTorch | Leverage existing ONNX model | — Pending |
 
 ---
-*Last updated: 2026-01-27 after v1.1 milestone start*
+*Last updated: 2026-01-28 after v1.2 milestone start*

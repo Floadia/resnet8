@@ -1,8 +1,10 @@
 # Roadmap: ResNet8 Model Evaluation
 
-## Overview
+## Milestones
 
-Multi-framework evaluation of ResNet8 for CIFAR-10. v1.0 completed ONNX conversion and evaluation (87.19% accuracy). v1.1 adds PyTorch conversion and evaluation using onnx2torch, targeting same >85% accuracy.
+- ✅ **v1.0 ONNX Evaluation** - Phases 1-2 (shipped 2026-01-27)
+- ✅ **v1.1 PyTorch Evaluation** - Phases 3-4 (shipped 2026-01-27)
+- 🚧 **v1.2 PTQ Evaluation** - Phases 5-8 (in progress)
 
 ## Phases
 
@@ -12,15 +14,8 @@ Multi-framework evaluation of ResNet8 for CIFAR-10. v1.0 completed ONNX conversi
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-### v1.0 (Complete)
-- [x] **Phase 1: Model Conversion** - Convert Keras .h5 to ONNX and verify structure
-- [x] **Phase 2: Accuracy Evaluation** - Evaluate ONNX model on CIFAR-10 test set
-
-### v1.1 (Current)
-- [x] **Phase 3: PyTorch Conversion** - Convert ONNX to PyTorch and verify structure
-- [x] **Phase 4: PyTorch Evaluation** - Evaluate PyTorch model on CIFAR-10 test set
-
-## Phase Details
+<details>
+<summary>✅ v1.0 ONNX Evaluation (Phases 1-2) - SHIPPED 2026-01-27</summary>
 
 ### Phase 1: Model Conversion
 **Goal**: ONNX model exists with verified structure matching Keras source
@@ -50,6 +45,11 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Evaluate ONNX model on CIFAR-10 and verify accuracy
 
+</details>
+
+<details>
+<summary>✅ v1.1 PyTorch Evaluation (Phases 3-4) - SHIPPED 2026-01-27</summary>
+
 ### Phase 3: PyTorch Conversion
 **Goal**: PyTorch model exists with verified structure matching ONNX source
 **Depends on**: Phase 2 (needs ONNX model)
@@ -78,18 +78,86 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Evaluate PyTorch model on CIFAR-10 and verify accuracy
 
+</details>
+
+### 🚧 v1.2 PTQ Evaluation (In Progress)
+
+**Milestone Goal:** Apply Post-Training Quantization (static) using both ONNX Runtime and PyTorch, evaluate int8 and uint8 model accuracy against full-precision baseline (87.19%)
+
+#### Phase 5: Calibration Infrastructure
+**Goal**: Calibration data prepared with correct preprocessing matching evaluation pipeline
+**Depends on**: Phase 4 (needs evaluation infrastructure)
+**Requirements**: CAL-01, CAL-02
+**Success Criteria** (what must be TRUE):
+  1. Calibration dataset contains 200+ stratified CIFAR-10 samples (20 per class minimum)
+  2. Calibration utility script (`scripts/calibration_utils.py`) exists and loads samples correctly
+  3. Calibration preprocessing exactly matches evaluation preprocessing (raw pixels 0-255, no normalization)
+  4. Sample distribution verification shows balanced class representation
+**Plans**: 1 plan
+
+Plans:
+- [x] 05-01-PLAN.md — Create calibration data loader with stratified sampling and verification
+
+#### Phase 6: ONNX Runtime Quantization
+**Goal**: ONNX models quantized to int8/uint8 with evaluated accuracy vs baseline
+**Depends on**: Phase 5
+**Requirements**: ORT-01, ORT-02, ORT-03, ORT-04
+**Success Criteria** (what must be TRUE):
+  1. Quantized ONNX models exist (resnet8_int8.onnx and resnet8_uint8.onnx)
+  2. Both quantized models evaluate successfully on CIFAR-10 test set using existing evaluation script
+  3. Accuracy delta reported for int8 model vs 87.19% baseline
+  4. Accuracy delta reported for uint8 model vs 87.19% baseline
+  5. Quantization script logs calibration method used (MinMax) and sample count
+**Plans**: 1 plan
+
+Plans:
+- [x] 06-01-PLAN.md — Quantize ONNX model to int8/uint8 and evaluate accuracy
+
+#### Phase 7: PyTorch Quantization
+**Goal**: PyTorch models quantized to int8/uint8 with evaluated accuracy vs baseline
+**Depends on**: Phase 6 (benefits from ONNX lessons learned)
+**Requirements**: PTQ-01, PTQ-02, PTQ-03, PTQ-04
+**Success Criteria** (what must be TRUE):
+  1. Quantized PyTorch model exists (resnet8_int8.pt)
+  2. uint8 model exists if fbgemm backend supports it, otherwise documented as unsupported
+  3. Quantized models evaluate successfully on CIFAR-10 test set
+  4. Accuracy delta reported for int8 model vs 87.19% baseline
+  5. Accuracy delta reported for uint8 model (if created) vs 87.19% baseline
+**Plans**: 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — Quantize PyTorch model to int8 and evaluate accuracy
+
+#### Phase 8: Comparison and Analysis
+**Goal**: All quantization results compared with accuracy deltas flagged
+**Depends on**: Phases 6 and 7
+**Requirements**: ANL-01, ANL-02
+**Success Criteria** (what must be TRUE):
+  1. Comparison table exists showing: Framework × Data Type × Accuracy × Delta from baseline
+  2. All configurations with accuracy drop >5% are flagged in analysis
+  3. Model size comparison included (FP32 vs quantized for all models)
+  4. Analysis document includes recommendation for best quantization approach
+**Plans**: TBD
+
+Plans:
+- [ ] TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Model Conversion | 1/1 | Complete | 2026-01-27 |
-| 2. Accuracy Evaluation | 1/1 | Complete | 2026-01-27 |
-| 3. PyTorch Conversion | 1/1 | Complete | 2026-01-27 |
-| 4. PyTorch Evaluation | 1/1 | Complete | 2026-01-27 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Model Conversion | v1.0 | 1/1 | Complete | 2026-01-27 |
+| 2. Accuracy Evaluation | v1.0 | 1/1 | Complete | 2026-01-27 |
+| 3. PyTorch Conversion | v1.1 | 1/1 | Complete | 2026-01-27 |
+| 4. PyTorch Evaluation | v1.1 | 1/1 | Complete | 2026-01-27 |
+| 5. Calibration Infrastructure | v1.2 | 1/1 | Complete | 2026-01-28 |
+| 6. ONNX Runtime Quantization | v1.2 | 1/1 | Complete | 2026-01-28 |
+| 7. PyTorch Quantization | v1.2 | 0/1 | Planned | - |
+| 8. Comparison and Analysis | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27 after v1.1 milestone start*
+*Last updated: 2026-01-28 with Phase 7 planned*
