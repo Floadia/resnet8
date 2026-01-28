@@ -34,8 +34,8 @@
 
 ### Calibration
 
-- [ ] **CAL-01**: Calibration dataset prepared from CIFAR-10 (1000+ stratified samples)
-- [ ] **CAL-02**: Calibration preprocessing matches evaluation pipeline exactly
+- [x] **CAL-01**: Calibration dataset prepared from CIFAR-10 (1000+ stratified samples)
+- [x] **CAL-02**: Calibration preprocessing matches evaluation pipeline exactly
 
 ### ONNX Runtime Quantization
 
@@ -101,8 +101,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PT-03 | Phase 4 | Complete |
 | PT-04 | Phase 4 | Complete |
 | PT-05 | Phase 4 | Complete |
-| CAL-01 | Phase 5 | Pending |
-| CAL-02 | Phase 5 | Pending |
+| CAL-01 | Phase 5 | Complete |
+| CAL-02 | Phase 5 | Complete |
 | ORT-01 | Phase 6 | Pending |
 | ORT-02 | Phase 6 | Pending |
 | ORT-03 | Phase 6 | Pending |
@@ -123,4 +123,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-01-28 with v1.2 phase mappings*
+*Last updated: 2026-01-28 with Phase 5 complete*
