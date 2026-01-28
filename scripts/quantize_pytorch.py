@@ -1,18 +1,35 @@
 #!/usr/bin/env python3
-"""Quantize ResNet8 PyTorch model using static quantization (eager mode).
+"""Quantize ResNet8 PyTorch model using static quantization.
+
+Supports two quantization modes:
+1. FX Graph Mode with JIT tracing - Traces model to enable serialization
+2. Eager Mode - Requires standard PyTorch module types (limited onnx2torch support)
 
 Uses torch.ao.quantization APIs with fbgemm backend for CPU inference.
 Calibration data loaded from calibration_utils.py (1000 stratified samples).
+
+IMPORTANT: onnx2torch models use custom ONNX operations that have limited
+support for PyTorch quantization. This script implements a best-effort approach
+using FX graph mode with JIT tracing to enable model serialization.
+
+NOTE: fbgemm backend supports only int8 quantization (quint8 activations + qint8 weights).
+uint8-only quantization (like ONNX Runtime's U8U8 mode) is NOT supported - PyTorch's
+quantized convolution requires qint8 (signed) weights. The "int8" output from this
+script uses unsigned 8-bit activations (quint8) and signed 8-bit weights (qint8).
 """
 
 import argparse
 import os
 import sys
+import warnings
 
 import numpy as np
 import torch
-from torch.ao.quantization import get_default_qconfig, prepare, convert
+from torch.ao.quantization import get_default_qconfig
 from torch.utils.data import DataLoader, TensorDataset
+
+# Suppress deprecation warnings for torch.ao.quantization (will migrate to torchao later)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="torch.ao.quantization")
 
 # Add scripts directory to path for calibration_utils import
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -83,38 +100,43 @@ def create_calibration_loader(
     return loader
 
 
-def quantize_model_eager(
+def quantize_model_fx(
     model: torch.nn.Module,
     calibration_loader: DataLoader,
-) -> torch.nn.Module:
-    """Quantize model using eager mode static quantization.
+    output_path: str,
+) -> torch.jit.ScriptModule:
+    """Quantize model using FX graph mode static quantization with JIT tracing.
 
-    Uses fbgemm backend with default qconfig (quint8 activations, qint8 weights).
-    Does NOT apply layer fusion initially (onnx2torch model structure unknown).
+    FX mode works with onnx2torch models by tracing the computation graph.
+    JIT tracing is used for serialization since FX GraphModule has issues.
 
     Args:
         model: FP32 PyTorch model in eval mode
         calibration_loader: DataLoader with calibration samples
+        output_path: Path to save quantized model
 
     Returns:
-        Quantized PyTorch model
+        JIT traced quantized model
     """
-    # Step 1: Skip fusion initially (onnx2torch model structure unknown)
-    # Layer fusion can be added later if needed based on model inspection
-    print("\nSkipping fusion (starting with baseline, no fusion patterns)")
+    from torch.ao.quantization import get_default_qconfig_mapping
+    from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 
-    # Step 2: Configure quantization
-    print("\nConfiguring quantization (fbgemm backend)...")
-    model.qconfig = get_default_qconfig("fbgemm")
-    print(f"  Activation observer: {model.qconfig.activation}")
-    print(f"  Weight observer: {model.qconfig.weight}")
+    # Get example input for tracing
+    example_input = next(iter(calibration_loader))[0][:1]  # Single sample
+    print(f"\nExample input shape: {tuple(example_input.shape)}")
 
-    # Step 3: Prepare model (insert observers)
-    print("\nPreparing model (inserting observers)...")
-    prepared_model = prepare(model, inplace=False)
+    # Configure quantization using proper QConfigMapping API
+    print("\nConfiguring quantization (fbgemm backend, FX mode)...")
+    qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+    print(f"  Backend: fbgemm")
+    print(f"  Using default qconfig mapping (HistogramObserver for activations, PerChannelMinMaxObserver for weights)")
+
+    # Prepare model (trace graph and insert observers)
+    print("\nPreparing model (FX graph tracing and inserting observers)...")
+    prepared_model = prepare_fx(model, qconfig_mapping, example_inputs=(example_input,))
     print("Model prepared")
 
-    # Step 4: Calibration
+    # Calibration
     print(f"\nCalibrating with {len(calibration_loader)} batches...")
     with torch.no_grad():
         for batch_idx, (data, _) in enumerate(calibration_loader):
@@ -123,7 +145,67 @@ def quantize_model_eager(
                 print(f"  Processed {batch_idx + 1}/{len(calibration_loader)} batches")
     print("Calibration complete")
 
-    # Step 5: Convert to quantized model
+    # Convert to quantized model
+    print("\nConverting to quantized model...")
+    quantized_model = convert_fx(prepared_model)
+    print("Conversion complete")
+
+    # JIT trace for serialization
+    print("\nTracing model with JIT for serialization...")
+    quantized_model.eval()
+    traced_model = torch.jit.trace(quantized_model, example_input)
+    print("JIT tracing complete")
+
+    # Save as TorchScript
+    print(f"\nSaving TorchScript model to: {output_path}")
+    traced_model.save(output_path)
+    print("Model saved")
+
+    return traced_model
+
+
+def quantize_model_eager(
+    model: torch.nn.Module,
+    calibration_loader: DataLoader,
+) -> torch.nn.Module:
+    """Quantize model using eager mode static quantization.
+
+    Note: Eager mode requires standard PyTorch module types (Conv2d, Linear, etc.)
+    and may not work with onnx2torch models that use custom ONNX operations.
+
+    Args:
+        model: FP32 PyTorch model in eval mode
+        calibration_loader: DataLoader with calibration samples
+
+    Returns:
+        Quantized PyTorch model
+    """
+    from torch.ao.quantization import prepare, convert
+
+    print("\nNote: Eager mode may not work with onnx2torch models")
+    print("Use --mode fx for FX graph mode quantization (recommended)")
+
+    # Configure quantization
+    print("\nConfiguring quantization (fbgemm backend, eager mode)...")
+    model.qconfig = get_default_qconfig("fbgemm")
+    print(f"  Activation observer: {model.qconfig.activation}")
+    print(f"  Weight observer: {model.qconfig.weight}")
+
+    # Prepare model (insert observers)
+    print("\nPreparing model (inserting observers)...")
+    prepared_model = prepare(model, inplace=False)
+    print("Model prepared")
+
+    # Calibration
+    print(f"\nCalibrating with {len(calibration_loader)} batches...")
+    with torch.no_grad():
+        for batch_idx, (data, _) in enumerate(calibration_loader):
+            prepared_model(data)
+            if (batch_idx + 1) % 10 == 0:
+                print(f"  Processed {batch_idx + 1}/{len(calibration_loader)} batches")
+    print("Calibration complete")
+
+    # Convert to quantized model
     print("\nConverting to quantized model...")
     quantized_model = convert(prepared_model, inplace=False)
     print("Conversion complete")
@@ -133,7 +215,7 @@ def quantize_model_eager(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Quantize ResNet8 PyTorch model using static quantization (eager mode)"
+        description="Quantize ResNet8 PyTorch model using static quantization"
     )
     parser.add_argument(
         "--model",
@@ -163,6 +245,12 @@ def main():
         help="Calibration batch size (default: 32)",
     )
     parser.add_argument(
+        "--mode",
+        choices=["fx", "eager"],
+        default="fx",
+        help="Quantization mode: fx (FX graph, default) or eager",
+    )
+    parser.add_argument(
         "--inspect-only",
         action="store_true",
         help="Only inspect model structure without quantizing",
@@ -170,7 +258,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 70)
-    print("PYTORCH STATIC QUANTIZATION (EAGER MODE)")
+    print(f"PYTORCH STATIC QUANTIZATION ({args.mode.upper()} MODE)")
     print("=" * 70)
 
     # Load model
@@ -191,18 +279,23 @@ def main():
         args.data_dir, args.samples_per_class, args.batch_size
     )
 
-    # Quantize model
-    quantized_model = quantize_model_eager(model, calibration_loader)
-
-    # Save quantized model (same format as evaluate_pytorch.py expects)
-    print(f"\nSaving quantized model to: {args.output}")
-    torch.save({"model": quantized_model}, args.output)
-    print("Quantized model saved")
+    # Quantize model using selected mode
+    if args.mode == "fx":
+        # FX mode saves model directly (uses JIT tracing for serialization)
+        quantize_model_fx(model, calibration_loader, args.output)
+    else:
+        quantized_model = quantize_model_eager(model, calibration_loader)
+        # Save quantized model (same format as evaluate_pytorch.py expects)
+        print(f"\nSaving quantized model to: {args.output}")
+        torch.save({"model": quantized_model}, args.output)
+        print("Quantized model saved")
 
     print("\n" + "=" * 70)
     print("QUANTIZATION COMPLETE")
     print("=" * 70)
     print(f"Output: {args.output}")
+    if args.mode == "fx":
+        print("\nNote: FX mode saves TorchScript model (load with torch.jit.load)")
     print("\nNext step: Evaluate with scripts/evaluate_pytorch.py --model " + args.output)
 
 

@@ -48,7 +48,11 @@ def load_cifar10_test(data_dir: str) -> tuple[np.ndarray, np.ndarray, list[str]]
 
 
 def load_pytorch_model(model_path: str) -> torch.nn.Module:
-    """Load PyTorch model from checkpoint.
+    """Load PyTorch model from checkpoint or TorchScript.
+
+    Supports two formats:
+    1. Checkpoint dict with 'model' key (standard format)
+    2. TorchScript model (saved with torch.jit.save or traced_model.save)
 
     Args:
         model_path: Path to .pt model file
@@ -56,6 +60,16 @@ def load_pytorch_model(model_path: str) -> torch.nn.Module:
     Returns:
         PyTorch model in eval mode
     """
+    # Try loading as TorchScript first (for FX-quantized models)
+    try:
+        model = torch.jit.load(model_path, map_location="cpu")
+        model.eval()
+        return model
+    except RuntimeError:
+        # Not a TorchScript model, try loading as checkpoint dict
+        pass
+
+    # Load as checkpoint dict
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
     model = checkpoint["model"]
     model.eval()
