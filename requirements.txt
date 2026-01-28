@@ -1,8 +1,12 @@
+# NOTE: pyproject.toml is the source of truth for dependencies.
+# This file is kept for backwards compatibility with pip.
+# Use `uv sync` or `uv run` for dependency management.
+
 tensorflow>=2.20.0
 onnx>=1.17.0
 # Use latest tf2onnx from GitHub for Python 3.12 compatibility
 git+https://github.com/onnx/tensorflow-onnx.git
-numpy>=1.26.4,<2.0
+numpy>=1.26.4
 protobuf>=5.28.0
 onnxruntime>=1.23.2
 # PyTorch conversion
