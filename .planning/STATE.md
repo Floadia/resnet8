@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 Phase: 8 of 8 (Comparison Analysis)
 Plan: 1 of 1 in current phase
 Status: Project complete
-Last activity: 2026-01-28 — Completed quick task 002: Add comprehensive README.md
+Last activity: 2026-01-28 — Completed quick task 003: Add CI linting with ruff
 
 Progress: [██████████] 100% (8/8 phases complete)
 
@@ -84,6 +84,7 @@ None - project complete.
 |---|-------------|------|--------|-----------|
 | 001 | Use uv instead of old python management system | 2026-01-28 | 62cd2a0 | [001-use-uv-instead-of-old-python-management-](./quick/001-use-uv-instead-of-old-python-management-/) |
 | 002 | Add comprehensive README.md | 2026-01-28 | 8ca7d31 | [002-add-readme](./quick/002-add-readme/) |
+| 003 | Add CI that lint by ruff | 2026-01-28 | cc40f18 | [003-add-ci-that-lint-by-ruff](./quick/003-add-ci-that-lint-by-ruff/) |
 
 ### Blockers/Concerns
 
@@ -113,7 +114,7 @@ None - project complete.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed quick task 002 (Add README.md)
+Stopped at: Completed quick task 003 (Add CI linting with ruff)
 Resume file: None
 
 **Project deliverables:**
