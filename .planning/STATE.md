@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-28)
 
 **Core value:** Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** Phase 7 - PyTorch Quantization (v1.2 PTQ Evaluation)
+**Current focus:** v1.2 PTQ Evaluation COMPLETE
 
 ## Current Position
 
-Phase: 7 of 8 (PyTorch Quantization)
+Phase: 8 of 8 (Comparison Analysis)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-28 — Completed 07-01-PLAN.md (PyTorch static quantization)
+Status: Project complete
+Last activity: 2026-01-28 — Completed 08-01-PLAN.md (PTQ comparison analysis)
 
-Progress: [███████░░░] 87.5% (7/8 phases complete)
+Progress: [██████████] 100% (8/8 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 5min (v1.2 tracking started)
-- Total execution time: 14min (v1.2 only)
+- Total plans completed: 8
+- Average duration: 4.25min (v1.2 tracking started)
+- Total execution time: 17min (v1.2 only)
 
 **By Phase:**
 
@@ -34,10 +34,11 @@ Progress: [███████░░░] 87.5% (7/8 phases complete)
 | 5. Calibration Infrastructure | 1/1 | 2min | 2min |
 | 6. ONNX Runtime Quantization | 1/1 | 6min | 6min |
 | 7. PyTorch Quantization | 1/1 | 6min | 6min |
+| 8. Comparison Analysis | 1/1 | 3min | 3min |
 
 **Recent Trend:**
-- Last plan: 07-01 (6min)
-- Trend: Quantization phases consistently ~6min (dependency installation and debugging)
+- Last plan: 08-01 (3min)
+- Analysis/documentation phases faster than implementation phases
 
 ## Accumulated Context
 
@@ -68,38 +69,52 @@ From Phase 7 (PyTorch Quantization):
 - fbgemm uint8 limitation: PyTorch requires qint8 weights, uint8-only not supported
 - PyTorch int8 matches ONNX Runtime int8: 85.68% vs 85.58% accuracy
 
+From Phase 8 (Comparison Analysis):
+- ONNX Runtime uint8 recommended for best accuracy retention (86.75%, -0.44% drop)
+- All quantized models meet >85% accuracy and <5% drop requirements
+- PyTorch uint8 documented as not supported (fbgemm limitation)
+
 ### Pending Todos
 
-None yet.
+None - project complete.
 
 ### Blockers/Concerns
 
-**v1.2 PTQ Evaluation risks (from research):**
+**All risks resolved:**
 - ✓ Calibration data quality: RESOLVED - Stratified sampling with 1000 samples (100 per class)
 - ✓ Preprocessing mismatches: RESOLVED - Verified identical to evaluate.py (float32, 0-255, NHWC)
 - ✓ ONNX Runtime quantization: RESOLVED - Both int8/uint8 achieve >85% accuracy (85.58%/86.75%)
 - ✓ PyTorch FX mode: RESOLVED - FX graph mode works with onnx2torch models
 - ✓ PyTorch serialization: RESOLVED - JIT tracing enables model serialization
 - ✓ PyTorch uint8: DOCUMENTED - fbgemm requires qint8 weights, uint8-only not possible
+- ✓ Comparison analysis: COMPLETE - Analysis document with recommendations
 
-**Quantization Results Summary:**
+## Final Results Summary
 
-| Model | Accuracy | Delta | Status |
-|-------|----------|-------|--------|
-| FP32 baseline | 87.19% | - | Reference |
-| ONNX Runtime uint8 | 86.75% | -0.44% | Best quantized |
-| PyTorch int8 | 85.68% | -1.51% | Pass (>80%) |
-| ONNX Runtime int8 | 85.58% | -1.61% | Pass (>80%) |
-| PyTorch uint8 | N/A | N/A | Not supported |
+**v1.2 PTQ Evaluation milestone complete.**
+
+| Model | Accuracy | Delta | Size | Reduction |
+|-------|----------|-------|------|-----------|
+| FP32 baseline | 87.19% | - | 315KB | - |
+| ONNX Runtime uint8 | 86.75% | -0.44% | 123KB | 61% |
+| ONNX Runtime int8 | 85.58% | -1.61% | 123KB | 61% |
+| PyTorch int8 | 85.68% | -1.51% | 165KB | 52% |
+| PyTorch uint8 | N/A | N/A | N/A | Not supported |
+
+**Recommendation:** ONNX Runtime uint8 for best accuracy-to-size ratio.
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed Phase 7 (PyTorch Quantization)
+Stopped at: Completed Phase 8 (Comparison Analysis) - PROJECT COMPLETE
 Resume file: None
 
-**Next step:** Plan Phase 8 (Comparison Analysis) via `/gsd:plan-phase 8`
+**Project deliverables:**
+- docs/QUANTIZATION_ANALYSIS.md - Complete PTQ evaluation analysis
+- models/resnet8_int8.onnx - ONNX int8 quantized model
+- models/resnet8_uint8.onnx - ONNX uint8 quantized model
+- models/resnet8_int8.pt - PyTorch int8 quantized model
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-28 after completing Phase 7*
+*Last updated: 2026-01-28 after completing Phase 8 (v1.2 milestone complete)*
