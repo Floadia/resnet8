@@ -126,7 +126,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 07-01-PLAN.md — Quantize PyTorch model to int8 and evaluate accuracy
+- [x] 07-01-PLAN.md — Quantize PyTorch model to int8 and evaluate accuracy
 
 #### Phase 8: Comparison and Analysis
 **Goal**: All quantization results compared with accuracy deltas flagged
@@ -137,10 +137,10 @@ Plans:
   2. All configurations with accuracy drop >5% are flagged in analysis
   3. Model size comparison included (FP32 vs quantized for all models)
   4. Analysis document includes recommendation for best quantization approach
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 08-01-PLAN.md — Create quantization comparison analysis document
 
 ## Progress
 
@@ -155,9 +155,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. PyTorch Evaluation | v1.1 | 1/1 | Complete | 2026-01-27 |
 | 5. Calibration Infrastructure | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 6. ONNX Runtime Quantization | v1.2 | 1/1 | Complete | 2026-01-28 |
-| 7. PyTorch Quantization | v1.2 | 0/1 | Planned | - |
-| 8. Comparison and Analysis | v1.2 | 0/TBD | Not started | - |
+| 7. PyTorch Quantization | v1.2 | 1/1 | Complete | 2026-01-28 |
+| 8. Comparison and Analysis | v1.2 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-28 with Phase 7 planned*
+*Last updated: 2026-01-28 with Phase 8 planned*
