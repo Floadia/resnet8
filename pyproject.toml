@@ -24,6 +24,9 @@ build-backend = "hatchling.build"
 # Allow git+https:// direct references for tf2onnx
 allow-direct-references = true
 
+[dependency-groups]
+dev = ["ruff>=0.8.0"]
+
 [tool.uv]
 # This is a scripts-only project, not an installable package
 package = false
@@ -33,3 +36,10 @@ package = false
 override-dependencies = [
     "protobuf>=5.28.0",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
