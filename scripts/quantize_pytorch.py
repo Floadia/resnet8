@@ -12,10 +12,11 @@ IMPORTANT: onnx2torch models use custom ONNX operations that have limited
 support for PyTorch quantization. This script implements a best-effort approach
 using FX graph mode with JIT tracing to enable model serialization.
 
-NOTE: fbgemm backend supports only int8 quantization (quint8 activations + qint8 weights).
-uint8-only quantization (like ONNX Runtime's U8U8 mode) is NOT supported - PyTorch's
-quantized convolution requires qint8 (signed) weights. The "int8" output from this
-script uses unsigned 8-bit activations (quint8) and signed 8-bit weights (qint8).
+NOTE: fbgemm backend supports only int8 quantization
+(quint8 activations + qint8 weights). uint8-only quantization (like ONNX
+Runtime's U8U8 mode) is NOT supported - PyTorch's quantized convolution
+requires qint8 (signed) weights. The "int8" output from this script uses
+unsigned 8-bit activations (quint8) and signed 8-bit weights (qint8).
 """
 
 import argparse
@@ -28,12 +29,15 @@ import torch
 from torch.ao.quantization import get_default_qconfig
 from torch.utils.data import DataLoader, TensorDataset
 
-# Suppress deprecation warnings for torch.ao.quantization (will migrate to torchao later)
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="torch.ao.quantization")
+# Suppress deprecation warnings for torch.ao.quantization
+# (will migrate to torchao later)
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, module="torch.ao.quantization"
+)
 
 # Add scripts directory to path for calibration_utils import
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from calibration_utils import load_calibration_data
+from calibration_utils import load_calibration_data  # noqa: E402
 
 
 def load_pytorch_model(model_path: str) -> torch.nn.Module:
@@ -87,9 +91,10 @@ def create_calibration_loader(
     print(f"  Shape: {images.shape}")
     print(f"  dtype: {images.dtype}")
     print(f"  Range: [{images.min():.1f}, {images.max():.1f}]")
-    print(f"  Format: NHWC (samples, height, width, channels)")
+    print("  Format: NHWC (samples, height, width, channels)")
 
-    # Convert to tensors - keep NHWC format (model expects this from evaluate_pytorch.py)
+    # Convert to tensors - keep NHWC format
+    # (model expects this from evaluate_pytorch.py)
     dataset = TensorDataset(
         torch.from_numpy(images), torch.from_numpy(labels.astype(np.int64))
     )
@@ -119,7 +124,7 @@ def quantize_model_fx(
         JIT traced quantized model
     """
     from torch.ao.quantization import get_default_qconfig_mapping
-    from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
+    from torch.ao.quantization.quantize_fx import convert_fx, prepare_fx
 
     # Get example input for tracing
     example_input = next(iter(calibration_loader))[0][:1]  # Single sample
@@ -128,8 +133,11 @@ def quantize_model_fx(
     # Configure quantization using proper QConfigMapping API
     print("\nConfiguring quantization (fbgemm backend, FX mode)...")
     qconfig_mapping = get_default_qconfig_mapping("fbgemm")
-    print(f"  Backend: fbgemm")
-    print(f"  Using default qconfig mapping (HistogramObserver for activations, PerChannelMinMaxObserver for weights)")
+    print("  Backend: fbgemm")
+    print(
+        "  Using default qconfig mapping (HistogramObserver for "
+        "activations, PerChannelMinMaxObserver for weights)"
+    )
 
     # Prepare model (trace graph and insert observers)
     print("\nPreparing model (FX graph tracing and inserting observers)...")
@@ -180,7 +188,7 @@ def quantize_model_eager(
     Returns:
         Quantized PyTorch model
     """
-    from torch.ao.quantization import prepare, convert
+    from torch.ao.quantization import convert, prepare
 
     print("\nNote: Eager mode may not work with onnx2torch models")
     print("Use --mode fx for FX graph mode quantization (recommended)")
@@ -296,7 +304,9 @@ def main():
     print(f"Output: {args.output}")
     if args.mode == "fx":
         print("\nNote: FX mode saves TorchScript model (load with torch.jit.load)")
-    print("\nNext step: Evaluate with scripts/evaluate_pytorch.py --model " + args.output)
+    print(
+        "\nNext step: Evaluate with scripts/evaluate_pytorch.py --model " + args.output
+    )
 
 
 if __name__ == "__main__":

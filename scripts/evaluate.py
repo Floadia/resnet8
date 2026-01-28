@@ -33,8 +33,9 @@ def load_cifar10_test(data_dir: str) -> tuple[np.ndarray, np.ndarray, list[str]]
     # Reshape: (10000, 3072) -> (10000, 3, 32, 32) -> (10000, 32, 32, 3)
     images = raw_images.reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
 
-    # Convert to float32 WITHOUT normalizing - model was trained on raw pixel values (0-255)
-    # See: /mnt/ext1/references/tiny/benchmark/training/image_classification/train.py
+    # Convert to float32 WITHOUT normalizing
+    # Model was trained on raw pixel values (0-255)
+    # See: .../image_classification/train.py
     images = images.astype(np.float32)
 
     # Load class names from batches.meta
@@ -48,7 +49,9 @@ def load_cifar10_test(data_dir: str) -> tuple[np.ndarray, np.ndarray, list[str]]
     return images, labels, class_names
 
 
-def evaluate_model(model_path: str, images: np.ndarray, labels: np.ndarray) -> np.ndarray:
+def evaluate_model(
+    model_path: str, images: np.ndarray, labels: np.ndarray
+) -> np.ndarray:
     """Run inference on images using ONNX model.
 
     Args:
@@ -80,8 +83,9 @@ def evaluate_model(model_path: str, images: np.ndarray, labels: np.ndarray) -> n
     return predictions
 
 
-def compute_accuracy(predictions: np.ndarray, labels: np.ndarray,
-                     class_names: list[str]) -> tuple[float, dict[str, tuple[int, int, float]]]:
+def compute_accuracy(
+    predictions: np.ndarray, labels: np.ndarray, class_names: list[str]
+) -> tuple[float, dict[str, tuple[int, int, float]]]:
     """Compute overall and per-class accuracy.
 
     Args:
@@ -118,12 +122,12 @@ def main():
     parser.add_argument(
         "--model",
         default="models/resnet8.onnx",
-        help="Path to ONNX model file (default: models/resnet8.onnx)"
+        help="Path to ONNX model file (default: models/resnet8.onnx)",
     )
     parser.add_argument(
         "--data-dir",
         default="/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py",
-        help="Path to cifar-10-batches-py directory"
+        help="Path to cifar-10-batches-py directory",
     )
     args = parser.parse_args()
 
@@ -158,7 +162,10 @@ def main():
     print("-" * 40)
     for class_name in class_names:
         class_correct, class_total, class_acc = per_class[class_name]
-        print(f"  {class_name:12s}: {class_correct:4d}/{class_total:4d} = {class_acc * 100:5.2f}%")
+        print(
+            f"  {class_name:12s}: {class_correct:4d}/{class_total:4d} = "
+            f"{class_acc * 100:5.2f}%"
+        )
     print("-" * 40)
 
 

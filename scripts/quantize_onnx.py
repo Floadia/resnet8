@@ -17,7 +17,6 @@ import onnx
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from calibration_utils import load_calibration_data
-
 from onnxruntime.quantization import (
     CalibrationDataReader,
     CalibrationMethod,
@@ -107,7 +106,9 @@ def ensure_onnx_model(model_path: str) -> None:
     )
 
     if result.returncode != 0:
-        raise RuntimeError(f"Model conversion failed with exit code {result.returncode}")
+        raise RuntimeError(
+            f"Model conversion failed with exit code {result.returncode}"
+        )
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(
@@ -140,14 +141,17 @@ def quantize_model(
 
     # Set random seed for reproducible calibration
     np.random.seed(seed)
-    print(f"\nQuantization Configuration:")
+    print("\nQuantization Configuration:")
     print("-" * 50)
     print(f"  Random seed: {seed}")
     print(f"  Source model: {model_path}")
-    print(f"  Calibration samples: {samples_per_class * 10} ({samples_per_class} per class)")
-    print(f"  Calibration method: MinMax")
-    print(f"  Quantization format: QDQ (recommended for CPU)")
-    print(f"  Per-channel quantization: False")
+    print(
+        f"  Calibration samples: {samples_per_class * 10}"
+        f" ({samples_per_class} per class)"
+    )
+    print("  Calibration method: MinMax")
+    print("  Quantization format: QDQ (recommended for CPU)")
+    print("  Per-channel quantization: False")
     print("-" * 50)
     print()
 
@@ -175,7 +179,7 @@ def quantize_model(
         calibrate_method=CalibrationMethod.MinMax,
         per_channel=False,
     )
-    print(f"✓ Int8 quantization complete")
+    print("✓ Int8 quantization complete")
     print()
 
     # Quantize to Uint8 (QUInt8)
@@ -197,7 +201,7 @@ def quantize_model(
         calibrate_method=CalibrationMethod.MinMax,
         per_channel=False,
     )
-    print(f"✓ Uint8 quantization complete")
+    print("✓ Uint8 quantization complete")
     print()
 
     # Summary
@@ -212,7 +216,9 @@ def quantize_model(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Quantize ResNet8 ONNX model to int8 and uint8 using static quantization"
+        description=(
+            "Quantize ResNet8 ONNX model to int8 and uint8 using static quantization"
+        )
     )
     parser.add_argument(
         "--model",

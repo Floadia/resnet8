@@ -89,8 +89,8 @@ def load_calibration_data(
     # Reshape: (N, 3072) -> (N, 3, 32, 32) -> (N, 32, 32, 3)
     calibration_images = calibration_images.reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
 
-    # Convert to float32 WITHOUT normalizing - model was trained on raw pixel values (0-255)
-    # See: evaluate.py line 38
+    # Convert to float32 WITHOUT normalizing
+    # Model was trained on raw pixel values (0-255). See: evaluate.py line 38
     calibration_images = calibration_images.astype(np.float32)
 
     return calibration_images, calibration_labels, class_names
@@ -166,7 +166,7 @@ def main():
     print(f"  dtype: {images.dtype}")
     print(f"  shape: {images.shape}")
     print(f"  pixel range: [{images.min():.1f}, {images.max():.1f}]")
-    print(f"  format: NHWC (samples, height, width, channels)")
+    print("  format: NHWC (samples, height, width, channels)")
     print("-" * 40)
 
     # Verify class distribution
@@ -182,25 +182,30 @@ def main():
         print(f"✗ Total samples: {total_samples} (expected {expected_total})")
 
     if images.dtype == np.float32:
-        print(f"✓ dtype: float32")
+        print("✓ dtype: float32")
     else:
         print(f"✗ dtype: {images.dtype} (expected float32)")
 
     if images.shape == (total_samples, 32, 32, 3):
-        print(f"✓ shape: NHWC format")
+        print("✓ shape: NHWC format")
     else:
         print(f"✗ shape: {images.shape} (expected ({total_samples}, 32, 32, 3))")
 
     if 0 <= images.min() <= 5 and 250 <= images.max() <= 255:
-        print(f"✓ pixel range: [0, 255] (no normalization)")
+        print("✓ pixel range: [0, 255] (no normalization)")
     else:
-        print(f"⚠ pixel range: [{images.min():.1f}, {images.max():.1f}] (expected [0, 255])")
+        print(
+            f"⚠ pixel range: [{images.min():.1f}, {images.max():.1f}]"
+            f" (expected [0, 255])"
+        )
 
-    all_balanced = all(count == args.samples_per_class for count in distribution.values())
+    all_balanced = all(
+        count == args.samples_per_class for count in distribution.values()
+    )
     if all_balanced:
         print(f"✓ distribution: balanced ({args.samples_per_class} per class)")
     else:
-        print(f"✗ distribution: imbalanced")
+        print("✗ distribution: imbalanced")
 
     print("-" * 40)
 
