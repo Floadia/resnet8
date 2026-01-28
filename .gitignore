@@ -3,6 +3,9 @@ venv/
 .venv/
 env/
 
+# uv artifacts
+uv.lock
+
 # ONNX model output (generated file)
 models/*.onnx
 
