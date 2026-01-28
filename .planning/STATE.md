@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 Phase: 8 of 8 (Comparison Analysis)
 Plan: 1 of 1 in current phase
 Status: Project complete
-Last activity: 2026-01-28 — Completed 08-01-PLAN.md (PTQ comparison analysis)
+Last activity: 2026-01-28 — Completed quick task 001: Use uv instead of old python management system
 
 Progress: [██████████] 100% (8/8 phases complete)
 
@@ -77,6 +77,12 @@ From Phase 8 (Comparison Analysis):
 ### Pending Todos
 
 None - project complete.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 001 | Use uv instead of old python management system | 2026-01-28 | 62cd2a0 | [001-use-uv-instead-of-old-python-management-](./quick/001-use-uv-instead-of-old-python-management-/) |
 
 ### Blockers/Concerns
 
