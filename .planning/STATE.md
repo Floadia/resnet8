@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 Phase: 8 of 8 (Comparison Analysis)
 Plan: 1 of 1 in current phase
 Status: Project complete
-Last activity: 2026-01-28 — Completed quick task 001: Use uv instead of old python management system
+Last activity: 2026-01-28 — Completed quick task 002: Add comprehensive README.md
 
 Progress: [██████████] 100% (8/8 phases complete)
 
@@ -83,6 +83,7 @@ None - project complete.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 001 | Use uv instead of old python management system | 2026-01-28 | 62cd2a0 | [001-use-uv-instead-of-old-python-management-](./quick/001-use-uv-instead-of-old-python-management-/) |
+| 002 | Add comprehensive README.md | 2026-01-28 | 8ca7d31 | [002-add-readme](./quick/002-add-readme/) |
 
 ### Blockers/Concerns
 
@@ -112,10 +113,11 @@ None - project complete.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed Phase 8 (Comparison Analysis) - PROJECT COMPLETE
+Stopped at: Completed quick task 002 (Add README.md)
 Resume file: None
 
 **Project deliverables:**
+- README.md - Comprehensive project documentation with usage examples
 - docs/QUANTIZATION_ANALYSIS.md - Complete PTQ evaluation analysis
 - models/resnet8_int8.onnx - ONNX int8 quantized model
 - models/resnet8_uint8.onnx - ONNX uint8 quantized model
