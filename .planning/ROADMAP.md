@@ -123,10 +123,10 @@ Plans:
   3. Quantized models evaluate successfully on CIFAR-10 test set
   4. Accuracy delta reported for int8 model vs 87.19% baseline
   5. Accuracy delta reported for uint8 model (if created) vs 87.19% baseline
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 07-01-PLAN.md — Quantize PyTorch model to int8 and evaluate accuracy
 
 #### Phase 8: Comparison and Analysis
 **Goal**: All quantization results compared with accuracy deltas flagged
@@ -155,9 +155,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. PyTorch Evaluation | v1.1 | 1/1 | Complete | 2026-01-27 |
 | 5. Calibration Infrastructure | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 6. ONNX Runtime Quantization | v1.2 | 1/1 | Complete | 2026-01-28 |
-| 7. PyTorch Quantization | v1.2 | 0/TBD | Not started | - |
+| 7. PyTorch Quantization | v1.2 | 0/1 | Planned | - |
 | 8. Comparison and Analysis | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-28 with Phase 6 complete*
+*Last updated: 2026-01-28 with Phase 7 planned*
