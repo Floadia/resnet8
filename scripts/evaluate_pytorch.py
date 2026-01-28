@@ -17,7 +17,8 @@ def load_cifar10_test(data_dir: str) -> tuple[np.ndarray, np.ndarray, list[str]]
 
     Returns:
         Tuple of (images, labels, class_names)
-        - images: float32 array of shape (10000, 32, 32, 3) with raw pixel values (0-255)
+        - images: float32 array of shape (10000, 32, 32, 3)
+          with raw pixel values (0-255)
         - labels: int array of shape (10000,)
         - class_names: list of 10 class name strings
     """
@@ -76,7 +77,9 @@ def load_pytorch_model(model_path: str) -> torch.nn.Module:
     return model
 
 
-def evaluate_model(model: torch.nn.Module, images: np.ndarray, labels: np.ndarray) -> np.ndarray:
+def evaluate_model(
+    model: torch.nn.Module, images: np.ndarray, labels: np.ndarray
+) -> np.ndarray:
     """Run inference on images using PyTorch model.
 
     Args:
@@ -103,8 +106,9 @@ def evaluate_model(model: torch.nn.Module, images: np.ndarray, labels: np.ndarra
     return predictions
 
 
-def compute_accuracy(predictions: np.ndarray, labels: np.ndarray,
-                     class_names: list[str]) -> tuple[float, dict[str, tuple[int, int, float]]]:
+def compute_accuracy(
+    predictions: np.ndarray, labels: np.ndarray, class_names: list[str]
+) -> tuple[float, dict[str, tuple[int, int, float]]]:
     """Compute overall and per-class accuracy.
 
     Args:
@@ -141,12 +145,12 @@ def main():
     parser.add_argument(
         "--model",
         default="models/resnet8.pt",
-        help="Path to PyTorch model file (default: models/resnet8.pt)"
+        help="Path to PyTorch model file (default: models/resnet8.pt)",
     )
     parser.add_argument(
         "--data-dir",
         default="/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py",
-        help="Path to cifar-10-batches-py directory"
+        help="Path to cifar-10-batches-py directory",
     )
     args = parser.parse_args()
 
@@ -186,7 +190,10 @@ def main():
     print("-" * 40)
     for class_name in class_names:
         class_correct, class_total, class_acc = per_class[class_name]
-        print(f"  {class_name:12s}: {class_correct:4d}/{class_total:4d} = {class_acc * 100:5.2f}%")
+        print(
+            f"  {class_name:12s}: {class_correct:4d}/{class_total:4d} = "
+            f"{class_acc * 100:5.2f}%"
+        )
     print("-" * 40)
 
 
