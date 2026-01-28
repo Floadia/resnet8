@@ -39,10 +39,10 @@
 
 ### ONNX Runtime Quantization
 
-- [ ] **ORT-01**: ONNX model quantized to int8 using static quantization
-- [ ] **ORT-02**: ONNX model quantized to uint8 using static quantization
-- [ ] **ORT-03**: Quantized ONNX models evaluated on CIFAR-10 test set
-- [ ] **ORT-04**: Accuracy delta reported vs 87.19% baseline
+- [x] **ORT-01**: ONNX model quantized to int8 using static quantization
+- [x] **ORT-02**: ONNX model quantized to uint8 using static quantization
+- [x] **ORT-03**: Quantized ONNX models evaluated on CIFAR-10 test set
+- [x] **ORT-04**: Accuracy delta reported vs 87.19% baseline
 
 ### PyTorch Quantization
 
@@ -103,10 +103,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PT-05 | Phase 4 | Complete |
 | CAL-01 | Phase 5 | Complete |
 | CAL-02 | Phase 5 | Complete |
-| ORT-01 | Phase 6 | Pending |
-| ORT-02 | Phase 6 | Pending |
-| ORT-03 | Phase 6 | Pending |
-| ORT-04 | Phase 6 | Pending |
+| ORT-01 | Phase 6 | Complete |
+| ORT-02 | Phase 6 | Complete |
+| ORT-03 | Phase 6 | Complete |
+| ORT-04 | Phase 6 | Complete |
 | PTQ-01 | Phase 7 | Pending |
 | PTQ-02 | Phase 7 | Pending |
 | PTQ-03 | Phase 7 | Pending |
@@ -123,4 +123,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-01-28 with Phase 5 complete*
+*Last updated: 2026-01-28 with Phase 6 complete*

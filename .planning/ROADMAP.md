@@ -111,7 +111,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 06-01-PLAN.md — Quantize ONNX model to int8/uint8 and evaluate accuracy
+- [x] 06-01-PLAN.md — Quantize ONNX model to int8/uint8 and evaluate accuracy
 
 #### Phase 7: PyTorch Quantization
 **Goal**: PyTorch models quantized to int8/uint8 with evaluated accuracy vs baseline
@@ -154,10 +154,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. PyTorch Conversion | v1.1 | 1/1 | Complete | 2026-01-27 |
 | 4. PyTorch Evaluation | v1.1 | 1/1 | Complete | 2026-01-27 |
 | 5. Calibration Infrastructure | v1.2 | 1/1 | Complete | 2026-01-28 |
-| 6. ONNX Runtime Quantization | v1.2 | 0/1 | Planned | - |
+| 6. ONNX Runtime Quantization | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 7. PyTorch Quantization | v1.2 | 0/TBD | Not started | - |
 | 8. Comparison and Analysis | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-28 with Phase 6 planned*
+*Last updated: 2026-01-28 with Phase 6 complete*
