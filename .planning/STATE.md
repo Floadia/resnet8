@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-28)
 
 **Core value:** Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** v1.2 PTQ Evaluation COMPLETE
+**Current focus:** v1.3 Quantized Operations Documentation
 
 ## Current Position
 
-Phase: 8 of 8 (Comparison Analysis)
-Plan: 1 of 1 in current phase
-Status: Project complete
-Last activity: 2026-01-28 — Completed quick task 003: Add CI linting with ruff
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-02 — Milestone v1.3 started
 
-Progress: [██████████] 100% (8/8 phases complete)
+Progress: [░░░░░░░░░░] 0% (0/? phases complete)
 
 ## Performance Metrics
 
