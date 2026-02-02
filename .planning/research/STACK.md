@@ -454,3 +454,569 @@ print(torch.backends.quantized.engine)
 6. **Evaluate and compare** - Run both quantized models through evaluation, compare to 87.19% baseline
 
 Each script should follow existing patterns in `scripts/` directory (argparse CLI, clear output logging).
+
+---
+
+# Milestone v1.3: Quantized Operations Documentation Stack
+
+**Researched:** 2026-02-02
+**Confidence:** HIGH
+
+## Executive Summary
+
+**For documenting quantized operations with visualization:** Three-tool stack using ONNX Python API for programmatic extraction, onnx.tools.net_drawer + pydot for graph visualization, and GitHub-flavored Markdown with MathJax for math equations. **No major new dependencies** - visualization tools require only graphviz (system) and pydot (Python).
+
+## Documentation Objective (v1.3)
+
+Create reference markdown documentation explaining:
+1. **QLinear operation math** - Scale, zero-point, integer arithmetic for hardware implementation
+2. **QuantizeLinear/DequantizeLinear** - Input/output boundary operations
+3. **ONNX graph visualization** - Netron-style diagrams of quantized models
+4. **Operation extraction** - Programmatic access to node details, attributes, parameters
+
+## Recommended Stack for v1.3
+
+### ONNX Model Inspection (Already Available)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **onnx** | >=1.17.0 (in pyproject.toml) | ONNX model loading and inspection | Core library - load models, iterate nodes, access attributes |
+| **onnxruntime** | >=1.23.2 (in pyproject.toml) | Model validation | Verify model structure before documenting |
+
+**No installation needed** - Already in project dependencies.
+
+**API for extraction:**
+```python
+import onnx
+
+# Load quantized model
+model = onnx.load("models/resnet8_int8.onnx")
+
+# Iterate through nodes
+for node in model.graph.node:
+    print(f"Op: {node.op_type}")
+    print(f"Inputs: {node.input}")
+    print(f"Outputs: {node.output}")
+    # Access attributes
+    for attr in node.attribute:
+        print(f"{attr.name}: {attr}")
+```
+
+**Confidence:** HIGH - Official ONNX Python API, verified in documentation
+
+**Sources:**
+- [ONNX Python API Overview](https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html)
+- [ONNX with Python](https://onnx.ai/onnx/intro/python.html)
+
+### ONNX Graph Visualization (New for v1.3)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **onnx.tools.net_drawer** | Built into onnx | Generate pydot graphs from ONNX models | Official ONNX visualization tool - produces Graphviz DOT representations |
+| **pydot** | Latest (>=3.0.0) | Python interface to Graphviz | Convert pydot graphs to PNG/SVG for documentation |
+| **graphviz** | Latest (system package) | Graph rendering engine | Renders DOT files to images (PNG, SVG, PDF) |
+
+**Installation:**
+```bash
+# Python package (only pydot needed, onnx.tools.net_drawer is built-in)
+pip install pydot
+
+# System package (graphviz - for rendering)
+# Ubuntu/Debian:
+sudo apt-get install graphviz
+
+# macOS:
+brew install graphviz
+
+# Windows (via Chocolatey):
+choco install graphviz
+```
+
+**Usage pattern:**
+```python
+import onnx
+from onnx.tools.net_drawer import GetPydotGraph, GetOpNodeProducer
+
+# Load ONNX model
+model = onnx.load("models/resnet8_int8.onnx")
+
+# Generate pydot graph
+pydot_graph = GetPydotGraph(
+    model.graph,
+    name="ResNet8_Quantized",
+    rankdir="TB",  # Top-to-bottom layout
+    node_producer=GetOpNodeProducer(embed_docstring=False)
+)
+
+# Save as DOT file
+pydot_graph.write_dot("docs/resnet8_graph.dot")
+
+# Convert to PNG directly
+pydot_graph.write_png("docs/resnet8_graph.png")
+
+# Or convert to SVG (better for web docs)
+pydot_graph.write_svg("docs/resnet8_graph.svg")
+```
+
+**Why NOT Netron directly:**
+- Netron is primarily a viewer (GUI application)
+- Python API only provides `netron.start()` to launch web viewer
+- No programmatic export to images for documentation
+- Not designed for automated documentation workflows
+
+**Why NOT onnx-visualizer or onnx-vis:**
+- Client-server architectures designed for interactive exploration
+- Require running web servers to view visualizations
+- More complex than needed for static documentation
+- net_drawer is simpler and official ONNX tooling
+
+**Confidence:** HIGH - Official ONNX tools, pydot well-established
+
+**Sources:**
+- [ONNX Visualizing a Model Tutorial](https://github.com/onnx/tutorials/blob/main/tutorials/VisualizingAModel.md)
+- [onnx.tools.net_drawer Source](https://github.com/onnx/onnx/blob/main/onnx/tools/net_drawer.py)
+- [pydot GitHub](https://github.com/pydot/pydot)
+
+### Markdown Math Documentation (Already Available)
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **GitHub Markdown** | Native | Documentation format | LaTeX math support via MathJax (May 2024+) |
+| **MathJax** | 3.x (GitHub-hosted) | Math equation rendering | Renders LaTeX equations in GitHub markdown |
+
+**No installation needed** - GitHub natively supports math since May 2024.
+
+**Syntax:**
+```markdown
+## Quantization Formula
+
+Inline math: The quantized value is computed as $q = \text{round}(\frac{x}{s}) + z$
+
+Block equation:
+$$
+x_{\text{dequantized}} = (q - z_{\text{zero\_point}}) \times s_{\text{scale}}
+$$
+
+## QLinearConv Operation
+
+The quantized convolution computes:
+
+$$
+\begin{aligned}
+Y_{\text{int8}} &= \text{Conv2D}(X_{\text{int8}}, W_{\text{int8}}) \\
+Y_{\text{fp32}} &= (Y_{\text{int8}} - z_y) \times s_y
+\end{aligned}
+$$
+
+Where:
+- $X_{\text{int8}}$ is quantized input: $X_{\text{int8}} = \text{round}(X_{\text{fp32}} / s_x) + z_x$
+- $W_{\text{int8}}$ is quantized weight
+- $s_x, s_y$ are scale factors
+- $z_x, z_y$ are zero-points
+```
+
+**Rendered output:** GitHub automatically renders LaTeX using MathJax when viewing .md files.
+
+**Alternative for local preview:**
+- Use VSCode with extensions: "Markdown Preview Enhanced" or "Markdown All in One"
+- Both support LaTeX math rendering in live preview
+
+**Why NOT Jupyter notebooks:**
+- Documentation lives in repo as markdown (version controlled, review-friendly)
+- Jupyter adds complexity (requires notebook server, JSON format harder to diff)
+- Markdown is more accessible and searchable
+
+**Confidence:** HIGH - GitHub native support verified, widely used
+
+**Sources:**
+- [GitHub Writing Mathematical Expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)
+- [Math Support in Markdown - GitHub Blog](https://github.blog/news-insights/product-news/math-support-in-markdown/)
+
+### QLinearConv/QLinearMatMul Operation Details (Reference)
+
+**ONNX operator documentation provides:**
+- Input/output tensor specifications
+- Attribute definitions (dilations, group, kernel_shape, pads, strides)
+- Mathematical descriptions
+- Type constraints
+
+**Key QLinearConv inputs (for documentation):**
+1. `x` (T1): Input tensor [N × C × H × W]
+2. `x_scale` (float): Input quantization scale
+3. `x_zero_point` (T1): Input quantization zero-point
+4. `w` (T2): Weight tensor [M × C/group × kH × kW]
+5. `w_scale` (float): Weight quantization scale (scalar or per-channel)
+6. `w_zero_point` (T2): Weight quantization zero-point
+7. `y_scale` (float): Output quantization scale
+8. `y_zero_point` (T3): Output quantization zero-point
+9. `B` (optional, T4): Bias tensor [M]
+
+**QLinearMatMul inputs:**
+1. `a`, `a_scale`, `a_zero_point` (matrix A)
+2. `b`, `b_scale`, `b_zero_point` (matrix B)
+3. `y_scale`, `y_zero_point` (output Y)
+
+**Sources:**
+- [QLinearConv - ONNX 1.20.0 Documentation](https://onnx.ai/onnx/operators/onnx__QLinearConv.html)
+- [QLinearMatMul - ONNX 1.20.0 Documentation](https://onnx.ai/onnx/operators/onnx__QLinearMatMul.html)
+
+## Optional Tools (NOT Recommended for v1.3)
+
+### onnx-tool - NOT NEEDED
+
+**Library:** onnx-tool
+**Purpose:** Shape inference, MACs/FLOPs counting, subgraph extraction
+
+**Why NOT adding:**
+- v1.3 focuses on documentation, not performance profiling
+- MACs/FLOPs counting is out of scope (accuracy only, not inference speed)
+- ONNX Python API sufficient for operation extraction
+- Adds dependency without clear benefit for current milestone
+
+**Defer to:** Future milestone if performance analysis becomes requirement
+
+**Sources:**
+- [onnx-tool PyPI](https://pypi.org/project/onnx-tool/0.2.9/)
+- [onnx-tool GitHub](https://github.com/ThanatosShinji/onnx-tool)
+
+### Netron - REFERENCE ONLY
+
+**Tool:** Netron (GUI visualizer)
+**Purpose:** Interactive ONNX model exploration
+
+**Why NOT using programmatically:**
+- Primarily a viewer application (desktop/web GUI)
+- Python API limited to `netron.start()` (launches viewer)
+- Cannot export visualizations programmatically
+- Better as manual reference tool, not for automated docs
+
+**Usage recommendation:** Use Netron manually to explore models and verify your documented visualizations match reality, but use onnx.tools.net_drawer for generating documentation diagrams.
+
+**How to use as reference:**
+```bash
+# Install (if needed for manual exploration)
+pip install netron
+
+# Launch viewer
+netron models/resnet8_int8.onnx
+```
+
+**Sources:**
+- [Netron GitHub](https://github.com/lutzroeder/netron)
+- [Netron PyPI](https://pypi.org/project/netron/)
+
+## Implementation Approach for v1.3
+
+### Phase 1: Extract Operation Details Programmatically
+
+**Script:** `scripts/extract_operations.py`
+
+**Purpose:** Parse quantized ONNX models and extract QLinear operation details
+
+**Output:** JSON or structured text file listing:
+- All QLinearConv nodes with attributes
+- All QLinearMatMul nodes with attributes
+- QuantizeLinear/DequantizeLinear nodes at boundaries
+- Scale and zero-point values per operation
+
+**Implementation:**
+```python
+import onnx
+import json
+
+def extract_qlinear_ops(model_path):
+    model = onnx.load(model_path)
+    operations = []
+
+    for node in model.graph.node:
+        if node.op_type in ['QLinearConv', 'QLinearMatMul', 'QuantizeLinear', 'DequantizeLinear']:
+            op_info = {
+                'name': node.name,
+                'op_type': node.op_type,
+                'inputs': list(node.input),
+                'outputs': list(node.output),
+                'attributes': {attr.name: onnx.helper.get_attribute_value(attr)
+                               for attr in node.attribute}
+            }
+            operations.append(op_info)
+
+    return operations
+
+# Usage
+ops = extract_qlinear_ops("models/resnet8_int8.onnx")
+with open("docs/operations.json", "w") as f:
+    json.dump(ops, f, indent=2, default=str)
+```
+
+### Phase 2: Generate Graph Visualizations
+
+**Script:** `scripts/visualize_graph.py`
+
+**Purpose:** Create PNG/SVG visualizations of quantized ONNX models
+
+**Output:**
+- `docs/resnet8_int8_graph.png` - Full model graph
+- `docs/resnet8_uint8_graph.png` - Alternative quantization
+- `docs/qlinear_conv_detail.png` - Zoomed-in single operation
+
+**Implementation:**
+```python
+import onnx
+from onnx.tools.net_drawer import GetPydotGraph, GetOpNodeProducer
+
+def visualize_model(model_path, output_path, rankdir="TB"):
+    model = onnx.load(model_path)
+
+    pydot_graph = GetPydotGraph(
+        model.graph,
+        name=model.graph.name,
+        rankdir=rankdir,
+        node_producer=GetOpNodeProducer(embed_docstring=False)
+    )
+
+    # Save both formats
+    pydot_graph.write_png(output_path.replace('.svg', '.png'))
+    pydot_graph.write_svg(output_path)
+    print(f"Saved visualization to {output_path}")
+
+# Usage
+visualize_model("models/resnet8_int8.onnx", "docs/resnet8_int8_graph.svg")
+```
+
+### Phase 3: Write Markdown Documentation
+
+**Files to create:**
+- `docs/QUANTIZATION_OPERATIONS.md` - Main documentation
+- `docs/QLINEAR_CONV.md` - QLinearConv detailed breakdown
+- `docs/QLINEAR_MATMUL.md` - QLinearMatMul detailed breakdown
+- `docs/QUANTIZE_DEQUANTIZE.md` - Boundary operations
+
+**Structure:**
+```markdown
+# Quantized Operations Reference
+
+## Overview
+
+This document explains quantized operations in the ResNet8 int8 model for hardware implementation.
+
+## Graph Visualization
+
+![ResNet8 Quantized Graph](resnet8_int8_graph.svg)
+
+## QLinearConv Operation
+
+### Mathematical Formulation
+
+The QLinearConv operation performs quantized convolution:
+
+$$
+Y_{\text{quantized}} = \text{Conv2D}(X_{\text{quantized}}, W_{\text{quantized}})
+$$
+
+Where quantization is defined as:
+
+$$
+X_{\text{quantized}} = \text{clamp}\left(\text{round}\left(\frac{X_{\text{fp32}}}{s_x}\right) + z_x, 0, 255\right)
+$$
+
+### Hardware Implementation
+
+For hardware accelerators, the operation decomposes into:
+
+1. **Integer convolution** (int8 × int8 → int32 accumulation)
+2. **Requantization** (int32 → int8 with new scale/zero-point)
+3. **Activation** (ReLU in quantized domain)
+
+[Detailed parameter table extracted from operations.json]
+
+### ONNX Node Structure
+
+```
+Node: QLinearConv_0
+  Inputs: ['x_quantized', 'x_scale', 'x_zero_point',
+           'w_quantized', 'w_scale', 'w_zero_point',
+           'y_scale', 'y_zero_point', 'bias']
+  Attributes:
+    - dilations: [1, 1]
+    - group: 1
+    - kernel_shape: [3, 3]
+    - pads: [1, 1, 1, 1]
+    - strides: [1, 1]
+```
+```
+
+## Documentation Checklist for v1.3
+
+- [ ] Extract all QLinearConv nodes from resnet8_int8.onnx
+- [ ] Extract all QLinearMatMul nodes (if any)
+- [ ] Identify QuantizeLinear/DequantizeLinear boundaries
+- [ ] Generate full graph visualizations (PNG + SVG)
+- [ ] Write mathematical formulations with LaTeX
+- [ ] Document hardware implementation considerations
+- [ ] Create parameter reference tables
+- [ ] Cross-reference with official ONNX operator docs
+- [ ] Verify equations render correctly on GitHub
+- [ ] Test local markdown preview (VSCode)
+
+## Stack Summary for v1.3
+
+| Component | Technology | Installation | Confidence |
+|-----------|-----------|--------------|------------|
+| **Model loading** | onnx (>=1.17.0) | Already installed | HIGH |
+| **Operation extraction** | onnx.helper API | Built into onnx | HIGH |
+| **Graph visualization** | onnx.tools.net_drawer | Built into onnx | HIGH |
+| **DOT to image** | pydot + graphviz | `pip install pydot` + system graphviz | HIGH |
+| **Math equations** | GitHub Markdown + MathJax | No install (native) | HIGH |
+
+## Installation for v1.3
+
+### Minimal Addition to Existing Stack
+
+```bash
+# Only one new Python package needed
+pip install pydot
+
+# System dependency (graphviz)
+# Ubuntu/Debian:
+sudo apt-get install graphviz
+
+# macOS:
+brew install graphviz
+
+# Windows:
+choco install graphviz
+# OR download from https://graphviz.org/download/
+```
+
+### Verify Installation
+
+```bash
+# Test pydot import
+python -c "import pydot; print('pydot OK')"
+
+# Test graphviz command-line tool
+dot -V
+# Should output: dot - graphviz version X.X.X
+
+# Test onnx.tools.net_drawer
+python -c "from onnx.tools.net_drawer import GetPydotGraph; print('net_drawer OK')"
+```
+
+## Integration with Existing Project
+
+### Current project structure:
+```
+resnet8/
+├── models/
+│   ├── resnet8_int8.pt       # PyTorch quantized model (v1.2)
+│   └── resnet8.pt             # PyTorch fp32 model (v1.1)
+├── scripts/
+│   ├── quantize_onnx.py      # ONNX quantization (v1.2)
+│   └── quantize_pytorch.py   # PyTorch quantization (v1.2)
+└── pyproject.toml            # Dependencies
+```
+
+### Additions for v1.3:
+```
+resnet8/
+├── docs/                     # NEW - Documentation directory
+│   ├── QUANTIZATION_OPERATIONS.md
+│   ├── QLINEAR_CONV.md
+│   ├── resnet8_int8_graph.png
+│   └── operations.json
+└── scripts/
+    ├── extract_operations.py  # NEW - Extract op details
+    └── visualize_graph.py     # NEW - Generate diagrams
+```
+
+### Workflow:
+1. Run `scripts/extract_operations.py` → `docs/operations.json`
+2. Run `scripts/visualize_graph.py` → `docs/*.png` and `docs/*.svg`
+3. Write markdown docs referencing extracted data and diagrams
+4. Push to GitHub → Math equations render automatically
+
+## Known Constraints
+
+### Graphviz System Dependency
+- **Issue:** graphviz must be installed at system level (not just Python package)
+- **Why:** pydot calls `dot` command-line tool to render graphs
+- **Mitigation:** Document installation for common platforms (apt, brew, choco)
+- **Fallback:** If graphviz unavailable, can still generate .dot files and render elsewhere
+
+### Large Graph Complexity
+- **Issue:** ResNet8 graph may be too large for readable single-image visualization
+- **Why:** Many nodes and edges create cluttered diagrams
+- **Mitigation:**
+  1. Use SVG format (zoomable in browsers)
+  2. Generate subgraph visualizations (extract specific layers)
+  3. Adjust rankdir ("TB" vs "LR") for better layout
+  4. Use Netron manually for interactive exploration, export screenshots
+
+### GitHub Math Rendering
+- **Issue:** Math only renders on GitHub web interface, not in git clients or some editors
+- **Why:** Requires MathJax JavaScript processing
+- **Mitigation:** Use VSCode extensions for local preview during writing
+
+## Success Criteria for v1.3 Documentation
+
+### Functional
+1. All quantized models visualized as PNG/SVG diagrams
+2. All QLinear operations extracted with complete parameter lists
+3. Markdown documentation renders math equations correctly on GitHub
+4. Scripts run without errors on clean Python environment
+
+### Quality
+1. Documentation explains hardware-implementable integer arithmetic
+2. Mathematical formulations are precise and verifiable
+3. Visualizations are readable (not cluttered)
+4. Cross-references to official ONNX operator documentation provided
+
+### Completeness
+1. QLinearConv operations fully documented
+2. QuantizeLinear/DequantizeLinear boundary operations explained
+3. Scale and zero-point propagation through graph documented
+4. Example implementation pseudocode provided for hardware developers
+
+## Sources Summary
+
+### Official ONNX Documentation (HIGH confidence)
+- [ONNX Python API Overview](https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html)
+- [ONNX with Python](https://onnx.ai/onnx/intro/python.html)
+- [QLinearConv Operator](https://onnx.ai/onnx/operators/onnx__QLinearConv.html)
+- [QLinearMatMul Operator](https://onnx.ai/onnx/operators/onnx__QLinearMatMul.html)
+
+### Visualization Tools (HIGH confidence)
+- [ONNX Visualizing a Model Tutorial](https://github.com/onnx/tutorials/blob/main/tutorials/VisualizingAModel.md)
+- [onnx.tools.net_drawer Source Code](https://github.com/onnx/onnx/blob/main/onnx/tools/net_drawer.py)
+- [pydot GitHub Repository](https://github.com/pydot/pydot)
+
+### Markdown Math Support (HIGH confidence)
+- [GitHub Writing Mathematical Expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)
+- [Math Support in Markdown - GitHub Blog](https://github.blog/news-insights/product-news/math-support-in-markdown/)
+
+### Reference Tools (MEDIUM confidence - supplementary)
+- [Netron GitHub](https://github.com/lutzroeder/netron) - Manual exploration tool
+- [onnx-tool PyPI](https://pypi.org/project/onnx-tool/0.2.9/) - Optional profiling (deferred)
+
+## Risk Assessment for v1.3
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Graphviz not installed | Medium | High | Clear installation docs for all platforms, check in scripts |
+| Graph too complex to visualize | Medium | Low | Use SVG (zoomable), generate subgraphs, provide Netron as fallback |
+| Math rendering issues | Low | Medium | Test on GitHub before finalizing, provide VSCode preview instructions |
+| Missing ONNX models | Low | High | v1.2 already generated int8/uint8 ONNX models - verify they exist |
+| Operation extraction incomplete | Low | Medium | Cross-reference with Netron manual inspection |
+
+## Next Steps for v1.3 Implementation
+
+1. **Install pydot + graphviz** - Add to dev dependencies, document system install
+2. **Create docs/ directory** - Initialize documentation structure
+3. **Write extract_operations.py** - Parse ONNX models, output JSON
+4. **Write visualize_graph.py** - Generate PNG/SVG diagrams
+5. **Draft QUANTIZATION_OPERATIONS.md** - Main documentation with math equations
+6. **Generate all visualizations** - Run visualization script on all quantized models
+7. **Validate on GitHub** - Push and verify math rendering, image display
+8. **Cross-reference official docs** - Link to ONNX operator documentation
+
+Each script follows existing project patterns: argparse CLI, clear logging, error handling.

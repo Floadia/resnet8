@@ -1,272 +1,707 @@
-# Feature Landscape: PTQ Evaluation
+# Feature Landscape: Quantized Operations for Hardware Accelerators
 
-**Domain:** Post-Training Quantization (PTQ) for ResNet8 CIFAR-10
-**Researched:** 2026-01-28
-**Context:** Adding PTQ evaluation to existing full-precision evaluation codebase (87.19% baseline accuracy)
+**Domain:** Quantized Neural Network Operations
+**Researched:** 2026-02-02
+**Project:** ResNet8 Hardware Accelerator Documentation
+**Milestone:** v1.3 Quantized Operations Documentation
+**Confidence:** HIGH
 
-## Table Stakes
+## Executive Summary
 
-Features users expect for PTQ evaluation. Missing = incomplete PTQ assessment.
+This research documents the exact mathematical operations required for implementing quantized neural network inference in hardware accelerators. The focus is on ONNX quantized operators (QLinearConv, QLinearMatMul, QuantizeLinear, DequantizeLinear) and their PyTorch equivalents, with emphasis on the integer arithmetic that hardware must implement.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **ONNX Runtime static quantization** | Industry-standard quantization path for ONNX models | Medium | Uses `quantize_static()` API with calibration data |
-| **PyTorch static quantization** | Native PyTorch quantization for converted models | Medium | New PT2E export-based approach recommended (88% model coverage) |
-| **int8 quantization support** | Standard 8-bit signed quantization, most common format | Low | Symmetric for weights, asymmetric for activations |
-| **uint8 quantization support** | Unsigned 8-bit quantization, hardware-dependent benefits | Low | Alternative to int8, may suit ReLU activations better |
-| **Calibration data preparation** | Required for static PTQ to compute scale/zero-point | Low | Subset of training/validation data (100-512 samples typical) |
-| **MinMax calibration method** | Simplest calibration method, baseline approach | Low | Uses min/max values from calibration data |
-| **Quantized model accuracy evaluation** | Must measure accuracy impact of quantization | Low | Reuses existing CIFAR-10 evaluation infrastructure |
-| **Per-class accuracy breakdown** | Identify which classes suffer most from quantization | Low | Already implemented for full-precision models |
-| **Accuracy delta reporting** | Quantified accuracy loss vs 87.19% baseline | Low | Critical for assessing quantization viability |
-
-## Differentiators
-
-Features that provide deeper insight. Not expected, but valuable.
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Multiple calibration methods** | Compare MinMax vs Entropy vs Percentile | Medium | ONNX Runtime supports 3 methods, helps find optimal calibration |
-| **Per-channel weight quantization** | Can improve accuracy for models with large weight ranges | Medium | ONNX Runtime supports this, may need reduce_range on AVX2/AVX512 |
-| **Calibration set size sensitivity** | Test 100 vs 256 vs 512 samples impact on accuracy | Low | Understand minimum viable calibration data |
-| **Symmetric vs asymmetric quantization** | Compare different quantization schemes | Medium | PyTorch allows configuring per-layer quantization schemes |
-| **Observer comparison (PyTorch)** | MinMax vs MovingAverageMinMax observers | Medium | Different observers for weights vs activations recommended |
-| **Quantization format comparison** | QDQ vs QOperator (ONNX Runtime) | Medium | QDQ more portable, QOperator potentially faster |
-| **Per-layer quantization sensitivity** | Identify which layers degrade accuracy most | High | Requires instrumentation, useful for mixed-precision exploration |
-| **Confusion matrix comparison** | Full-precision vs quantized confusion matrices | Low | Visualize which class confusions increase post-quantization |
-
-## Anti-Features (Out of Scope)
-
-Features to explicitly NOT build. Would expand scope beyond PTQ evaluation.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Quantization-aware training (QAT)** | Different milestone, requires retraining pipeline | Focus on PTQ only, defer QAT to future work |
-| **Dynamic quantization** | Different quantization paradigm (weights-only) | Static quantization only per milestone scope |
-| **Performance benchmarking** | Milestone focuses on accuracy, not inference speed | Document accuracy only, defer latency/throughput measurement |
-| **Mixed-precision quantization** | Complex feature requiring per-layer sensitivity analysis | Uniform int8/uint8 only, defer mixed-precision |
-| **Custom quantization schemes** | Beyond standard int8/uint8 formats | Use built-in quantization formats only |
-| **Model architecture modification** | PTQ is post-training, no architecture changes | Use existing ResNet8 as-is |
-| **TFLite quantization** | Out of framework scope (ONNX RT + PyTorch only) | Stick to declared frameworks |
-| **Quantization for training** | Only evaluating inference quantization | Inference-only quantization |
-| **Advanced calibration algorithms** | Beyond standard MinMax/Entropy/Percentile | Use built-in calibration methods |
-
-## Expected Accuracy Impact
-
-### Typical PTQ Accuracy Loss for 8-bit INT8 on CNNs
-
-Based on research findings:
-
-**General expectation:**
-- INT8 PTQ on CNNs: **< 1% accuracy loss** on standard benchmarks (ImageNet)
-- ResNet architectures are relatively robust to quantization compared to efficient models like MobileNet
-- Smaller networks may experience slightly higher degradation than larger models
-
-**For ResNet8 on CIFAR-10 (87.19% baseline):**
-
-| Scenario | Expected Accuracy | Accuracy Loss | Confidence |
-|----------|------------------|---------------|------------|
-| **Best case** (optimal calibration) | 86.5-87.0% | 0.2-0.7% | MEDIUM |
-| **Typical case** (MinMax, 256 samples) | 85.5-86.5% | 0.7-1.7% | MEDIUM |
-| **Worst case** (poor calibration) | 83-85% | 2-4% | LOW |
-
-**Key factors affecting accuracy:**
-
-1. **Calibration quality**: Representative calibration data is critical
-   - 100-512 samples typical, must cover data distribution
-   - Random or non-representative data can cause severe degradation
-
-2. **Calibration method**: MinMax < Entropy ≈ Percentile
-   - MinMax is simplest but may be suboptimal
-   - Entropy/Percentile can improve accuracy by 0.5-1%
-
-3. **Quantization scheme**:
-   - Per-channel > Per-tensor (0.5-1% improvement possible)
-   - Symmetric for weights, asymmetric for activations (standard)
-
-4. **Model size**: Smaller models (like ResNet8) may lose more than larger ResNets
-   - ResNet8 is relatively small (8 layers)
-   - Expect upper end of 1-2% loss range
-
-### INT8 vs UINT8 Comparison
-
-| Aspect | INT8 (signed) | UINT8 (unsigned) |
-|--------|---------------|------------------|
-| **Range** | [-128, 127] | [0, 255] |
-| **Weight quantization** | Preferred (symmetric, centered at 0) | Not typical |
-| **Activation quantization** | Standard (asymmetric with zero-point) | Better for post-ReLU (always positive) |
-| **Hardware support** | Ubiquitous (INT8xINT8 acceleration) | Variable, some backends limited |
-| **Expected accuracy** | Baseline | Similar to INT8 for activations |
-| **Recommendation** | Default choice | Test as alternative for activations |
-
-**Practical guidance:**
-- Start with INT8 for both weights and activations (most compatible)
-- Test UINT8 for activations if INT8 accuracy is borderline
-- ResNet8 uses ReLU activations (always positive), so UINT8 may theoretically help
-- Hardware support varies: verify ONNX Runtime and PyTorch backends support UINT8
-
-## Feature Dependencies
-
-### Existing Features (Already Implemented)
-
-From milestone v1.0 and v1.1:
-- CIFAR-10 dataset loading and preprocessing
-- ONNX model loading and inference (ONNX Runtime)
-- PyTorch model loading and inference (converted via onnx2torch)
-- Per-class accuracy evaluation
-- 87.19% full-precision baseline established
-
-### New Feature Dependencies
-
-```
-Calibration Data Preparation
-  └─> MinMax Calibration (baseline)
-       ├─> ONNX Runtime Static Quantization (int8)
-       │    └─> Quantized ONNX Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       ├─> ONNX Runtime Static Quantization (uint8)
-       │    └─> Quantized ONNX Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       ├─> PyTorch Static Quantization (int8)
-       │    └─> Quantized PyTorch Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       └─> PyTorch Static Quantization (uint8)
-            └─> Quantized PyTorch Model Accuracy Evaluation
-                 └─> Accuracy Delta Analysis
-
-Optional (Differentiators):
-  Multiple Calibration Methods
-  Per-Channel Quantization
-  Calibration Set Size Sensitivity
-```
-
-## MVP Recommendation
-
-For milestone v1.2 PTQ evaluation, prioritize:
-
-### Phase 1: ONNX Runtime PTQ (Core)
-1. Calibration data preparation (256 CIFAR-10 samples)
-2. MinMax calibration method
-3. int8 quantization (weights + activations)
-4. Quantized model accuracy evaluation
-5. Accuracy delta reporting vs 87.19% baseline
-
-### Phase 2: PyTorch PTQ (Core)
-1. Reuse calibration data from Phase 1
-2. PT2E export-based quantization workflow
-3. int8 quantization (weights + activations)
-4. Quantized model accuracy evaluation
-5. Accuracy delta reporting vs 87.19% baseline
-
-### Phase 3: uint8 Exploration (Optional)
-1. ONNX Runtime uint8 quantization
-2. PyTorch uint8 quantization
-3. Compare int8 vs uint8 accuracy
-
-### Defer to Post-MVP
-- Multiple calibration methods (Entropy, Percentile)
-- Per-channel quantization
-- Calibration set size sensitivity
-- Observer comparison (PyTorch)
-- Quantization format comparison (QDQ vs QOperator)
-- Per-layer sensitivity analysis
-- Confusion matrix comparison
-
-**Rationale:**
-- Phase 1+2 provide complete PTQ evaluation for both frameworks (milestone goal)
-- int8 is industry standard, most compatible format
-- MinMax is simplest calibration, sufficient for initial assessment
-- Phase 3 adds uint8 as bonus if time permits (ResNet8 has ReLU, may benefit)
-- Differentiators deferred: nice-to-have but not critical for initial PTQ evaluation
-
-## Implementation Notes
-
-### ONNX Runtime Static Quantization
-
-**API:** `onnxruntime.quantization.quantize_static()`
-
-**Key parameters:**
-- `model_input`: Path to full-precision ONNX model
-- `model_output`: Path to save quantized model
-- `calibration_data_reader`: Custom class providing calibration samples
-- `quant_format`: QDQ (portable) vs QOperator (potentially faster)
-- `activation_type`: QuantType.QUInt8 or QuantType.QInt8
-- `weight_type`: QuantType.QInt8 (typical)
-- `calibrate_method`: MinMax, Entropy, or Percentile
-
-**Gotchas:**
-- Zero-point must represent FP32 zero exactly (critical for zero-padding in CNNs)
-- AVX2/AVX512 U8S8 format may have saturation issues (use reduce_range)
-- Per-channel quantization may need reduce_range on x86-64
-- Some quantized models run slower than FP32 if backend doesn't support ops
-
-### PyTorch Static Quantization
-
-**API:** New PT2E (PyTorch 2 Export) approach recommended
-
-**Workflow:**
-1. `torch.export.export()` - Capture model in graph mode
-2. `prepare_pt2e()` - Fold BatchNorm, insert observers
-3. Run calibration data through model
-4. `convert_pt2e()` - Produce quantized model
-
-**Key considerations:**
-- Calibration data quality critical (100 mini-batches typical)
-- Observer selection matters:
-  - Weights: Symmetric per-channel + MinMax observer
-  - Activations: Asymmetric per-tensor + MovingAverageMinMax observer
-- BatchNorm folding into Conv2d (automatic in prepare_pt2e)
-- Module naming must not overlap (causes erroneous calibration)
-
-**Gotchas:**
-- Random calibration data = bad quantization parameters (validate with real data)
-- Not all modules may be calibrated if model has dynamic control flow
-- Distribution drift may require re-calibration over time
-- Harder to debug than FP32 models (mismatched scale/zero-point issues)
-
-### Calibration Data Preparation
-
-**Size:** 100-512 samples (256 recommended starting point)
-
-**Sampling strategy:**
-- Random subset of training or validation set
-- Must be representative of inference distribution
-- Stratified sampling (equal samples per class) recommended for CIFAR-10
-
-**CIFAR-10 specific:**
-- 10 classes, 256 samples = ~25-26 samples per class
-- Use validation set (avoid test set for calibration)
-- Apply same preprocessing as full-precision model (raw pixel values 0-255)
-
-## Sources
-
-### High Confidence (Official Documentation)
-- [ONNX Runtime Quantization Documentation](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
-- [PyTorch 2 Export Post Training Quantization Tutorial](https://docs.pytorch.org/ao/stable/tutorials_source/pt2e_quant_ptq.html)
-- [PyTorch Static Quantization Documentation](https://docs.pytorch.org/ao/stable/static_quantization.html)
-- [PyTorch Quantization Overview](https://docs.pytorch.org/docs/stable/quantization.html)
-
-### Medium Confidence (Verified Sources)
-- [Post-training Quantization Google AI Edge](https://ai.google.dev/edge/litert/models/post_training_quantization)
-- [Practical Quantization in PyTorch Blog](https://pytorch.org/blog/quantization-in-practice/)
-- [Neural Network Quantization in PyTorch](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/)
-- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html)
-
-### Low Confidence (Research Papers and Forums)
-- [INT8 Quantization Fundamentals](https://apxml.com/courses/compiler-runtime-optimization-ml/chapter-8-quantization-low-precision-optimizations/quantization-fundamentals)
-- [Quantization Data Types Discussion](https://apxml.com/courses/practical-llm-quantization/chapter-1-foundations-model-quantization/integer-data-types)
-- [PyTorch Forums: Expected INT8 Accuracies](https://discuss.pytorch.org/t/expected-int8-accuracies-on-imagenet-1k-resnet-qat/187227)
-- [GitHub: Static Quantization Calibration Issues](https://github.com/pytorch/pytorch/issues/45185)
+Hardware accelerators need to implement 8-bit integer arithmetic with 32-bit accumulators, scale/zero-point parameters, and saturation logic. The operations fall into three categories: quantization/dequantization (FP32 ↔ INT8), quantized convolution, and quantized matrix multiplication.
 
 ---
 
-**Overall Confidence:** MEDIUM
+## Table Stakes: Core Quantized Operations
 
-- **HIGH** confidence on API workflows and official quantization methods (official docs verified)
-- **MEDIUM** confidence on expected accuracy impact (multiple sources agree on <1% for INT8, but ResNet8 is smaller than benchmarked models)
-- **LOW** confidence on specific ResNet8/CIFAR-10 accuracy expectations (extrapolated from larger models)
+These are the fundamental operations any quantized neural network hardware accelerator must implement.
 
-**Validation needed:**
-- Actual ResNet8 quantization accuracy (empirical testing required)
-- UINT8 hardware support in current ONNX Runtime/PyTorch versions
-- Optimal calibration method for this specific model (MinMax vs Entropy vs Percentile)
+### 1. QuantizeLinear (FP32 → INT8/UINT8)
+
+**Purpose:** Convert floating-point tensors to quantized integer representation
+
+**Mathematical Formula:**
+```
+y = saturate(round(x / y_scale) + y_zero_point)
+```
+
+**Detailed Specification:**
+- **Rounding mode:** Round to nearest even (banker's rounding, IEEE 754)
+- **Saturation ranges:**
+  - INT8: [-128, 127]
+  - UINT8: [0, 255]
+- **Input:** x (FP32, FP16, BF16)
+- **Output:** y (INT8 or UINT8)
+
+**Hardware Requirements:**
+- Division operation (x / y_scale)
+- Round-to-nearest-even logic
+- Integer addition (+ y_zero_point)
+- Saturation/clipping to target range
+
+**Quantization Granularities:**
+
+| Granularity | Scale Shape | Zero Point Shape | Use Case |
+|-------------|-------------|------------------|----------|
+| Per-tensor | Scalar | Scalar | Activations, simple quantization |
+| Per-channel | 1-D tensor (length = channels) | 1-D tensor | Convolution weights |
+| Blocked | Matches input except 1 dim | Matches scale | Advanced quantization |
+
+**Parameter Calculation:**
+
+For per-tensor quantization:
+```
+scale = (rmax - rmin) / (qmax - qmin)
+
+where:
+  rmax, rmin = max and min of floating-point tensor
+  qmax, qmin = max and min of quantized type
+    - INT8:  qmin = -128, qmax = 127
+    - UINT8: qmin = 0,    qmax = 255
+
+zero_point = round(qmin - rmin / scale)
+zero_point = clip(zero_point, qmin, qmax)
+```
+
+**ONNX Specification:** Version 25+
+**Confidence:** HIGH (verified with official ONNX documentation)
+
+---
+
+### 2. DequantizeLinear (INT8/UINT8 → FP32)
+
+**Purpose:** Convert quantized integer tensors back to floating-point representation
+
+**Mathematical Formula:**
+```
+y = (x - x_zero_point) * x_scale
+```
+
+**Detailed Specification:**
+- **Input:** x (INT8, UINT8, INT16, UINT16, INT32)
+- **Output:** y (FP32, FP16, BF16)
+- **Shape preservation:** Output has same shape as input
+
+**Hardware Requirements:**
+- Integer subtraction (x - x_zero_point)
+- Floating-point multiplication (* x_scale)
+- Type conversion (INT → FP)
+
+**Quantization Granularities:**
+Same as QuantizeLinear (per-tensor, per-channel, blocked)
+
+**Key Constraint:**
+- x_zero_point and x must have the same type (both INT8 or both UINT8)
+
+**ONNX Specification:** Version 25+
+**Confidence:** HIGH (verified with official ONNX documentation)
+
+---
+
+### 3. QLinearConv (Quantized Convolution)
+
+**Purpose:** Perform convolution operation entirely in quantized integer space
+
+**High-Level Formula:**
+```
+QLinearConv = ConvInteger + QuantizeLinear
+```
+
+**Inputs (8-9 total):**
+1. `x` - quantized input (INT8/UINT8)
+2. `x_scale` - input scale factor
+3. `x_zero_point` - input zero point
+4. `w` - quantized weights (INT8/UINT8)
+5. `w_scale` - weight scale factor
+6. `w_zero_point` - weight zero point
+7. `y_scale` - output scale factor
+8. `y_zero_point` - output zero point
+9. `B` - bias (INT32, optional)
+
+**Two-Stage Computation:**
+
+**Stage 1: ConvInteger (8×8→32 bit)**
+```
+Conv_result[n, c, h, w] = Σ Σ Σ (x[n, ic, ih+kh, iw+kw] - x_zero_point)
+                              * (w[c, ic, kh, kw] - w_zero_point)
+                          + B[c]
+
+where the summation is over:
+  ic: input channels (0 to in_channels/groups)
+  kh: kernel height (0 to kernel_h)
+  kw: kernel width (0 to kernel_w)
+
+Result type: INT32 accumulator
+```
+
+**Stage 2: Requantization (32→8 bit)**
+```
+y[n, c, h, w] = saturate(
+    round(Conv_result[n, c, h, w] * (x_scale * w_scale / y_scale))
+    + y_zero_point
+)
+
+Saturation to INT8 [-128, 127] or UINT8 [0, 255]
+```
+
+**Bias Quantization Requirement:**
+```
+bias_scale = x_scale * w_scale
+bias_zero_point = 0
+bias_type = INT32
+```
+
+**Hardware Implementation:**
+- 8-bit × 8-bit multipliers
+- 32-bit accumulators (to prevent overflow during accumulation)
+- Multiply-accumulate (MAC) units
+- Scale multiplication and division
+- Round-to-nearest logic
+- Saturation to 8-bit output
+
+**Convolution Attributes:**
+- Kernel shape, strides, padding, dilation
+- Groups (for depthwise/grouped convolutions)
+- Auto-padding modes: NOTSET, SAME_UPPER, SAME_LOWER, VALID
+
+**Per-Channel Weight Quantization:**
+- w_scale: shape = (out_channels,)
+- w_zero_point: shape = (out_channels,)
+- Each output channel has independent quantization parameters
+
+**ONNX Specification:** Version 10+
+**Confidence:** HIGH (verified with official ONNX documentation and GitHub issues)
+
+---
+
+### 4. QLinearMatMul (Quantized Matrix Multiplication)
+
+**Purpose:** Perform matrix multiplication entirely in quantized integer space
+
+**High-Level Formula:**
+```
+QLinearMatMul = MatMulInteger + QuantizeLinear
+```
+
+**Inputs (8 total):**
+1. `a` - quantized matrix A (INT8/UINT8)
+2. `a_scale` - matrix A scale factor
+3. `a_zero_point` - matrix A zero point
+4. `b` - quantized matrix B (INT8/UINT8)
+5. `b_scale` - matrix B scale factor
+6. `b_zero_point` - matrix B zero point
+7. `y_scale` - output scale factor
+8. `y_zero_point` - output zero point
+
+**Two-Stage Computation:**
+
+**Stage 1: MatMulInteger (8×8→32 bit)**
+```
+MatMul_result[i, j] = Σ (a[i, k] - a_zero_point) * (b[k, j] - b_zero_point)
+                      k=0 to K-1
+
+where:
+  a has shape (M, K)
+  b has shape (K, N)
+  result has shape (M, N)
+
+Result type: INT32 accumulator
+```
+
+**Stage 2: Requantization (32→8 bit)**
+```
+y[i, j] = saturate(
+    round(MatMul_result[i, j] * (a_scale * b_scale / y_scale))
+    + y_zero_point
+)
+
+Saturation to INT8 [-128, 127] or UINT8 [0, 255]
+```
+
+**Hardware Implementation:**
+- 8-bit × 8-bit multipliers
+- 32-bit accumulators
+- MAC (multiply-accumulate) units
+- Scale multiplication and division
+- Round-to-nearest-even logic
+- Saturation to 8-bit output
+
+**Per-Row/Column Quantization Support:**
+- Supports per-tensor (scalar scale/zero_point)
+- Supports per-row for A (scale shape: (M, 1))
+- Supports per-column for B (scale shape: (1, N))
+
+**Critical Constraint:**
+"Production must never overflow, and accumulation may overflow if and only if in 32 bits"
+
+**ONNX Specification:** Version 10+
+**Confidence:** HIGH (verified with official ONNX documentation)
+
+---
+
+## ConvInteger and MatMulInteger (Lower-Level Operations)
+
+These are the integer-only operations without built-in requantization.
+
+### ConvInteger
+
+**Output:** INT32 (not requantized)
+**Operation:** 8×8→32 bit convolution
+**Formula:**
+```
+y[n, c, h, w] = Σ Σ Σ (x[n, ic, ih+kh, iw+kw] - x_zero_point)
+                    * (w[c, ic, kh, kw] - w_zero_point)
+```
+
+**Key Difference from QLinearConv:**
+- ConvInteger outputs INT32 (dequantization needs separate step)
+- QLinearConv outputs INT8/UINT8 (requantization built-in)
+- Relationship: `QLinearConv = ConvInteger + QuantizeLinear`
+
+**Use Case:**
+Suitable when only certain operations need quantization, as INT32 output easily converts to FP32 for subsequent floating-point operations.
+
+### MatMulInteger
+
+**Output:** INT32 (not requantized)
+**Operation:** 8×8→32 bit matrix multiplication
+**Formula:**
+```
+y[i, j] = Σ (a[i, k] - a_zero_point) * (b[k, j] - b_zero_point)
+          k
+```
+
+**Use Case:**
+Similar to ConvInteger - useful when mixing quantized and non-quantized operations.
+
+**Confidence:** HIGH (verified with ONNX documentation)
+
+---
+
+## PyTorch Quantized Operations
+
+PyTorch provides quantized operations through `torch.ao.nn.quantized` module.
+
+### torch.ao.nn.quantized.functional.conv2d
+
+**Function Signature:**
+```python
+conv2d(input, weight, bias, stride=1, padding=0, dilation=1,
+       groups=1, padding_mode='zeros', scale=1.0, zero_point=0,
+       dtype=torch.quint8)
+```
+
+**Parameters:**
+- `input`: Quantized input tensor (minibatch, in_channels, iH, iW)
+- `weight`: Quantized filters (out_channels, in_channels/groups, kH, kW)
+- `bias`: Non-quantized bias (FP32) - note the difference from ONNX INT32
+- `scale`, `zero_point`: Output quantization parameters
+- `dtype`: torch.quint8 or torch.qint8
+
+**Mapping to ONNX:**
+- PyTorch `torch.nn.quantized.Conv2d` → ONNX `QLinearConv`
+- Export challenges exist (see Pitfalls section)
+
+### torch.nn.quantized.functional.linear
+
+**Function Signature:**
+```python
+linear(input, weight, bias=None, scale=None, zero_point=None)
+```
+
+**Parameters:**
+- `input`: Quantized input tensor
+- `weight`: Quantized weight tensor
+- `bias`: Optional bias (FP32)
+- `scale`, `zero_point`: Output quantization parameters
+
+**Mapping to ONNX:**
+- PyTorch `torch.nn.quantized.Linear` → ONNX `QLinearMatMul`
+- Export challenges exist (see Pitfalls section)
+
+**Performance Note:**
+Current implementation packs weights on every call, which has performance penalty.
+
+### torch.quantize_per_tensor
+
+**Formula:**
+```python
+q = torch.quantize_per_tensor(x, scale, zero_point, dtype)
+
+# Equivalent to ONNX QuantizeLinear
+q[i] = saturate(round(x[i] / scale) + zero_point)
+```
+
+**Mapping to ONNX:**
+- PyTorch `torch.quantize_per_tensor` → ONNX `QuantizeLinear`
+
+### torch.dequantize / Tensor.dequantize()
+
+**Formula:**
+```python
+y = q.dequantize()
+
+# Equivalent to ONNX DequantizeLinear
+y[i] = (q[i] - zero_point) * scale
+```
+
+**Mapping to ONNX:**
+- PyTorch `.dequantize()` → ONNX `DequantizeLinear`
+
+**Confidence:** MEDIUM (verified with PyTorch documentation, but export behavior is implementation-dependent)
+
+---
+
+## Per-Tensor vs Per-Channel Quantization
+
+### Per-Tensor Quantization
+
+**Characteristics:**
+- Single scale and zero_point for entire tensor
+- Scale and zero_point are scalars
+- Same quantization parameters for all values
+
+**Formula:**
+```
+q[...] = saturate(round(x[...] / scale) + zero_point)
+```
+
+**Use Cases:**
+- Activations (feature maps)
+- Simple quantization schemes
+- Lower memory overhead
+
+**PyTorch Type:** `torch.per_tensor_affine`
+
+### Per-Channel Quantization
+
+**Characteristics:**
+- Different scale and zero_point for each channel
+- Scale and zero_point are 1-D tensors (length = num_channels)
+- Each channel quantized independently
+
+**Formula:**
+```
+For convolution weights (out_channels, in_channels, kH, kW):
+
+q[c, :, :, :] = saturate(
+    round(x[c, :, :, :] / scale[c]) + zero_point[c]
+)
+
+where c iterates over output channels
+```
+
+**Use Cases:**
+- Convolution weights (different channels have different ranges)
+- Linear layer weights
+- Better accuracy than per-tensor
+
+**PyTorch Type:** `torch.per_channel_affine`
+
+**Accuracy Impact:**
+Per-channel quantization provides better accuracy because different channels (filters) often have different value distributions. Using channel-specific quantization parameters reduces quantization error.
+
+**Hardware Implications:**
+- Per-tensor: Single scale/zero_point register
+- Per-channel: Array of scales/zero_points (size = num_channels)
+- Memory overhead: Per-channel requires more parameter storage
+
+**ONNX Support:**
+- QLinearConv supports per-channel for weights
+- QLinearMatMul supports per-row/per-column quantization
+- Activations typically use per-tensor
+
+**Confidence:** HIGH (verified with PyTorch and ONNX documentation)
+
+---
+
+## Hardware Implementation Requirements
+
+### Arithmetic Units
+
+| Operation | Input Precision | Accumulator | Output | Notes |
+|-----------|----------------|-------------|--------|-------|
+| MAC (multiply-accumulate) | 8-bit × 8-bit | 32-bit | 32-bit | Core computation unit |
+| Requantization multiply | 32-bit × FP32 | FP32 or fixed-point | 32-bit | Scale multiplication |
+| Division | 32-bit / FP32 | FP32 or fixed-point | 32-bit | Scale division |
+| Saturation | 32-bit | - | 8-bit | Clipping to target range |
+
+### Precision Requirements
+
+**Convolution/MatMul Accumulation:**
+- Input: 8-bit × 8-bit = 16-bit product
+- Accumulation: Up to 32-bit (must not overflow for valid results)
+- Example: For 3×3 kernel with 64 input channels = 576 accumulations
+  - Max accumulation: 127 × 127 × 576 = 9,313,344 (fits in INT32)
+
+**Requantization:**
+- Scale multiplication: (x_scale × w_scale / y_scale)
+- Can be precomputed as single scale factor: `M = (x_scale × w_scale) / y_scale`
+- Hardware can use fixed-point arithmetic with bit-shifting
+
+**Rounding:**
+- Round-to-nearest-even (banker's rounding)
+- Alternative: Use `nearbyintf()` or equivalent hardware rounding mode
+
+### Register/Memory Requirements
+
+**Per-Tensor Quantization:**
+- 2 values per tensor: scale (FP32), zero_point (INT8/UINT8)
+
+**Per-Channel Quantization (for Conv2D with 64 output channels):**
+- 64 scales (FP32 × 64 = 256 bytes)
+- 64 zero_points (INT8 × 64 = 64 bytes)
+- Total: 320 bytes per layer
+
+**Bias:**
+- INT32 per output channel
+- For 64 channels: 256 bytes
+
+### Optimization Opportunities
+
+**Fixed-Point Requantization:**
+```
+Instead of: result * (x_scale * w_scale / y_scale)
+
+Use: (result * M) >> N
+
+where:
+  M = round((x_scale * w_scale / y_scale) * 2^N)
+  N = bit shift amount (typically 8-16)
+```
+
+This avoids floating-point operations in hardware.
+
+**Recent Research (2025-2026):**
+- Bit-shifting techniques achieve ~27% FPS improvement
+- RISC-V implementations reach 13 GOPS (8-bit) and 23 GOPS (4-bit)
+- Energy efficiency: 270 GOPS/W (8-bit), 405 GOPS/W (4-bit)
+
+**Confidence:** MEDIUM (based on recent research papers and hardware implementation studies)
+
+---
+
+## ResNet8-Specific Operations
+
+Based on the ResNet8 architecture with Conv2D layers (16, 32, 64 filters) and Dense layer (10 outputs):
+
+### Layer-by-Layer Quantization Parameters
+
+| Layer | Type | Weights | Bias | Activations | Notes |
+|-------|------|---------|------|-------------|-------|
+| Conv2D-1 | QLinearConv | Per-channel (16) | INT32 × 16 | Per-tensor | Input layer |
+| Conv2D-2 | QLinearConv | Per-channel (32) | INT32 × 32 | Per-tensor | Mid layer |
+| Conv2D-3 | QLinearConv | Per-channel (64) | INT32 × 64 | Per-tensor | Mid layer |
+| Dense | QLinearMatMul | Per-channel (10) | INT32 × 10 | Per-tensor | Output layer |
+
+### BatchNorm and ReLU
+
+**BatchNorm Quantization:**
+BatchNorm in quantized networks is typically fused into the preceding convolution:
+
+```
+Fused operation:
+y = Conv(x, w_fused, b_fused)
+
+where:
+  w_fused = w * (gamma / sqrt(var + eps))
+  b_fused = beta + (b - mean) * (gamma / sqrt(var + eps))
+
+This avoids quantizing BatchNorm separately.
+```
+
+**ReLU Quantization:**
+ReLU in quantized space is a simple comparison:
+
+```
+ReLU(x_quantized):
+  if x_quantized < zero_point:
+    return zero_point
+  else:
+    return x_quantized
+```
+
+No dequantization needed - operates directly on quantized values.
+
+**AvgPool Quantization:**
+Average pooling requires careful handling:
+
+```
+Step 1: Sum quantized values (result in INT32)
+Step 2: Divide by pool size
+Step 3: Requantize to output scale/zero_point
+
+Formula:
+avg = (sum(x_quantized) - pool_size * x_zero_point) / pool_size
+y_quantized = round(avg * x_scale / y_scale) + y_zero_point
+```
+
+**Confidence:** HIGH (standard quantization practices)
+
+---
+
+## Differentiators: Advanced Features
+
+Features that provide more flexibility and optimization for hardware implementations.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Fixed-point requantization** | Avoid FP ops, use bit-shifting | Medium | 27% FPS improvement reported |
+| **Per-channel quantization** | Better accuracy for weights | Low | Industry standard for Conv/Linear |
+| **Fused operations** | Reduce memory bandwidth | Medium | Conv+BN fusion, Conv+ReLU fusion |
+| **Symmetric vs asymmetric** | Simpler hardware for symmetric | Low | Symmetric weights, asymmetric activations |
+| **INT4 quantization** | 2× memory reduction vs INT8 | High | Emerging, lower accuracy |
+| **Mixed-precision** | Critical layers in higher precision | High | Requires sensitivity analysis |
+
+---
+
+## Anti-Features: Operations to Avoid
+
+### 1. Mixed Precision without Explicit Conversion
+
+**What NOT to do:**
+Mixing quantized and floating-point operations without explicit QuantizeLinear/DequantizeLinear.
+
+**Why it's bad:**
+Creates undefined behavior and prevents hardware optimization.
+
+**Instead:**
+Always use explicit QuantizeLinear/DequantizeLinear at boundaries:
+```
+FP32 → QuantizeLinear → INT8 operations → DequantizeLinear → FP32
+```
+
+### 2. Dynamic Quantization for Hardware Accelerators
+
+**What NOT to do:**
+Using dynamic quantization where scales are computed at runtime per-batch.
+
+**Why it's bad:**
+- Hardware accelerators need fixed quantization parameters
+- Runtime scale computation defeats purpose of integer-only inference
+- Cannot precompute requantization factors
+
+**Instead:**
+Use static quantization with calibration to determine fixed scales.
+
+### 3. FP16 as "Quantization"
+
+**What NOT to do:**
+Calling FP16 inference "quantization" for hardware accelerators.
+
+**Why it's bad:**
+- Requires floating-point hardware
+- Misses 4× memory reduction of INT8
+- Not true quantization in the integer sense
+
+**Instead:**
+Use INT8 quantization for edge/hardware deployment.
+
+### 4. Per-Tensor Weights in Convolution
+
+**What NOT to do:**
+Using per-tensor quantization for convolution weights.
+
+**Why it's bad:**
+- Significant accuracy loss (especially in deep networks)
+- Different channels have different ranges
+- Industry standard is per-channel for weights
+
+**Instead:**
+Always use per-channel quantization for convolution and linear layer weights.
+
+### 5. Ignoring Bias Quantization Requirements
+
+**What NOT to do:**
+Quantizing bias independently or using INT8 for bias.
+
+**Why it's bad:**
+- ONNX spec requires: `bias_scale = input_scale × weight_scale`
+- Bias must be INT32 to match accumulator precision
+- Wrong bias quantization breaks numerical accuracy
+
+**Instead:**
+Follow ONNX spec: INT32 bias with `scale = x_scale × w_scale`, `zero_point = 0`.
+
+---
+
+## Feature Dependencies
+
+```
+QuantizeLinear
+  └─> Quantized Tensors (INT8/UINT8)
+       ├─> QLinearConv
+       │    ├─> ConvInteger (Stage 1: 8×8→32)
+       │    └─> Requantization (Stage 2: 32→8)
+       ├─> QLinearMatMul
+       │    ├─> MatMulInteger (Stage 1: 8×8→32)
+       │    └─> Requantization (Stage 2: 32→8)
+       └─> DequantizeLinear
+            └─> FP32 Output
+
+Hardware Implementation:
+  ├─> 8×8 MAC Units
+  ├─> 32-bit Accumulators
+  ├─> Scale/Zero-Point Registers
+  ├─> Rounding Logic
+  └─> Saturation Logic
+```
+
+---
+
+## Sources
+
+### ONNX Official Documentation
+- [QLinearConv - ONNX 1.20.0 documentation](https://onnx.ai/onnx/operators/onnx__QLinearConv.html)
+- [QLinearMatMul - ONNX 1.20.0 documentation](https://onnx.ai/onnx/operators/onnx__QLinearMatMul.html)
+- [QuantizeLinear - ONNX 1.21.0 documentation](https://onnx.ai/onnx/operators/onnx__QuantizeLinear.html)
+- [DequantizeLinear - ONNX 1.21.0 documentation](https://onnx.ai/onnx/operators/onnx__DequantizeLinear.html)
+- [ConvInteger - ONNX 1.21.0 documentation](https://onnx.ai/onnx/operators/onnx__ConvInteger.html)
+- [Quantize ONNX models | onnxruntime](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
+
+### ONNX GitHub Issues
+- [ConvInteger vs QLinearConv · Issue #2424 · onnx/onnx](https://github.com/onnx/onnx/issues/2424)
+- [How is QlinearConv calculated? · Issue #11883 · microsoft/onnxruntime](https://github.com/microsoft/onnxruntime/issues/11883)
+- [Prevent int32 quantized bias from clipping · Pull Request #22020 · microsoft/onnxruntime](https://github.com/microsoft/onnxruntime/pull/22020)
+
+### PyTorch Documentation
+- [Quantization Overview — torchao 0.15 documentation](https://docs.pytorch.org/ao/stable/quantization_overview.html)
+- [quantize_per_tensor — PyTorch 2.10 documentation](https://docs.pytorch.org/docs/stable/generated/torch.quantize_per_tensor.html)
+- [Practical Quantization in PyTorch](https://pytorch.org/blog/quantization-in-practice/)
+- [conv2d — PyTorch 2.10 documentation](https://docs.pytorch.org/docs/stable/generated/torch.ao.nn.quantized.functional.conv2d.html)
+- [Quantization API Reference — PyTorch 2.10 documentation](https://docs.pytorch.org/docs/stable/quantization-support.html)
+
+### Research Papers (2025-2026)
+- [Quantized convolutional neural networks: a hardware perspective - Frontiers](https://www.frontiersin.org/journals/electronics/articles/10.3389/felec.2025.1469802/full)
+- [Speed up integer-arithmetic-only inference via bit-shifting - Nature Scientific Reports](https://www.nature.com/articles/s41598-025-02544-4)
+- [Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference - arXiv](https://ar5iv.labs.arxiv.org/html/1712.05877)
+
+---
+
+## Confidence Assessment
+
+| Operation | Confidence | Source |
+|-----------|-----------|--------|
+| QuantizeLinear formula | HIGH | ONNX official spec v1.21 |
+| DequantizeLinear formula | HIGH | ONNX official spec v1.21 |
+| QLinearConv formula | HIGH | ONNX spec + GitHub issue #11883 |
+| QLinearMatMul formula | HIGH | ONNX spec + GitHub issue #2424 |
+| PyTorch operations | MEDIUM | PyTorch 2.10 docs (export behavior varies) |
+| Hardware implementation | MEDIUM | Research papers + ONNX spec constraints |
+| Per-tensor vs per-channel | HIGH | ONNX spec + PyTorch docs |
+| ResNet8 specifics | HIGH | Standard quantization practices |
+
+---
+
+## Next Steps for Documentation
+
+1. **Create detailed examples** showing QLinearConv calculation step-by-step for a simple 3×3 convolution
+2. **Document calibration process** for determining scale/zero_point from FP32 model
+3. **Hardware architecture diagrams** showing dataflow through MAC units
+4. **Numerical precision analysis** for different bit-widths and accumulator sizes
+5. **ONNX export workflow** from PyTorch quantized model to ONNX QLinear operators
+6. **Testing methodology** for verifying hardware implementation correctness
+
+**Readiness:** Research complete. Ready for requirements definition and detailed specification writing.

@@ -1,227 +1,204 @@
-# Research Summary: PTQ Evaluation (v1.2)
+# Project Research Summary
 
-**Project:** ResNet8 CIFAR-10 Post-Training Quantization Evaluation
-**Domain:** Model Compression - Static Quantization
-**Researched:** 2026-01-28
+**Project:** ResNet8 Quantized Operations Documentation
+**Domain:** Neural network quantization reference documentation
+**Researched:** 2026-02-02
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Post-training quantization (PTQ) for ResNet8 CIFAR-10 requires no new dependencies - existing stack (onnxruntime 1.23.2, torch 2.0+) already includes quantization capabilities. The implementation follows a quantize-then-evaluate pattern that extends existing evaluation infrastructure with calibration and quantization steps. Both ONNX Runtime and PyTorch use similar workflows: prepare calibration data, quantize model with calibration, evaluate quantized model using existing evaluation scripts.
+This milestone creates reference documentation explaining the mathematical operations needed to implement quantized neural network inference in hardware accelerators. The focus is on ONNX quantized operators (QLinearConv, QLinearMatMul, QuantizeLinear, DequantizeLinear) and their hardware implementation requirements. Hardware implementers need precise specifications of integer arithmetic, scale/zero-point parameters, and data flow through quantized networks.
 
-The recommended approach implements static quantization with int8 data types using 200-1000 calibration samples from CIFAR-10. ONNX Runtime quantization is simpler (no model export step) and should be implemented first to de-risk calibration approach. PyTorch quantization requires PT2E export workflow and is more complex but follows identical calibration patterns. Expected accuracy impact: 0-3% drop from 87.19% baseline for well-calibrated int8 quantization.
+The recommended approach combines programmatic ONNX model inspection with graph visualization and GitHub-flavored Markdown documentation. The existing stack (onnx >=1.17.0, onnxruntime >=1.23.2) already includes all necessary tools for extracting operation details. Only one new dependency (pydot + system graphviz) is needed for generating model visualizations. GitHub's native MathJax support (since May 2024) enables LaTeX math equations without additional tooling.
 
-Critical risks center on calibration data quality - using random or insufficient calibration data causes severe accuracy degradation (20-70% drop). Other major risks include preprocessing mismatches, missing module fusion (Conv-BatchNorm-ReLU), and forgetting to set eval mode during calibration. All are preventable with proper validation checkpoints before evaluation.
+The key risk is complexity overload: quantized operations involve multiple stages (integer MAC, requantization, scale/zero-point handling) that can overwhelm readers if not presented incrementally. Mitigation: structure documentation layer-by-layer (single operation → residual block → full network) with concrete ResNet8 examples at each level. Critical pitfalls to highlight: insufficient accumulator bit-width (causes overflow), incorrect rounding modes (degrades accuracy 2-5%), and per-channel quantization implementation complexity.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new dependencies required - existing stack covers all quantization needs.
+**Minimal additions to existing stack.** The project already has ONNX Python API (onnx >=1.17.0) for model inspection and ONNX Runtime (>=1.23.2) for validation. For v1.3, only pydot (Python package) and graphviz (system package) are needed for generating graph visualizations.
 
-**Already available:**
-- **onnxruntime 1.23.2**: Includes `onnxruntime.quantization` module with `quantize_static()` API, three calibration methods (MinMax, Entropy, Percentile), and int8/uint8 support
-- **torch 2.0+**: Includes `torch.ao.quantization` module with static quantization APIs, observer-based calibration, and fbgemm backend for x86 CPU
-- **Python 3.12**: Compatible with all quantization APIs
+**Core technologies:**
+- **ONNX Python API** (already available): Programmatic model loading, node iteration, attribute extraction — official ONNX library enables scripted extraction of QLinear operation parameters
+- **onnx.tools.net_drawer** (built into onnx): Generate Graphviz DOT files from ONNX models — official visualization tool produces Netron-style diagrams
+- **pydot + graphviz** (new for v1.3): Convert DOT to PNG/SVG — enables automated documentation workflow with embedded diagrams
+- **GitHub Markdown + MathJax** (no install): LaTeX math rendering — native support since May 2024, no custom tooling needed
 
-**Deferred dependency:**
-- **torchao** (next-gen PyTorch quantization): Not needed for v1.2 - current `torch.ao.quantization` APIs remain stable and functional until PyTorch 2.10+ migration timeline
-
-**Stack confidence:** HIGH - both modules verified as built-in to base packages, widely used in production
+**Not adding:** Netron (GUI-only, no programmatic export), onnx-tool (performance profiling out of scope), TensorFlow (only needed for original Keras model conversion, already done in v1.0-v1.1).
 
 ### Expected Features
 
+Documentation must explain four core quantized operations with hardware-implementable formulas.
+
 **Must have (table stakes):**
-- ONNX Runtime static quantization (int8) - industry standard quantization path
-- PyTorch static quantization (int8) - native PyTorch quantization for converted models
-- Calibration data preparation - required for computing scale/zero-point parameters
-- MinMax calibration method - baseline calibration approach
-- Quantized model accuracy evaluation - reuses existing CIFAR-10 evaluation infrastructure
-- Accuracy delta reporting - quantified loss vs 87.19% baseline
+- **QuantizeLinear/DequantizeLinear**: FP32 ↔ INT8 boundary operations with exact formulas: `q = saturate(round(x/scale) + zero_point)` and `x = (q - zero_point) × scale`
+- **QLinearConv**: Two-stage integer convolution (8×8→32 MAC, then requantization to 8-bit) with all 9 inputs documented (x, x_scale, x_zero_point, w, w_scale, w_zero_point, y_scale, y_zero_point, bias)
+- **QLinearMatMul**: Integer matrix multiplication with similar two-stage structure (8×8→32 MAC, then requantization)
+- **Scale/zero-point parameters**: Where they appear in ONNX graphs (initializers), how they're used in computation, storage requirements
 
-**Should have (differentiators):**
-- uint8 quantization support - alternative to int8, may benefit ReLU activations
-- Multiple calibration methods - compare MinMax vs Entropy to optimize accuracy
-- Per-channel weight quantization - can improve accuracy for models with large weight ranges
-- Calibration set size sensitivity - understand minimum viable calibration data
+**Should have (competitive):**
+- **Per-channel vs per-tensor quantization**: Hardware implications (scale[c] per output channel vs scalar scale), memory requirements (64 scales for Conv2D(64) vs 1 scale)
+- **Residual connection handling**: Three solution approaches for scale mismatch in ResNet skip connections (dequant-add-quant, scale matching via requantization, PyTorch FloatFunctional)
+- **ONNX graph visualizations**: Full ResNet8 quantized graph, zoomed-in single-operation diagrams, annotated with scale/zero-point flow
+- **Hardware implementation pseudocode**: C/Verilog-style code showing exact integer arithmetic and bit-widths
 
-**Defer to post-MVP:**
-- Quantization-aware training (QAT) - different milestone requiring retraining
-- Dynamic quantization - different paradigm (weights-only)
-- Performance benchmarking - focus on accuracy only per milestone scope
-- Mixed-precision quantization - complex feature requiring per-layer sensitivity analysis
-- TFLite quantization - out of framework scope
-
-**Expected accuracy impact:** Typical PTQ on CNNs: <1% loss. For ResNet8 (87.19% baseline), expect 85.5-87.0% (0.2-1.7pp drop) with good calibration, 83-85% (2-4pp drop) acceptable range.
+**Defer (v2+):**
+- **Mixed-precision quantization**: INT4 weights, INT8 activations (emerging, not standard yet)
+- **Dynamic quantization**: Runtime scale computation (incompatible with hardware accelerators)
+- **Calibration methodology**: How to choose scale/zero-point values (covered in v1.2 PTQ milestone, not needed for v1.3 operations documentation)
+- **Performance profiling**: MACs/FLOPs counting, inference speed optimization (out of scope for reference documentation)
 
 ### Architecture Approach
 
-PTQ integration follows a quantize-then-evaluate pattern extending existing evaluation scripts. Both frameworks use similar workflows: (1) prepare calibration data, (2) quantize model with calibration, (3) evaluate quantized model using existing evaluation infrastructure. Architecture maintains clean separation between quantization (one-time conversion) and evaluation (repeated validation), mirroring the existing conversion/evaluation pattern from v1.0-v1.1.
+Quantized inference transforms compute graphs from floating-point to integer arithmetic with explicit scale/zero-point parameters. Two formats exist: **QDQ format** (QuantizeLinear-DequantizeLinear pairs around FP32 ops) and **Pure Integer format** (QLinear ops with embedded parameters). ONNX Runtime defaults to QDQ format where runtime fuses Q/DQ pairs with operators for integer execution.
 
 **Major components:**
-1. **Calibration Data Utility** (`scripts/calibration_utils.py`) - Shared utility preparing representative CIFAR-10 subset (200 samples, stratified sampling), reused by both ONNX and PyTorch quantization
-2. **ONNX Runtime Quantization Script** (`scripts/quantize_onnx.py`) - Implements CalibrationDataReader, calls `quantize_static()` with MinMax calibration, produces `resnet8_int8.onnx` and `resnet8_uint8.onnx`
-3. **PyTorch Quantization Script** (`scripts/quantize_pytorch.py`) - PT2E export workflow with observer-based calibration, produces `resnet8_int8.pt` and `resnet8_uint8.pt`
-4. **Quantized Model Evaluation** (reuse existing) - No new component needed, existing `scripts/evaluate.py` and `scripts/evaluate_pytorch.py` work with quantized models unchanged (ONNX) or with minor model loading changes (PyTorch)
+1. **Boundary operations** (QuantizeLinear/DequantizeLinear) — Convert between FP32 input/output and INT8 internal representation, applied at model input and before final classification head
+2. **Quantized convolution/matmul** (QLinearConv/QLinearMatMul) — Two-stage integer operations: 8×8→32-bit MAC accumulation, then requantization (scale conversion) back to 8-bit output
+3. **Residual connections** (Add with scale matching) — Critical architecture point where two INT8 tensors with potentially different scales must be added, requires dequantization to FP32 or scale matching via requantization
+4. **Per-channel quantization parameters** (scale[c], zero_point[c]) — Each convolution output channel has independent scale/zero-point stored in ONNX initializers, hardware must index correctly
 
-**Integration points:**
-- Existing evaluation scripts reuse CIFAR-10 loading for calibration data preparation
-- ONNX quantized models work with existing `onnxruntime.InferenceSession` - no evaluation changes
-- PyTorch quantized models remain `torch.nn.Module` instances - evaluation logic unchanged
-- Both frameworks apply identical preprocessing (raw pixels 0-255, no normalization)
+**Data flow:** FP32 input → QuantizeLinear → INT8 tensor → (QDQ-wrapped Conv ops) → INT8 activations → DequantizeLinear → FP32 output. Key insight: QDQ format appears to be FP32 in graph, but runtime fuses operations for integer execution.
 
 ### Critical Pitfalls
 
-1. **Random or insufficient calibration data** - Using random data or <100 samples produces incorrect quantization parameters, causing 20-70% accuracy drops. Prevention: Use 1000-3200 real CIFAR-10 samples with stratified sampling, verify calibration distribution matches inference.
+Top 5 hardware implementation mistakes that break accuracy or cause incorrect results:
 
-2. **Model not in eval mode during calibration** - Calibrating in training mode causes BatchNorm to update statistics instead of using frozen values, producing 10-20% accuracy degradation. Prevention: Always call `model.eval()` before quantization preparation, assert mode before calibration.
+1. **Insufficient accumulator bit-width causes overflow** — Using 16-bit accumulators for INT8 multiply-accumulate overflows during convolution. ResNet8 Conv2D(64, 3×3) requires 25 bits worst-case (576 MACs × 127² = 9,290,304). **Prevention:** Always use INT32 accumulators for INT8×INT8 operations (industry standard).
 
-3. **Forgetting module fusion for Conv-BatchNorm-ReLU** - Not fusing Conv→BN→ReLU sequences causes incorrect quantization boundaries and 3-10% accuracy loss. Prevention: Call `torch.quantization.fuse_modules()` before prepare(), list all Conv-BN-ReLU sequences explicitly.
+2. **Incorrect rounding mode degrades accuracy 2-5%** — Using truncation (floor) instead of round-to-nearest during requantization causes systematic bias. **Prevention:** Implement round-to-nearest-even (banker's rounding) to match ONNX Runtime behavior: `rounded = (value >= 0) ? (value + 0.5) >> frac_bits : (value - 0.5) >> frac_bits`.
 
-4. **Skip connections not prepared for quantization** - Standard Python `+` operator fails during quantization or produces incorrect results (5-15% accuracy drop). Prevention: Replace `+` with `torch.nn.quantized.FloatFunctional.add()` in all residual blocks.
+3. **Scale factors stored with insufficient precision** — Using float16 or fixed-point <24 bits for scales causes quantization range mismatch, degrading accuracy 3-10%. **Prevention:** Use float32 for scale factors (4 bytes per scale, ~160 bytes total for ResNet8, negligible memory cost).
 
-5. **Calibration preprocessing mismatch** - Using different preprocessing in calibration vs evaluation (e.g., normalized 0-1 vs raw 0-255) causes catastrophic accuracy drops (10-40%). Prevention: Match evaluate_pytorch.py exactly - use raw pixels [0, 255] without normalization.
+4. **Per-channel quantization complexity underestimated** — Implementing per-tensor scale for all channels loses accuracy benefit of per-channel quantization. **Prevention:** Store C_out scales (one per output channel), multiplex correct scale[c] during requantization, verify with test cases where each channel has different scale.
 
-## Recommended Phase Structure
+5. **Fused operations incorrectly implemented** — Implementing Conv-BatchNorm-ReLU as separate operations with intermediate quantization degrades accuracy 5-10%. **Prevention:** Fold BatchNorm into Conv weights/bias offline (before quantization), implement Conv-ReLU as single fused operation with one requantization step.
 
-### Phase 1: Calibration Infrastructure (Foundation)
-**Rationale:** Both ONNX and PyTorch quantization require calibration data. Building this first enables validation of calibration approach before quantization complexity.
+**Additional moderate pitfall:** Zero-point asymmetry not handled in convolution. Formula requires correction terms: `acc - zero_x × Σ(weights)` for asymmetric activations. Recommendation: use symmetric weights (zero_w = 0) to simplify, only handle asymmetric activations.
 
+## Implications for Roadmap
+
+Based on research, suggested documentation structure builds understanding incrementally from single operations to full network.
+
+### Phase 1: Operation Extraction Scripts
+**Rationale:** Before writing documentation, need programmatic tools to extract operation details from quantized ONNX models (resnet8_int8.onnx, resnet8_uint8.onnx from v1.2).
 **Delivers:**
-- `scripts/calibration_utils.py` with stratified sampling
-- 200 CIFAR-10 calibration samples (20 per class)
-- Validation that samples match evaluation preprocessing
+- `scripts/extract_operations.py` — Parse ONNX models, output JSON with all QLinear nodes, scales, zero-points, attributes
+- `scripts/visualize_graph.py` — Generate PNG/SVG diagrams using onnx.tools.net_drawer + pydot
+**Addresses:** Must-have features (programmatic extraction), enables data-driven documentation
+**Avoids:** Manual inspection errors, ensures documentation matches actual model parameters
 
-**Features:** Calibration data preparation (table stakes)
-
-**Avoids:** Random/insufficient calibration data pitfall, preprocessing mismatch
-
-**Research flag:** Low risk - straightforward data sampling reusing existing load logic
-
-### Phase 2: ONNX Runtime Quantization (Simple Path)
-**Rationale:** ONNX Runtime quantization is simpler - no model export step, quantized models use same evaluation script unchanged. De-risk calibration approach before tackling PyTorch complexity.
-
+### Phase 2: Boundary Operations Documentation
+**Rationale:** QuantizeLinear/DequantizeLinear are simplest operations (single formula each), establish documentation style and math rendering.
 **Delivers:**
-- `scripts/quantize_onnx.py` with CalibrationDataReader
-- Quantized models: `resnet8_int8.onnx`, `resnet8_uint8.onnx`
-- Accuracy evaluation for both quantized models
+- `docs/QUANTIZE_DEQUANTIZE.md` — QuantizeLinear and DequantizeLinear formulas, numerical examples, hardware pseudocode
+- GitHub Markdown with LaTeX math equations (test rendering)
+**Uses:** GitHub MathJax support for inline ($...$) and block ($$...$$) equations
+**Implements:** Boundary operations documentation (table stakes feature)
 
-**Features:** ONNX Runtime static quantization, int8/uint8 support, MinMax calibration, accuracy delta reporting
-
-**Stack:** onnxruntime.quantization module, shape_inference pre-processing
-
-**Avoids:** ONNX quantization without model optimization pitfall
-
-**Research flag:** Low risk - well-documented ONNX Runtime API with clear examples
-
-### Phase 3: PyTorch Quantization (Complex Path)
-**Rationale:** PyTorch quantization requires PT2E export, observer configuration, potential model architecture changes. Benefits from Phase 2 learnings on calibration quality and accuracy expectations.
-
+### Phase 3: QLinearConv Documentation
+**Rationale:** QLinearConv is the most complex operation (9 inputs, two-stage computation), most critical for hardware implementers.
 **Delivers:**
-- `scripts/quantize_pytorch.py` with PT2E workflow
-- Quantized models: `resnet8_int8.pt` (uint8 if supported)
-- Updated evaluation script if quantized model loading differs
+- `docs/QLINEAR_CONV.md` — Detailed QLinearConv breakdown: integer MAC stage, requantization stage, per-channel quantization handling, hardware implementation pseudocode with exact bit-widths
+- Worked example with ResNet8 Conv2D(16, 3×3) layer showing all intermediate values
+**Addresses:** QLinearConv table stakes, per-channel quantization (should-have)
+**Avoids:** Pitfall #1 (accumulator overflow) by specifying INT32 requirement, Pitfall #3 (scale precision) by documenting float32 storage
 
-**Features:** PyTorch static quantization, int8 support (uint8 if backend supports), accuracy delta reporting
-
-**Stack:** torch.ao.quantization module, fbgemm backend for x86 CPU
-
-**Avoids:** Module fusion pitfall, eval mode pitfall, skip connection quantization issues
-
-**Research flag:** Medium risk - PT2E is newer API, uint8 support on x86 backend unclear, may require model architecture modifications
-
-### Phase 4: Comparison and Documentation
-**Rationale:** Requires all quantized models evaluated to produce comprehensive comparison. Natural conclusion synthesizing results.
-
+### Phase 4: Residual Connection Handling
+**Rationale:** ResNet8's skip connections are unique architecture challenge where scales must match at Add operations.
 **Delivers:**
-- Accuracy comparison table: FP32 vs int8 vs uint8 for both frameworks
-- Model size comparison
-- Analysis of which quantization method performs best
-- Documentation of findings and recommendations
+- `docs/RESIDUAL_QUANTIZATION.md` — Scale mismatch problem explanation, three solution approaches (QDQ dequant-add-quant, TensorRT scale matching, PyTorch FloatFunctional), hardware trade-offs
+- Annotated ONNX graph showing both main path and skip path with scale annotations
+**Addresses:** Residual connection handling (should-have differentiator)
+**Implements:** Architecture component #3 (Add with scale matching)
 
-**Features:** Complete PTQ evaluation assessment
-
-**Research flag:** No risk - data collection and reporting only
+### Phase 5: Complete Reference Documentation
+**Rationale:** Tie all operations together with full-network context and hardware implementation checklist.
+**Delivers:**
+- `docs/QUANTIZATION_OPERATIONS.md` — Main reference combining all operations, full ResNet8 graph visualization, data flow diagrams, hardware accelerator requirements summary
+- Hardware implementation checklist covering all 6 critical pitfalls
+- Cross-references to ONNX operator specs
+**Addresses:** Complete table stakes coverage, critical pitfalls summary
+**Avoids:** All 6 critical pitfalls by providing verification checklist
 
 ### Phase Ordering Rationale
 
-**Sequential dependencies:**
-- Phase 1 (Calibration) is foundation for Phases 2-3
-- Phase 2 (ONNX) de-risks before Phase 3 (PyTorch complexity)
-- Phase 3 benefits from Phase 2 calibration lessons (sample size tuning, accuracy expectations)
-- Phase 4 requires Phases 2-3 complete (all evaluations done)
+- **Scripts first:** Extraction and visualization tools enable accurate documentation, prevent manual errors
+- **Boundary ops before compute ops:** QuantizeLinear/DequantizeLinear establish math notation and GitHub rendering workflow, simpler formulas validate approach
+- **QLinearConv before MatMul:** Convolution is more complex (spatial dimensions, padding, strides), documenting it first means MatMul is easier by comparison
+- **Residual connections after basic ops:** Requires understanding QLinearConv first, represents integration challenge rather than single-operation documentation
+- **Summary last:** Complete reference synthesizes all prior docs, adds hardware implementation guidance
 
-**Why this grouping:**
-- Phase 1 shared infrastructure prevents duplication
-- Phase 2 simpler path validates approach early
-- Phase 3 learns from Phase 2 (calibration quality, accuracy patterns)
-- Phase 4 natural synthesis point
-
-**Pitfall avoidance:**
-- Calibration-first prevents random data pitfall across both frameworks
-- ONNX-before-PyTorch identifies preprocessing issues early with simpler tooling
-- PyTorch phase addresses architecture changes (fusion, skip connections) separately
-- Validation checkpoints between quantization and evaluation prevent wasted debugging
+**Why this grouping avoids pitfalls:**
+- Incremental complexity prevents overwhelming readers
+- Scripts ensure documented parameters match actual models (no guesswork)
+- Worked examples with ResNet8 layers provide concrete bit-width calculations (prevents accumulator overflow)
+- Hardware pseudocode specifies exact rounding/saturation logic (prevents implementation errors)
 
 ### Research Flags
 
-**Needs deeper research during planning:**
-- **Phase 3 (PyTorch):** PT2E export compatibility with onnx2torch-converted models may have edge cases, uint8 support on x86 backend unclear, may require fallback to eager mode if export fails
+**Phases with standard patterns (skip research-phase):**
+- **Phase 1 (extraction scripts):** ONNX Python API is well-documented, onnx.tools.net_drawer has tutorial examples
+- **Phase 2 (boundary ops):** QuantizeLinear/DequantizeLinear operators have complete ONNX spec with formulas
+- **Phase 3 (QLinearConv):** Detailed operator spec exists, GitHub issues provide clarifications on two-stage computation
 
-**Standard patterns (skip research-phase):**
-- **Phase 1:** Simple data sampling pattern, well-established
-- **Phase 2:** ONNX Runtime quantization well-documented with official examples
-- **Phase 4:** Data collection and reporting only
+**Phases needing validation during implementation:**
+- **Phase 4 (residual connections):** TensorRT scale matching strategy is vendor-specific, need to verify hardware feasibility during doc writing (may simplify to QDQ approach if TensorRT method too complex)
+- **Phase 5 (hardware checklist):** Verification test cases should be executable, may need to create Python reference implementations for each pitfall test
+
+**No phases need deep research** — v1.3 is documentation of existing quantized models from v1.2, all operations are already implemented in ONNX Runtime.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Both quantization modules verified as built-in, no new dependencies needed |
-| Features | HIGH | Table stakes features clear from official docs, accuracy expectations backed by research |
-| Architecture | HIGH | Integration points analyzed against existing code, quantize-then-evaluate pattern proven |
-| Pitfalls | HIGH | Critical pitfalls verified with official documentation and GitHub issues, prevention strategies tested |
+| Stack | HIGH | ONNX Python API officially documented, pydot/graphviz well-established, GitHub MathJax verified |
+| Features | HIGH | ONNX operator specs provide exact formulas, ResNet8 quantized models from v1.2 provide concrete examples |
+| Architecture | HIGH | ONNX Runtime documentation explains QDQ format, TensorRT docs cover optimization strategies |
+| Pitfalls | HIGH | Verified with 2025-2026 research papers, ResNet8 PTQ results (86.75% ONNX, 85.68% PyTorch) validate proper implementation |
 
 **Overall confidence:** HIGH
 
-Research is comprehensive with official documentation coverage for both frameworks. Architecture analysis reviewed existing codebase integration points. Pitfalls research covered authoritative sources (PyTorch issues, ONNX Runtime docs, recent community discussions 2024-2026).
+Research is based on official ONNX specifications, verified with actual ResNet8 quantized models from v1.2, and cross-referenced with recent academic research on hardware quantization challenges. The only uncertainty is TensorRT-specific optimizations (scale matching strategy), which can default to simpler QDQ approach if needed.
 
 ### Gaps to Address
 
-**During implementation:**
-- **Actual ResNet8 quantization accuracy:** Expected 0-3% drop extrapolated from larger ResNets on ImageNet - ResNet8 on CIFAR-10 needs empirical validation
-- **PyTorch uint8 support on x86:** Documentation unclear whether fbgemm backend supports uint8 activations - attempt first, skip if unsupported (ONNX Runtime uint8 still available)
-- **Optimal calibration method:** MinMax vs Entropy vs Percentile for ResNet8 specifically - start with MinMax, try Entropy if accuracy <84%
-- **Minimum calibration samples:** 200 samples recommended starting point - increase to 500-1000 only if accuracy poor
-- **PT2E export compatibility:** onnx2torch-converted model may have dynamic control flow issues - test early in Phase 3, fallback to eager mode if needed
+**Minor gap: Optimal graph visualization layout** — ResNet8 full graph may be too cluttered for single PNG. During Phase 1, test different rankdir options (TB vs LR), potentially generate subgraph visualizations (per residual block) in addition to full graph. Fallback: provide Netron link for interactive exploration.
 
-**Validation strategy:**
-- Each phase includes validation checkpoint before proceeding (e.g., verify calibration data distribution, check quantized model size reduction, validate accuracy before comparison)
-- Expected accuracy ranges documented as debugging guide (>85% good, 80-85% check calibration, <80% investigate)
+**Minor gap: Hardware pseudocode language choice** — Should examples be C, Verilog, or Python? Recommendation: Use C-style pseudocode for algorithm clarity, add Verilog snippets for critical operations (rounding, saturation) where hardware specifics matter. Python reference implementations for test cases.
+
+**No critical gaps** — All core operations have complete specifications, extraction tools are proven (ONNX Python API used in industry), visualization approach validated by ONNX tutorials.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [ONNX Runtime Quantization Documentation](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) - Official quantization guide, static PTQ API reference
-- [ONNX Runtime v1.23.2 Release](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) - Version verification
-- [PyTorch 2 Export PTQ Tutorial](https://docs.pytorch.org/ao/stable/tutorials_source/pt2e_quant_ptq.html) - PT2E quantization workflow
-- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html) - Eager mode quantization
-- [PyTorch Quantization API Reference](https://docs.pytorch.org/docs/stable/quantization.html) - QConfig and backend configuration
-- [Practical Quantization in PyTorch Blog](https://pytorch.org/blog/quantization-in-practice/) - Best practices, calibration guidance (100 mini-batches)
+- [QLinearConv - ONNX 1.20.0 documentation](https://onnx.ai/onnx/operators/onnx__QLinearConv.html) — Complete operator specification with inputs, attributes, formula
+- [QLinearMatMul - ONNX 1.20.0 documentation](https://onnx.ai/onnx/operators/onnx__QLinearMatMul.html) — Matrix multiplication operator spec
+- [QuantizeLinear - ONNX 1.21.0 documentation](https://onnx.ai/onnx/operators/onnx__QuantizeLinear.html) — Quantization formula and rounding mode
+- [DequantizeLinear - ONNX 1.21.0 documentation](https://onnx.ai/onnx/operators/onnx__DequantizeLinear.html) — Dequantization formula
+- [ONNX Python API Overview](https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html) — Model loading and graph traversal
+- [ONNX Visualizing a Model Tutorial](https://github.com/onnx/tutorials/blob/main/tutorials/VisualizingAModel.md) — onnx.tools.net_drawer usage
+- [GitHub Writing Mathematical Expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions) — MathJax LaTeX support
 
 ### Secondary (MEDIUM confidence)
-- [PyTorch Static Quantization - Lei Mao](https://leimao.github.io/blog/PyTorch-Static-Quantization/) - Skip connection quantization patterns
-- [Master PyTorch Quantization Best Practices](https://medium.com/@noel.benji/beyond-the-basics-how-to-succeed-with-pytorch-quantization-e521ebb954cd) - Random calibration data warning
-- [Post-training Quantization - Google AI Edge](https://ai.google.dev/edge/litert/models/post_training_quantization) - Calibration best practices
-- [Neural Network Quantization in PyTorch](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/) - Workflow patterns
+- [How is QLinearConv calculated? - ONNX Runtime Issue #11883](https://github.com/microsoft/onnxruntime/issues/11883) — Clarifies two-stage computation (ConvInteger + requantization)
+- [ConvInteger vs QLinearConv - ONNX Issue #2424](https://github.com/onnx/onnx/issues/2424) — Explains relationship between integer convolution and requantization
+- [Working with Quantized Types - NVIDIA TensorRT](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/work-quantized-types.html) — Residual connection optimization strategies
+- [PyTorch vision quantized ResNet](https://github.com/pytorch/vision/blob/main/torchvision/models/quantization/resnet.py) — FloatFunctional.add() implementation for skip connections
 
-### Tertiary (LOW confidence, needs validation)
-- [PyTorch Forums: Expected INT8 Accuracies](https://discuss.pytorch.org/t/expected-int8-accuracies-on-imagenet-1k-resnet-qat/187227) - Accuracy expectations extrapolated from larger models
-- [Static Quantization Calibration Issues](https://github.com/pytorch/pytorch/issues/45185) - Calibration sensitivity discussions
+### Tertiary (Research papers, vendor-specific)
+- [Frontiers: Quantized CNNs hardware perspective (2025)](https://www.frontiersin.org/journals/electronics/articles/10.3389/felec.2025.1469802/full) — Hardware implementation challenges, accumulator bit-width requirements
+- [Speed up integer-arithmetic-only inference via bit-shifting (Nature 2025)](https://www.nature.com/articles/s41598-025-02544-4) — Fixed-point requantization optimization (27% FPS improvement)
+- [Is RTN Quantization All You Need? (arXiv 2025)](https://arxiv.org/html/2505.15909v1) — Round-to-nearest accuracy validation
+- [Deep learning inference optimization for IoT: Conv2D-ReLU-BN fusion (Springer 2025)](https://link.springer.com/article/10.1007/s11227-025-07107-y) — Fusion benefits (1.53× speedup)
+
+**Aggregated from research files:**
+- STACK.md: 15 high-confidence sources (official docs, PyPI verified versions)
+- FEATURES.md: 12 sources (ONNX specs, PyTorch docs, recent research)
+- ARCHITECTURE.md: 9 sources (ONNX Runtime, TensorRT, PyTorch implementation)
+- PITFALLS.md: 20+ sources (2025-2026 research papers, official framework docs)
 
 ---
-
-**Research completed:** 2026-01-28
-**Ready for roadmap:** Yes
-
-**Next steps for roadmapper:** Use Phase 1-4 structure as baseline roadmap, implement validation checkpoints between phases to catch pitfalls early, flag Phase 3 for potential deeper research if PT2E export compatibility issues arise.
+*Research completed: 2026-02-02*
+*Ready for roadmap: yes*
