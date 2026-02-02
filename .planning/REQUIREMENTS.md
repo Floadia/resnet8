@@ -30,7 +30,7 @@
 - [x] **PT-04**: Report per-class accuracy breakdown (10 classes)
 - [x] **PT-05**: Achieve >85% overall accuracy on CIFAR-10 test set
 
-## v1.2 Requirements (Current Milestone)
+## v1.2 Requirements (Complete)
 
 ### Calibration
 
@@ -46,15 +46,46 @@
 
 ### PyTorch Quantization
 
-- [ ] **PTQ-01**: PyTorch model quantized to int8 using static quantization
-- [ ] **PTQ-02**: PyTorch model quantized to uint8 using static quantization (if supported)
-- [ ] **PTQ-03**: Quantized PyTorch models evaluated on CIFAR-10 test set
-- [ ] **PTQ-04**: Accuracy delta reported vs 87.19% baseline
+- [x] **PTQ-01**: PyTorch model quantized to int8 using static quantization
+- [x] **PTQ-02**: PyTorch model quantized to uint8 — documented as not supported (fbgemm limitation)
+- [x] **PTQ-03**: Quantized PyTorch models evaluated on CIFAR-10 test set
+- [x] **PTQ-04**: Accuracy delta reported vs 87.19% baseline
 
 ### Analysis
 
-- [ ] **ANL-01**: Comparison table showing all quantization results (framework × dtype)
-- [ ] **ANL-02**: Flag any configuration with accuracy drop >5%
+- [x] **ANL-01**: Comparison table showing all quantization results (framework × dtype)
+- [x] **ANL-02**: Flag any configuration with accuracy drop >5%
+
+## v1.3 Requirements (Current Milestone)
+
+### Extraction & Visualization Tools
+
+- [ ] **TOOL-01**: Script extracts all QLinear nodes from ONNX models with scales, zero-points, and attributes as JSON
+- [ ] **TOOL-02**: Script generates PNG/SVG graph visualizations of quantized ONNX models
+
+### Boundary Operations Documentation
+
+- [ ] **BOUND-01**: QuantizeLinear operation documented with exact formula, numerical example, and hardware pseudocode
+- [ ] **BOUND-02**: DequantizeLinear operation documented with exact formula, numerical example, and hardware pseudocode
+
+### Core Operations Documentation
+
+- [ ] **CORE-01**: QLinearConv documented with all 9 inputs, two-stage computation (MAC + requantization), per-channel handling
+- [ ] **CORE-02**: QLinearMatMul documented with inputs, computation stages, and hardware requirements
+- [ ] **CORE-03**: Worked examples using actual ResNet8 layer values with intermediate calculations
+
+### Architecture Documentation
+
+- [ ] **ARCH-01**: Data flow diagram through quantized ResNet8 (FP32 input → INT8 → FP32 output)
+- [ ] **ARCH-02**: Scale/zero-point parameter locations documented (where they appear in ONNX graph)
+- [ ] **ARCH-03**: Residual connection handling documented (scale mismatch at Add operations)
+- [ ] **ARCH-04**: PyTorch quantized operation equivalents mapped to ONNX operations
+
+### Hardware Implementation Guide
+
+- [ ] **HW-01**: Critical pitfalls checklist with 6 items (accumulator overflow, rounding, scale precision, per-channel, fusion, clipping)
+- [ ] **HW-02**: Hardware pseudocode (C-style) with exact bit-widths for each operation
+- [ ] **HW-03**: Verification test vectors from ResNet8 for hardware validation
 
 ## Future Requirements
 
@@ -69,7 +100,13 @@ Deferred to future release. Tracked but not in current roadmap.
 
 - **ADV-01**: Quantization-aware training (QAT) for better accuracy
 - **ADV-02**: Per-channel quantization exploration
-- **ADV-03**: Mixed precision quantization
+- **ADV-03**: Mixed precision quantization (INT4 weights, INT8 activations)
+
+### Advanced Documentation
+
+- **DOC-01**: Dynamic quantization documentation
+- **DOC-02**: Calibration methodology deep-dive
+- **DOC-03**: Performance profiling documentation (MACs/FLOPs)
 
 ## Out of Scope
 
@@ -83,6 +120,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | Quantization-aware training | PTQ only — QAT deferred to future |
 | Inference speed benchmarking | Accuracy only for this milestone |
 | Model deployment | Evaluation only, not deployment artifacts |
+| Verilog/VHDL implementation | Documentation focuses on algorithms, not HDL |
 
 ## Traceability
 
@@ -107,20 +145,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORT-02 | Phase 6 | Complete |
 | ORT-03 | Phase 6 | Complete |
 | ORT-04 | Phase 6 | Complete |
-| PTQ-01 | Phase 7 | Pending |
-| PTQ-02 | Phase 7 | Pending |
-| PTQ-03 | Phase 7 | Pending |
-| PTQ-04 | Phase 7 | Pending |
-| ANL-01 | Phase 8 | Pending |
-| ANL-02 | Phase 8 | Pending |
+| PTQ-01 | Phase 7 | Complete |
+| PTQ-02 | Phase 7 | Complete |
+| PTQ-03 | Phase 7 | Complete |
+| PTQ-04 | Phase 7 | Complete |
+| ANL-01 | Phase 8 | Complete |
+| ANL-02 | Phase 8 | Complete |
+| TOOL-01 | — | Pending |
+| TOOL-02 | — | Pending |
+| BOUND-01 | — | Pending |
+| BOUND-02 | — | Pending |
+| CORE-01 | — | Pending |
+| CORE-02 | — | Pending |
+| CORE-03 | — | Pending |
+| ARCH-01 | — | Pending |
+| ARCH-02 | — | Pending |
+| ARCH-03 | — | Pending |
+| ARCH-04 | — | Pending |
+| HW-01 | — | Pending |
+| HW-02 | — | Pending |
+| HW-03 | — | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
-- v1.2 requirements: 12 total
-- Mapped to phases: 12/12 ✓
-- Unmapped: 0
+- v1.2 requirements: 12 total (Complete)
+- v1.3 requirements: 14 total (Pending)
+- Mapped to phases: 23/37 (v1.3 pending roadmap)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-01-28 with Phase 6 complete*
+*Last updated: 2026-02-02 with v1.3 requirements added*
