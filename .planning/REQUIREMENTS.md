@@ -60,13 +60,13 @@
 
 ### Extraction & Visualization Tools
 
-- [ ] **TOOL-01**: Script extracts all QLinear nodes from ONNX models with scales, zero-points, and attributes as JSON
-- [ ] **TOOL-02**: Script generates PNG/SVG graph visualizations of quantized ONNX models
+- [x] **TOOL-01**: Script extracts all QLinear nodes from ONNX models with scales, zero-points, and attributes as JSON
+- [x] **TOOL-02**: Script generates PNG/SVG graph visualizations of quantized ONNX models
 
 ### Boundary Operations Documentation
 
-- [ ] **BOUND-01**: QuantizeLinear operation documented with exact formula, numerical example, and hardware pseudocode
-- [ ] **BOUND-02**: DequantizeLinear operation documented with exact formula, numerical example, and hardware pseudocode
+- [x] **BOUND-01**: QuantizeLinear operation documented with exact formula, numerical example (hardware pseudocode deferred per user decision)
+- [x] **BOUND-02**: DequantizeLinear operation documented with exact formula, numerical example (hardware pseudocode deferred per user decision)
 
 ### Core Operations Documentation
 
@@ -151,10 +151,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PTQ-04 | Phase 7 | Complete |
 | ANL-01 | Phase 8 | Complete |
 | ANL-02 | Phase 8 | Complete |
-| TOOL-01 | Phase 9 | Pending |
-| TOOL-02 | Phase 9 | Pending |
-| BOUND-01 | Phase 10 | Pending |
-| BOUND-02 | Phase 10 | Pending |
+| TOOL-01 | Phase 9 | Complete |
+| TOOL-02 | Phase 9 | Complete |
+| BOUND-01 | Phase 10 | Complete |
+| BOUND-02 | Phase 10 | Complete |
 | CORE-01 | Phase 11 | Pending |
 | CORE-02 | Phase 11 | Pending |
 | CORE-03 | Phase 11 | Pending |
@@ -175,4 +175,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-02 with v1.3 traceability added*
+*Last updated: 2026-02-02 with Phase 10 requirements complete*
