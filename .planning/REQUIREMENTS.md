@@ -151,28 +151,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PTQ-04 | Phase 7 | Complete |
 | ANL-01 | Phase 8 | Complete |
 | ANL-02 | Phase 8 | Complete |
-| TOOL-01 | — | Pending |
-| TOOL-02 | — | Pending |
-| BOUND-01 | — | Pending |
-| BOUND-02 | — | Pending |
-| CORE-01 | — | Pending |
-| CORE-02 | — | Pending |
-| CORE-03 | — | Pending |
-| ARCH-01 | — | Pending |
-| ARCH-02 | — | Pending |
-| ARCH-03 | — | Pending |
-| ARCH-04 | — | Pending |
-| HW-01 | — | Pending |
-| HW-02 | — | Pending |
-| HW-03 | — | Pending |
+| TOOL-01 | Phase 9 | Pending |
+| TOOL-02 | Phase 9 | Pending |
+| BOUND-01 | Phase 10 | Pending |
+| BOUND-02 | Phase 10 | Pending |
+| CORE-01 | Phase 11 | Pending |
+| CORE-02 | Phase 11 | Pending |
+| CORE-03 | Phase 11 | Pending |
+| ARCH-01 | Phase 12 | Pending |
+| ARCH-02 | Phase 12 | Pending |
+| ARCH-03 | Phase 12 | Pending |
+| ARCH-04 | Phase 12 | Pending |
+| HW-01 | Phase 13 | Pending |
+| HW-02 | Phase 13 | Pending |
+| HW-03 | Phase 13 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
 - v1.2 requirements: 12 total (Complete)
 - v1.3 requirements: 14 total (Pending)
-- Mapped to phases: 23/37 (v1.3 pending roadmap)
+- Mapped to phases: 37/37 (100% coverage)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-02 with v1.3 requirements added*
+*Last updated: 2026-02-02 with v1.3 traceability added*
