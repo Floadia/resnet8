@@ -163,7 +163,8 @@ def qlinear_conv_manual(
     if verbose:
         print(f"After scaling: range [{scaled.min():.2f}, {scaled.max():.2f}]")
         print(f"After rounding: range [{rounded.min():.0f}, {rounded.max():.0f}]")
-        print(f"After zero-point: range [{with_zero_point.min():.0f}, {with_zero_point.max():.0f}]")
+        zp_min, zp_max = with_zero_point.min(), with_zero_point.max()
+        print(f"After zero-point: range [{zp_min:.0f}, {zp_max:.0f}]")
         print(f"After saturation (INT8): range [{y.min()}, {y.max()}]")
         print()
 

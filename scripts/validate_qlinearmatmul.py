@@ -151,8 +151,8 @@ def test_simple_matmul() -> bool:
     # Expected values (computed manually):
     # y[0,0] = 10*5 + 20*10 + 30*15 = 50 + 200 + 450 = 700 → 700 * (0.1*0.1/0.1) = 70
     # y[0,1] = 10*(-5) + 20*(-10) + 30*(-15) = -50 - 200 - 450 = -700 → -70
-    # y[1,0] = 40*5 + 50*10 + 60*15 = 200 + 500 + 900 = 1600 → 160 (saturates to 127)
-    # y[1,1] = 40*(-5) + 50*(-10) + 60*(-15) = -200 - 500 - 900 = -1600 → -160 (saturates to -128)
+    # y[1,0] = 40*5 + 50*10 + 60*15 = 1600 → 160 (saturates to 127)
+    # y[1,1] = 40*(-5) + 50*(-10) + 60*(-15) = -1600 → -160 (saturates to -128)
     expected = np.array([[70, -70], [127, -128]], dtype=np.int8)
 
     print(f"Expected output:\n{expected}")
@@ -201,7 +201,8 @@ def test_resnet8_fc_layer() -> bool:
 
     # Manual computation (verbose for first output)
     y_manual = qlinear_matmul_manual(
-        a, a_scale, a_zero_point, b, b_scale, b_zero_point, y_scale, y_zero_point, verbose=True
+        a, a_scale, a_zero_point, b, b_scale, b_zero_point,
+        y_scale, y_zero_point, verbose=True
     )
 
     print(f"Output y shape: {y_manual.shape}")
@@ -214,7 +215,8 @@ def test_resnet8_fc_layer() -> bool:
     a_fp32 = (a.astype(np.float32) - a_zero_point) * a_scale
     b_fp32 = (b.astype(np.float32) - b_zero_point) * b_scale
     y_fp32 = np.matmul(a_fp32, b_fp32)
-    y_reference = np.clip(np.round(y_fp32 / y_scale) + y_zero_point, -128, 127).astype(np.int8)
+    y_quant = np.clip(np.round(y_fp32 / y_scale) + y_zero_point, -128, 127)
+    y_reference = y_quant.astype(np.int8)
 
     print(f"Reference output (first 5 classes): {y_reference[0, :5]}")
     print()
@@ -254,14 +256,16 @@ def test_asymmetric_quantization() -> bool:
     print()
 
     y_manual = qlinear_matmul_manual(
-        a, a_scale, a_zero_point, b, b_scale, b_zero_point, y_scale, y_zero_point, verbose=True
+        a, a_scale, a_zero_point, b, b_scale, b_zero_point,
+        y_scale, y_zero_point, verbose=True
     )
 
     # Reference implementation
     a_fp32 = (a.astype(np.float32) - a_zero_point) * a_scale
     b_fp32 = (b.astype(np.float32) - b_zero_point) * b_scale
     y_fp32 = np.matmul(a_fp32, b_fp32)
-    y_reference = np.clip(np.round(y_fp32 / y_scale) + y_zero_point, -128, 127).astype(np.int8)
+    y_quant = np.clip(np.round(y_fp32 / y_scale) + y_zero_point, -128, 127)
+    y_reference = y_quant.astype(np.int8)
 
     print(f"Manual output: {y_manual}")
     print(f"Reference output: {y_reference}")
@@ -320,10 +324,13 @@ def test_int32_accumulator_overflow() -> bool:
     print()
 
     # Verify with actual computation
-    y_manual = qlinear_matmul_manual(a, a_scale, a_zero_point, b, b_scale, b_zero_point, y_scale, y_zero_point)
+    y_manual = qlinear_matmul_manual(
+        a, a_scale, a_zero_point, b, b_scale, b_zero_point, y_scale, y_zero_point
+    )
 
     print(f"Manual computation result: {y_manual[0, 0]}")
-    print(f"Expected: {total_accumulation} * (0.1*0.1/0.1) = {total_accumulation * 0.1} → saturated to 127")
+    scaled_val = total_accumulation * 0.1
+    print(f"Expected: {total_accumulation} * 0.1 = {scaled_val} → saturated to 127")
     print()
 
     # Expected: 1032256 * 0.1 = 103225.6 → round to 103226 → saturate to 127
@@ -337,11 +344,14 @@ def test_int32_accumulator_overflow() -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Validate QLinearMatMul implementation")
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Show detailed computation steps"
+    parser = argparse.ArgumentParser(
+        description="Validate QLinearMatMul implementation"
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Show detailed computation steps"
+    )
+    parser.parse_args()
 
     # Run all tests
     tests = [
