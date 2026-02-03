@@ -1,0 +1,75 @@
+digraph ResNet8_QDQ_Architecture {
+  rankdir="TB";
+  node [shape=box, style=filled, fontname="Arial", fontsize=10];
+  edge [fontname="Arial", fontsize=9];
+
+  // Input
+  input [label="Model Input\n(batch, 32, 32, 3)\n[FP32]", fillcolor="#E0F0FF"];
+
+  // Input Quantization
+  q_input [label="QuantizeLinear\nscale=1.000000\nzp=-128\n[FP32 → INT8]", fillcolor="#90EE90"];
+  input -> q_input [label="FP32"];
+
+  // QDQ Pattern Blocks
+  subgraph cluster_legend {
+    label="QDQ Format Pattern";
+    style=filled;
+    fillcolor="#F0F0F0";
+    pattern_q [label="QuantizeLinear\n(FP32 → INT8)", fillcolor="#90EE90"];
+    pattern_dq [label="DequantizeLinear\n(INT8 → FP32)", fillcolor="#FFB6C1"];
+    pattern_op [label="Operation\n(Conv, Add, etc.)\n[Operates on FP32]", fillcolor="#87CEEB"];
+    pattern_q -> pattern_dq [label="INT8"];
+    pattern_dq -> pattern_op [label="FP32"];
+  }
+
+  // Architecture Summary
+  subgraph cluster_stats {
+    label="ResNet8 QDQ Statistics";
+    style=filled;
+    fillcolor="#FFF8DC";
+    stats [shape=plaintext, label=<
+      <table border="0" cellborder="1" cellspacing="0">
+        <tr><td><b>Operation</b></td><td><b>Count</b></td></tr>
+        <tr><td>QuantizeLinear</td><td>32</td></tr>
+        <tr><td>DequantizeLinear</td><td>66</td></tr>
+        <tr><td>Total QDQ nodes</td><td>98</td></tr>
+        <tr><td>Total graph nodes</td><td>130</td></tr>
+      </table>
+    >];
+  }
+
+  // Typical Data Flow (simplified)
+  q_input -> layer1_dq [label="INT8"];
+  layer1_dq [label="DequantizeLinear\n[INT8 → FP32]", fillcolor="#FFB6C1"];
+  layer1_dq -> layer1_conv [label="FP32"];
+  layer1_conv [label="Conv2D\n[FP32 compute]", fillcolor="#87CEEB"];
+  layer1_conv -> layer1_q [label="FP32"];
+  layer1_q [label="QuantizeLinear\n[FP32 → INT8]", fillcolor="#90EE90"];
+
+  layer1_q -> layer2_dq [label="INT8"];
+  layer2_dq [label="DequantizeLinear\n[INT8 → FP32]", fillcolor="#FFB6C1"];
+  layer2_dq -> layer2_op [label="FP32"];
+  layer2_op [label="...\n(more layers)\n[FP32]", fillcolor="#87CEEB"];
+
+  layer2_op -> output_q [label="FP32"];
+  output_q [label="QuantizeLinear\n[FP32 → INT8]", fillcolor="#90EE90"];
+  output_q -> output_dq [label="INT8"];
+  output_dq [label="DequantizeLinear\n(final)\n[INT8 → FP32]", fillcolor="#FFB6C1"];
+  output_dq -> output [label="FP32"];
+
+  // Output
+  output [label="Model Output\n(batch, 10)\n[FP32]", fillcolor="#FFE0E0"];
+
+  // Parameter Storage Note
+  note [shape=note, fillcolor="#FFFACD", 
+        label="Scale and Zero-Point Parameters\n\n
+Stored as initializers in ONNX graph.\n
+Each Q/DQ node references 2-3 inputs:\n
+  1. Data tensor (from previous layer)\n
+  2. scale (FP32 initializer)\n
+  3. zero_point (INT8 initializer, optional)\n\n
+Example from this model:\n
+  QuantizeLinear nodes: 32\n
+  DequantizeLinear nodes: 66"];
+
+}
