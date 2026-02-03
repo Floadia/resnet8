@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 11 of 13 (Core Operations Documentation)
-Plan: 1 of 1
+Plan: 2 of 2
 Status: Phase complete
-Last activity: 2026-02-03 — Completed 11-01-PLAN.md
+Last activity: 2026-02-03 — Completed 11-02-PLAN.md
 
 Progress: [████████████░] 85% (11/13 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 3.81min (v1.2+ tracking)
-- Total execution time: 42min (v1.2-v1.3)
+- Total plans completed: 12
+- Average duration: 3.83min (v1.2+ tracking)
+- Total execution time: 46min (v1.2-v1.3)
 
 **By Phase:**
 
@@ -37,11 +37,11 @@ Progress: [████████████░] 85% (11/13 phases complete)
 | 8. Comparison Analysis | 1/1 | 3min | 3min |
 | 9. Operation Extraction Scripts | 1/1 | 2min | 2min |
 | 10. Boundary Operations Documentation | 1/1 | 2min | 2min |
-| 11. Core Operations Documentation | 1/1 | 5min | 5min |
+| 11. Core Operations Documentation | 2/2 | 9min | 4.5min |
 
 **Recent Trend:**
-- Last plan: 11-01 (5min)
-- Documentation phases maintaining excellent pace (established patterns, validation scripts add value)
+- Last 2 plans: 11-01 (5min), 11-02 (4min)
+- Documentation phases maintaining excellent pace (cross-referencing pattern speeds up related operations)
 
 ## Accumulated Context
 
@@ -85,6 +85,8 @@ From Phase 11 (Core Operations Documentation):
 - Per-channel quantization overhead is negligible for typical layers (0.17% for 256-channel conv)
 - Two-stage computation pattern (INT8×INT8→INT32 MAC, then requantization) is universal across quantized ops
 - Validation scripts with multiple test cases demonstrate correctness and edge case handling
+- Cross-referencing pattern: Link to detailed explanations in related operation docs instead of duplicating content
+- QLinearMatMul shares identical arithmetic pattern with QLinearConv (only structural differences: no spatial dims, different input names)
 
 ### Pending Todos
 
@@ -96,7 +98,6 @@ None - ready for Phase 12 (Architecture Documentation)
 
 Minor considerations for upcoming phases:
 - Architecture documentation (Phase 12) will work with QDQ format models, not QLinearConv
-- QLinearMatMul documentation needed for Phase 12 (matrix multiplication in dense layers)
 - Hardware implementation guide (Phase 13) can leverage established patterns from Phases 10-11
 
 ## v1.3 Milestone Overview
@@ -118,7 +119,7 @@ Minor considerations for upcoming phases:
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 11-01-PLAN.md
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
 
 **Next action:** `/gsd:plan-phase 12` to create execution plan for Architecture Documentation
