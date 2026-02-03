@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 12 of 13 (Architecture Documentation)
-Plan: 1 of 1
+Plan: 2 of 2
 Status: Phase complete
-Last activity: 2026-02-03 — Completed 12-01-PLAN.md
+Last activity: 2026-02-03 — Completed 12-02-PLAN.md
 
 Progress: [████████████░] 92% (12/13 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
-- Average duration: 4.00min (v1.2+ tracking)
-- Total execution time: 52min (v1.2-v1.3)
+- Total plans completed: 14
+- Average duration: 3.93min (v1.2+ tracking)
+- Total execution time: 55min (v1.2-v1.3)
 
 **By Phase:**
 
@@ -38,10 +38,10 @@ Progress: [████████████░] 92% (12/13 phases complete)
 | 9. Operation Extraction Scripts | 1/1 | 2min | 2min |
 | 10. Boundary Operations Documentation | 1/1 | 2min | 2min |
 | 11. Core Operations Documentation | 2/2 | 9min | 4.5min |
-| 12. Architecture Documentation | 1/1 | 6min | 6min |
+| 12. Architecture Documentation | 2/2 | 9min | 4.5min |
 
 **Recent Trend:**
-- Last 3 plans: 11-01 (5min), 11-02 (4min), 12-01 (6min)
+- Last 3 plans: 11-02 (4min), 12-01 (6min), 12-02 (3min)
 - Documentation phases maintaining excellent pace (cross-referencing pattern established)
 
 ## Accumulated Context
@@ -97,6 +97,11 @@ From Phase 12 (Architecture Documentation):
 - JSON-driven visualization more portable than ONNX-driven (no library dependencies)
 - Conceptual diagrams more effective than full graph for understanding (130 nodes overwhelming)
 - Scale/zero-point parameters stored as initializers with systematic naming convention
+- Residual connections have significant scale mismatches (2.65×-3.32× ratios in ResNet8)
+- QDQ dequant-add-quant pattern required for mathematically correct residual addition
+- Direct INT8 addition fails when branches have different scales (same value represents different magnitudes)
+- PyTorch→ONNX conversion: export FP32 then quantize with ONNX Runtime (avoids aten::quantize_per_channel limitation)
+- Two-stage computation pattern applies to both QLinear operators (spec) and QDQ format (implementation)
 
 ### Pending Todos
 
@@ -130,11 +135,11 @@ Minor considerations for Phase 13:
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 12-02-PLAN.md (Phase 12 complete)
 Resume file: None
 
 **Next action:** `/gsd:plan-phase 13` to create execution plan for Hardware Implementation Guide
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-03 with Phase 12 completion*
+*Last updated: 2026-02-03 with Phase 12 Plan 02 completion*
