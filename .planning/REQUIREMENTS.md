@@ -76,10 +76,10 @@
 
 ### Architecture Documentation
 
-- [ ] **ARCH-01**: Data flow diagram through quantized ResNet8 (FP32 input → INT8 → FP32 output)
-- [ ] **ARCH-02**: Scale/zero-point parameter locations documented (where they appear in ONNX graph)
-- [ ] **ARCH-03**: Residual connection handling documented (scale mismatch at Add operations)
-- [ ] **ARCH-04**: PyTorch quantized operation equivalents mapped to ONNX operations
+- [x] **ARCH-01**: Data flow diagram through quantized ResNet8 (FP32 input → INT8 → FP32 output)
+- [x] **ARCH-02**: Scale/zero-point parameter locations documented (where they appear in ONNX graph)
+- [x] **ARCH-03**: Residual connection handling documented (scale mismatch at Add operations)
+- [x] **ARCH-04**: PyTorch quantized operation equivalents mapped to ONNX operations
 
 ### Hardware Implementation Guide
 
@@ -158,10 +158,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORE-01 | Phase 11 | Complete |
 | CORE-02 | Phase 11 | Complete |
 | CORE-03 | Phase 11 | Complete |
-| ARCH-01 | Phase 12 | Pending |
-| ARCH-02 | Phase 12 | Pending |
-| ARCH-03 | Phase 12 | Pending |
-| ARCH-04 | Phase 12 | Pending |
+| ARCH-01 | Phase 12 | Complete |
+| ARCH-02 | Phase 12 | Complete |
+| ARCH-03 | Phase 12 | Complete |
+| ARCH-04 | Phase 12 | Complete |
 | HW-01 | Phase 13 | Pending |
 | HW-02 | Phase 13 | Pending |
 | HW-03 | Phase 13 | Pending |
@@ -175,4 +175,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-03 with Phase 11 requirements complete*
+*Last updated: 2026-02-03 with Phase 12 requirements complete*

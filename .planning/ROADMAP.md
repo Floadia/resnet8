@@ -205,8 +205,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — QDQ architecture documentation with network visualization and scale/zero-point locations
-- [ ] 12-02-PLAN.md — Residual connections and PyTorch equivalents documentation
+- [x] 12-01-PLAN.md — QDQ architecture documentation with network visualization and scale/zero-point locations
+- [x] 12-02-PLAN.md — Residual connections and PyTorch equivalents documentation
 
 #### Phase 13: Hardware Implementation Guide
 **Goal**: Complete hardware implementation checklist with critical pitfalls, pseudocode, and test vectors
@@ -241,9 +241,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 9. Operation Extraction Scripts | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 10. Boundary Operations Documentation | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 11. Core Operations Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
-| 12. Architecture Documentation | v1.3 | 0/2 | Not started | - |
+| 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-03 with Phase 11 complete*
+*Last updated: 2026-02-03 with Phase 12 complete*
