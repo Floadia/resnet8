@@ -202,10 +202,11 @@ Plans:
   3. Residual connection handling documented with scale mismatch problem explained and solution approaches compared (QDQ dequant-add-quant, scale matching, PyTorch FloatFunctional)
   4. PyTorch quantized operation equivalents mapped to ONNX operations (e.g., torch.nn.quantized.Conv2d → QLinearConv)
   5. Full network visualization included showing all quantized operations with annotated scale/zero-point flow
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] TBD
+- [ ] 12-01-PLAN.md — QDQ architecture documentation with network visualization and scale/zero-point locations
+- [ ] 12-02-PLAN.md — Residual connections and PyTorch equivalents documentation
 
 #### Phase 13: Hardware Implementation Guide
 **Goal**: Complete hardware implementation checklist with critical pitfalls, pseudocode, and test vectors
@@ -240,7 +241,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 9. Operation Extraction Scripts | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 10. Boundary Operations Documentation | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 11. Core Operations Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
-| 12. Architecture Documentation | v1.3 | 0/TBD | Not started | - |
+| 12. Architecture Documentation | v1.3 | 0/2 | Not started | - |
 | 13. Hardware Implementation Guide | v1.3 | 0/TBD | Not started | - |
 
 ---
