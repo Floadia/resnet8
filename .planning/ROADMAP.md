@@ -189,8 +189,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — QLinearConv documentation with two-stage computation and validation
-- [ ] 11-02-PLAN.md — QLinearMatMul documentation for FC layer
+- [x] 11-01-PLAN.md — QLinearConv documentation with two-stage computation and validation
+- [x] 11-02-PLAN.md — QLinearMatMul documentation for FC layer
 
 #### Phase 12: Architecture Documentation
 **Goal**: Full ResNet8 quantized architecture documented with scale/zero-point flow and residual connection handling
@@ -239,10 +239,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. Comparison and Analysis | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 9. Operation Extraction Scripts | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 10. Boundary Operations Documentation | v1.3 | 1/1 | Complete | 2026-02-02 |
-| 11. Core Operations Documentation | v1.3 | 0/2 | Not started | - |
+| 11. Core Operations Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 12. Architecture Documentation | v1.3 | 0/TBD | Not started | - |
 | 13. Hardware Implementation Guide | v1.3 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-03 with Phase 11 plans created*
+*Last updated: 2026-02-03 with Phase 11 complete*

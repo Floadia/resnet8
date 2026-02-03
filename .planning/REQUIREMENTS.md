@@ -70,9 +70,9 @@
 
 ### Core Operations Documentation
 
-- [ ] **CORE-01**: QLinearConv documented with all 9 inputs, two-stage computation (MAC + requantization), per-channel handling
-- [ ] **CORE-02**: QLinearMatMul documented with inputs, computation stages, and hardware requirements
-- [ ] **CORE-03**: Worked examples using actual ResNet8 layer values with intermediate calculations
+- [x] **CORE-01**: QLinearConv documented with all 9 inputs, two-stage computation (MAC + requantization), per-channel handling
+- [x] **CORE-02**: QLinearMatMul documented with inputs, computation stages, and hardware requirements
+- [x] **CORE-03**: Worked examples using actual ResNet8 layer values with intermediate calculations
 
 ### Architecture Documentation
 
@@ -155,9 +155,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOOL-02 | Phase 9 | Complete |
 | BOUND-01 | Phase 10 | Complete |
 | BOUND-02 | Phase 10 | Complete |
-| CORE-01 | Phase 11 | Pending |
-| CORE-02 | Phase 11 | Pending |
-| CORE-03 | Phase 11 | Pending |
+| CORE-01 | Phase 11 | Complete |
+| CORE-02 | Phase 11 | Complete |
+| CORE-03 | Phase 11 | Complete |
 | ARCH-01 | Phase 12 | Pending |
 | ARCH-02 | Phase 12 | Pending |
 | ARCH-03 | Phase 12 | Pending |
@@ -175,4 +175,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-02 with Phase 10 requirements complete*
+*Last updated: 2026-02-03 with Phase 11 requirements complete*
