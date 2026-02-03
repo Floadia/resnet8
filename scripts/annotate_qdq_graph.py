@@ -14,7 +14,7 @@ import json
 import os
 import subprocess
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 
 def check_graphviz_installation() -> bool:
@@ -70,7 +70,8 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         '  edge [fontname="Arial", fontsize=9];',
         "",
         "  // Input",
-        '  input [label="Model Input\\n(batch, 32, 32, 3)\\n[FP32]", fillcolor="#E0F0FF"];',
+        '  input [label="Model Input\\n(batch, 32, 32, 3)\\n[FP32]",'
+        ' fillcolor="#E0F0FF"];',
         "",
     ]
 
@@ -78,7 +79,10 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
     # For ResNet8: conv1 -> block1 -> block2 -> block3 -> pool -> dense
 
     # Add input quantization
-    input_quant = [op for op in quantize_ops if "input" in op["name"].lower() or op == quantize_ops[0]]
+    input_quant = [
+        op for op in quantize_ops
+        if "input" in op["name"].lower() or op == quantize_ops[0]
+    ]
     if input_quant:
         op = input_quant[0]
         scale_str = ""
@@ -89,7 +93,8 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
             zp_str = f"\\nzp={zp_val}"
 
         dot_lines.append('  // Input Quantization')
-        dot_lines.append(f'  q_input [label="QuantizeLinear{scale_str}{zp_str}\\n[FP32 → INT8]", fillcolor="#90EE90"];')
+        label = f"QuantizeLinear{scale_str}{zp_str}\\n[FP32 → INT8]"
+        dot_lines.append(f'  q_input [label="{label}", fillcolor="#90EE90"];')
         dot_lines.append('  input -> q_input [label="FP32"];')
         dot_lines.append('')
 
@@ -100,9 +105,12 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         '    label="QDQ Format Pattern";',
         '    style=filled;',
         '    fillcolor="#F0F0F0";',
-        '    pattern_q [label="QuantizeLinear\\n(FP32 → INT8)", fillcolor="#90EE90"];',
-        '    pattern_dq [label="DequantizeLinear\\n(INT8 → FP32)", fillcolor="#FFB6C1"];',
-        '    pattern_op [label="Operation\\n(Conv, Add, etc.)\\n[Operates on FP32]", fillcolor="#87CEEB"];',
+        '    pattern_q [label="QuantizeLinear\\n(FP32 → INT8)",'
+        ' fillcolor="#90EE90"];',
+        '    pattern_dq [label="DequantizeLinear\\n(INT8 → FP32)",'
+        ' fillcolor="#FFB6C1"];',
+        '    pattern_op [label="Operation\\n(Conv, Add, etc.)\\n[Operates on FP32]",'
+        ' fillcolor="#87CEEB"];',
         '    pattern_q -> pattern_dq [label="INT8"];',
         '    pattern_dq -> pattern_op [label="FP32"];',
         '  }',
@@ -110,21 +118,23 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
     ])
 
     # Add summary statistics
+    total_qdq = len(quantize_ops) + len(dequantize_ops)
+    total_nodes = ops_data["summary"]["total_nodes"]
     dot_lines.extend([
         '  // Architecture Summary',
         '  subgraph cluster_stats {',
         '    label="ResNet8 QDQ Statistics";',
         '    style=filled;',
         '    fillcolor="#FFF8DC";',
-        f'    stats [shape=plaintext, label=<',
-        f'      <table border="0" cellborder="1" cellspacing="0">',
-        f'        <tr><td><b>Operation</b></td><td><b>Count</b></td></tr>',
+        '    stats [shape=plaintext, label=<',
+        '      <table border="0" cellborder="1" cellspacing="0">',
+        '        <tr><td><b>Operation</b></td><td><b>Count</b></td></tr>',
         f'        <tr><td>QuantizeLinear</td><td>{len(quantize_ops)}</td></tr>',
         f'        <tr><td>DequantizeLinear</td><td>{len(dequantize_ops)}</td></tr>',
-        f'        <tr><td>Total QDQ nodes</td><td>{len(quantize_ops) + len(dequantize_ops)}</td></tr>',
-        f'        <tr><td>Total graph nodes</td><td>{ops_data["summary"]["total_nodes"]}</td></tr>',
-        f'      </table>',
-        f'    >];',
+        f'        <tr><td>Total QDQ nodes</td><td>{total_qdq}</td></tr>',
+        f'        <tr><td>Total graph nodes</td><td>{total_nodes}</td></tr>',
+        '      </table>',
+        '    >];',
         '  }',
         '',
     ])
@@ -147,7 +157,8 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         '  layer2_op -> output_q [label="FP32"];',
         '  output_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
         '  output_q -> output_dq [label="INT8"];',
-        '  output_dq [label="DequantizeLinear\\n(final)\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
+        '  output_dq [label="DequantizeLinear\\n(final)\\n[INT8 → FP32]",'
+        ' fillcolor="#FFB6C1"];',
         '  output_dq -> output [label="FP32"];',
         '',
         '  // Output',
@@ -199,7 +210,8 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         '  quantize_table [label=<',
         '    <table border="1" cellborder="1" cellspacing="0">',
         '      <tr><td colspan="4"><b>QuantizeLinear Nodes</b></td></tr>',
-        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td><td><b>Zero Point</b></td><td><b>Output</b></td></tr>',
+        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td>'
+        '<td><b>Zero Point</b></td><td><b>Output</b></td></tr>',
     ]
 
     # Add first 10 quantize operations as examples
@@ -214,12 +226,14 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         else:
             scale_str = str(scale_val)
 
-        dot_lines.append(
-            f'      <tr><td>{name}</td><td>{scale_str}</td><td>{zp_val}</td><td>{output[:30]}...</td></tr>'
-        )
+        row = f'<tr><td>{name}</td><td>{scale_str}</td>'
+        row += f'<td>{zp_val}</td><td>{output[:30]}...</td></tr>'
+        dot_lines.append(f'      {row}')
 
     if len(quantize_ops) > 10:
-        dot_lines.append(f'      <tr><td colspan="4">... and {len(quantize_ops) - 10} more</td></tr>')
+        remaining = len(quantize_ops) - 10
+        more_row = f'<tr><td colspan="4">... and {remaining} more</td></tr>'
+        dot_lines.append(f'      {more_row}')
 
     dot_lines.extend([
         '    </table>',
@@ -228,7 +242,8 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         '  dequantize_table [label=<',
         '    <table border="1" cellborder="1" cellspacing="0">',
         '      <tr><td colspan="4"><b>DequantizeLinear Nodes</b></td></tr>',
-        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td><td><b>Zero Point</b></td><td><b>Input</b></td></tr>',
+        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td>'
+        '<td><b>Zero Point</b></td><td><b>Input</b></td></tr>',
     ])
 
     # Add first 10 dequantize operations as examples
@@ -243,12 +258,14 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         else:
             scale_str = str(scale_val)
 
-        dot_lines.append(
-            f'      <tr><td>{name}</td><td>{scale_str}</td><td>{zp_val}</td><td>{input_tensor[:30]}...</td></tr>'
-        )
+        row = f'<tr><td>{name}</td><td>{scale_str}</td>'
+        row += f'<td>{zp_val}</td><td>{input_tensor[:30]}...</td></tr>'
+        dot_lines.append(f'      {row}')
 
     if len(dequantize_ops) > 10:
-        dot_lines.append(f'      <tr><td colspan="4">... and {len(dequantize_ops) - 10} more</td></tr>')
+        remaining = len(dequantize_ops) - 10
+        more_row = f'<tr><td colspan="4">... and {remaining} more</td></tr>'
+        dot_lines.append(f'      {more_row}')
 
     dot_lines.extend([
         '    </table>',
@@ -274,8 +291,10 @@ def generate_diagrams(operations_json: str, output_dir: str) -> Tuple[str, str]:
     ops_data = load_operations_json(operations_json)
 
     print(f"Found {ops_data['summary']['qlinear_nodes']} QDQ nodes")
-    print(f"  QuantizeLinear: {ops_data['summary']['op_type_counts']['QuantizeLinear']}")
-    print(f"  DequantizeLinear: {ops_data['summary']['op_type_counts']['DequantizeLinear']}")
+    q_count = ops_data['summary']['op_type_counts']['QuantizeLinear']
+    dq_count = ops_data['summary']['op_type_counts']['DequantizeLinear']
+    print(f"  QuantizeLinear: {q_count}")
+    print(f"  DequantizeLinear: {dq_count}")
     print()
 
     # Create output directory if needed
@@ -324,7 +343,7 @@ def main():
     parser.add_argument(
         "--operations-json",
         default="models/resnet8_int8_operations.json",
-        help="Path to operations JSON file (default: models/resnet8_int8_operations.json)",
+        help="Path to operations JSON file",
     )
     parser.add_argument(
         "--output-dir",
