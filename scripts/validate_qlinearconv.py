@@ -110,12 +110,12 @@ def qlinear_conv_manual(
 
                     # Show first MAC for debugging
                     if verbose and n == 0 and m == 0 and h_out == 0 and w_out == 0:
-                        print(f"First output position [0,0,0,0]:")
-                        print(f"  Input patch (INT8):")
+                        print("First output position [0,0,0,0]:")
+                        print("  Input patch (INT8):")
                         print(f"    {patch[0, :, :]}")
-                        print(f"  Weight kernel (INT8):")
+                        print("  Weight kernel (INT8):")
                         print(f"    {w[m, 0, :, :]}")
-                        print(f"  After zero-point subtraction:")
+                        print("  After zero-point subtraction:")
                         print(f"    x_centered[0]: {x_centered[0, :, :]}")
                         print(f"    w_centered[0]: {w_centered[0, :, :]}")
                         print(f"  Products (INT32): shape {products.shape}")
@@ -168,7 +168,7 @@ def qlinear_conv_manual(
         print()
 
         # Show first output value details
-        print(f"First output value [0,0,0,0]:")
+        print("First output value [0,0,0,0]:")
         print(f"  Accumulator (INT32): {acc[0, 0, 0, 0]}")
         print(f"  After scale: {scaled[0, 0, 0, 0]:.2f}")
         print(f"  After round: {rounded[0, 0, 0, 0]:.0f}")
@@ -324,9 +324,9 @@ def validate_test_case(case_name: str, verbose: bool = False) -> bool:
         num_macs = params["w"].shape[1] * params["w"].shape[2] * params["w"].shape[3]
         worst_case_acc = num_macs * 127 * 127
         print(f"\n  Worst-case accumulator value: {worst_case_acc:,}")
-        print(f"  INT16 max: 32,767")
+        print("  INT16 max: 32,767")
         print(f"  Overflow factor: {worst_case_acc / 32767:.1f}×")
-        print(f"  → INT32 accumulator required ✓")
+        print("  → INT32 accumulator required ✓")
 
     print()
     if checks_passed:
@@ -379,7 +379,7 @@ def main():
         print("  • INT32 accumulator prevents overflow")
         sys.exit(0)
     else:
-        print(f"Some test cases failed ✗")
+        print("Some test cases failed ✗")
         sys.exit(1)
 
 

@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import onnx
 import onnx.numpy_helper as nph

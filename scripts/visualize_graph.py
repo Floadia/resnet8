@@ -10,7 +10,6 @@ import argparse
 import os
 import subprocess
 import sys
-from typing import Optional
 
 import onnx
 

@@ -15,7 +15,6 @@ Usage:
 
 import argparse
 import sys
-from typing import Tuple
 
 import numpy as np
 
@@ -188,7 +187,7 @@ def test_resnet8_fc_layer() -> bool:
     y_scale = 0.1585
     y_zero_point = 0
 
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  Batch size: {N}")
     print(f"  Input features: {K}")
     print(f"  Output features: {M}")
@@ -248,7 +247,7 @@ def test_asymmetric_quantization() -> bool:
     y_scale = 0.1
     y_zero_point = 10  # Non-zero
 
-    print(f"Quantization parameters:")
+    print("Quantization parameters:")
     print(f"  a_zero_point: {a_zero_point} (non-zero)")
     print(f"  b_zero_point: {b_zero_point} (non-zero)")
     print(f"  y_zero_point: {y_zero_point} (non-zero)")
@@ -293,10 +292,10 @@ def test_int32_accumulator_overflow() -> bool:
     y_scale = 0.1
     y_zero_point = 0
 
-    print(f"Configuration:")
+    print("Configuration:")
     print(f"  K = {K} (number of MACs per output)")
-    print(f"  Input values: all 127 (maximum INT8)")
-    print(f"  Weight values: all 127 (maximum INT8)")
+    print("  Input values: all 127 (maximum INT8)")
+    print("  Weight values: all 127 (maximum INT8)")
     print()
 
     # Compute accumulator value
@@ -309,7 +308,7 @@ def test_int32_accumulator_overflow() -> bool:
     overflow_factor_int16 = total_accumulation / INT16_MAX
     margin_int32 = INT32_MAX / total_accumulation
 
-    print(f"Analysis:")
+    print("Analysis:")
     print(f"  Single product: 127 × 127 = {max_product}")
     print(f"  Total accumulation: {max_product} × {K} = {total_accumulation}")
     print()
