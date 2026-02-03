@@ -5,7 +5,7 @@
 - ✅ **v1.0 ONNX Evaluation** - Phases 1-2 (shipped 2026-01-27)
 - ✅ **v1.1 PyTorch Evaluation** - Phases 3-4 (shipped 2026-01-27)
 - ✅ **v1.2 PTQ Evaluation** - Phases 5-8 (shipped 2026-01-28)
-- 🚧 **v1.3 Quantized Operations Documentation** - Phases 9-13 (in progress)
+- ✅ **v1.3 Quantized Operations Documentation** - Phases 9-12 (shipped 2026-02-03)
 
 ## Phases
 
@@ -144,11 +144,12 @@ Plans:
 
 </details>
 
-### 🚧 v1.3 Quantized Operations Documentation (In Progress)
+<details>
+<summary>✅ v1.3 Quantized Operations Documentation (Phases 9-12) - SHIPPED 2026-02-03</summary>
 
 **Milestone Goal:** Create reference documentation explaining the calculations needed to implement quantized inference in hardware, with ONNX graph visualization
 
-#### Phase 9: Operation Extraction Scripts
+### Phase 9: Operation Extraction Scripts
 **Goal**: Programmatic tools extract quantized operation details from ONNX models for data-driven documentation
 **Depends on**: Phase 8 (needs quantized ONNX models from v1.2)
 **Requirements**: TOOL-01, TOOL-02
@@ -162,7 +163,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md — Create extraction and visualization scripts for quantized ONNX models
 
-#### Phase 10: Boundary Operations Documentation
+### Phase 10: Boundary Operations Documentation
 **Goal**: QuantizeLinear and DequantizeLinear operations fully documented with formulas and hardware guidance
 **Depends on**: Phase 9 (needs extracted operation parameters)
 **Requirements**: BOUND-01, BOUND-02
@@ -176,7 +177,7 @@ Plans:
 Plans:
 - [x] 10-01-PLAN.md — Document QuantizeLinear and DequantizeLinear operations with formulas and examples
 
-#### Phase 11: Core Operations Documentation
+### Phase 11: Core Operations Documentation
 **Goal**: QLinearConv and QLinearMatMul operations fully documented with two-stage computation explained
 **Depends on**: Phase 10 (builds on boundary operations foundation)
 **Requirements**: CORE-01, CORE-02, CORE-03
@@ -192,7 +193,7 @@ Plans:
 - [x] 11-01-PLAN.md — QLinearConv documentation with two-stage computation and validation
 - [x] 11-02-PLAN.md — QLinearMatMul documentation for FC layer
 
-#### Phase 12: Architecture Documentation
+### Phase 12: Architecture Documentation
 **Goal**: Full ResNet8 quantized architecture documented with scale/zero-point flow and residual connection handling
 **Depends on**: Phase 11 (needs core operations context)
 **Requirements**: ARCH-01, ARCH-02, ARCH-03, ARCH-04
@@ -208,25 +209,12 @@ Plans:
 - [x] 12-01-PLAN.md — QDQ architecture documentation with network visualization and scale/zero-point locations
 - [x] 12-02-PLAN.md — Residual connections and PyTorch equivalents documentation
 
-#### Phase 13: Hardware Implementation Guide
-**Goal**: Complete hardware implementation checklist with critical pitfalls, pseudocode, and test vectors
-**Depends on**: Phase 12 (needs full architecture context)
-**Requirements**: HW-01, HW-02, HW-03
-**Success Criteria** (what must be TRUE):
-  1. Critical pitfalls checklist covers all 6 items: INT32 accumulator overflow prevention, round-to-nearest-even rounding mode, float32 scale precision, per-channel quantization indexing, operation fusion (Conv-ReLU), and INT8 saturation/clipping
-  2. Hardware pseudocode (C-style) shows exact bit-widths for each operation stage (8×8→32 MAC, 32→8 requantization)
-  3. Pseudocode includes correct rounding logic: (value >= 0) ? (value + 0.5) >> frac_bits : (value - 0.5) >> frac_bits
-  4. Verification test vectors extracted from ResNet8 actual layer outputs (input tensor, weights, scales, zero-points, expected output) for hardware validation
-  5. Each critical pitfall includes example showing what breaks if not handled correctly
-**Plans**: TBD
-
-Plans:
-- [ ] TBD
+</details>
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -242,8 +230,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 10. Boundary Operations Documentation | v1.3 | 1/1 | Complete | 2026-02-02 |
 | 11. Core Operations Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
-| 13. Hardware Implementation Guide | v1.3 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-03 with Phase 12 complete*
+*Last updated: 2026-02-03 with Phase 13 removed, v1.3 complete*
