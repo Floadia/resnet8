@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 10 of 13 (Boundary Operations Documentation)
+Phase: 11 of 13 (Core Operations Documentation)
 Plan: 1 of 1
 Status: Phase complete
-Last activity: 2026-02-02 — Completed 10-01-PLAN.md
+Last activity: 2026-02-03 — Completed 11-01-PLAN.md
 
-Progress: [██████████░░░] 77% (10/13 phases complete)
+Progress: [████████████░] 85% (11/13 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 3.70min (v1.2+ tracking)
-- Total execution time: 37min (v1.2-v1.3)
+- Total plans completed: 11
+- Average duration: 3.81min (v1.2+ tracking)
+- Total execution time: 42min (v1.2-v1.3)
 
 **By Phase:**
 
@@ -37,10 +37,11 @@ Progress: [██████████░░░] 77% (10/13 phases complete)
 | 8. Comparison Analysis | 1/1 | 3min | 3min |
 | 9. Operation Extraction Scripts | 1/1 | 2min | 2min |
 | 10. Boundary Operations Documentation | 1/1 | 2min | 2min |
+| 11. Core Operations Documentation | 1/1 | 5min | 5min |
 
 **Recent Trend:**
-- Last plan: 10-01 (2min)
-- Documentation phases maintaining fast pace (clear structure, established patterns)
+- Last plan: 11-01 (5min)
+- Documentation phases maintaining excellent pace (established patterns, validation scripts add value)
 
 ## Accumulated Context
 
@@ -77,18 +78,26 @@ From Phase 10 (Boundary Operations Documentation):
 - Round-trip error bound: |x - Dequant(Quant(x))| ≤ y_scale/2 for values within quantization range
 - Hardware pseudocode deferred for boundary operations per user decision (focusing on integer matmul instead)
 
+From Phase 11 (Core Operations Documentation):
+- QDQ format (QuantizeLinear/DequantizeLinear pairs) used in actual models instead of QLinearConv operations
+- Document operations based on ONNX specification when model format differs - spec is authoritative source
+- INT32 accumulator is non-negotiable: 64 channels × 3×3 kernel = 9.3M accumulator (283.5× INT16 max)
+- Per-channel quantization overhead is negligible for typical layers (0.17% for 256-channel conv)
+- Two-stage computation pattern (INT8×INT8→INT32 MAC, then requantization) is universal across quantized ops
+- Validation scripts with multiple test cases demonstrate correctness and edge case handling
+
 ### Pending Todos
 
-None - ready for Phase 11 (Core Operations Documentation)
+None - ready for Phase 12 (Architecture Documentation)
 
 ### Blockers/Concerns
 
 **No critical blockers.**
 
 Minor considerations for upcoming phases:
-- Core operations documentation will build on boundary operations foundation
-- QLinearConv/QLinearMatMul will introduce INT32 accumulator overflow pitfalls
-- Architecture documentation will need to extract actual ResNet8 quantized model parameters from Phase 9 tools
+- Architecture documentation (Phase 12) will work with QDQ format models, not QLinearConv
+- QLinearMatMul documentation needed for Phase 12 (matrix multiplication in dense layers)
+- Hardware implementation guide (Phase 13) can leverage established patterns from Phases 10-11
 
 ## v1.3 Milestone Overview
 
@@ -108,12 +117,12 @@ Minor considerations for upcoming phases:
 
 ## Session Continuity
 
-Last session: 2026-02-02
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-02-03
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
 
-**Next action:** `/gsd:plan-phase 11` to create execution plan for Core Operations Documentation
+**Next action:** `/gsd:plan-phase 12` to create execution plan for Architecture Documentation
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-02 with Phase 10 completion*
+*Last updated: 2026-02-03 with Phase 11 completion*
