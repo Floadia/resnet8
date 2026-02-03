@@ -134,6 +134,162 @@ Both branches must be dequantized to FP32 before the Add operation, then the res
 
 ---
 
+## Residual Connections in Quantized Networks
+
+ResNet architectures rely on skip connections that add outputs from different layers. In quantized networks, these residual connections present a unique challenge: **branches may have different quantization scales**, making direct INT8 addition mathematically incorrect.
+
+### 5.1 The Scale Mismatch Problem
+
+In ResNet, residual connections add two branches:
+
+```
+output = conv_branch + skip_branch
+```
+
+In quantized networks, each branch may have different scales. Consider this example from ResNet8:
+
+**Residual connection 1** (`model_1/add_1/Add`):
+- Branch 1 scale: 0.046150 (activation from conv path)
+- Branch 2 scale: 0.122343 (skip connection path)
+
+The same INT8 value represents different FP32 magnitudes in each branch:
+- INT8 value 100 in Branch 1 represents: 100 × 0.046150 = 4.615
+- INT8 value 100 in Branch 2 represents: 100 × 0.122343 = 12.234
+
+**Direct INT8 addition would be incorrect:**
+```
+100 (Branch 1) + 100 (Branch 2) = 200 (INT8)
+But mathematically: 4.615 + 12.234 = 16.849 ≠ 200 × (any single scale)
+```
+
+This scale mismatch problem occurs at every residual connection in quantized ResNets.
+
+### 5.2 QDQ Solution (Used in ResNet8)
+
+ResNet8's quantized model uses the **QDQ dequant-add-quant pattern**:
+
+```
+Branch 1: ... → QuantizeLinear → INT8 → DequantizeLinear(scale₁) → FP32 → \
+                                                                            Add(FP32) → QuantizeLinear → INT8 → ...
+Branch 2: ... → QuantizeLinear → INT8 → DequantizeLinear(scale₂) → FP32 → /
+```
+
+**How it works:**
+1. **Dequantize both branches** to FP32 using their respective scales
+2. **Perform addition** in floating-point (mathematically correct)
+3. **Quantize result** back to INT8 with output scale
+
+**Example from ResNet8 residual connection:**
+
+```python
+# Branch 1: scale=0.046150, zero_point=-128
+branch1_fp32 = (branch1_int8 - (-128)) * 0.046150
+
+# Branch 2: scale=0.122343, zero_point=1
+branch2_fp32 = (branch2_int8 - 1) * 0.122343
+
+# Add in FP32 space (correct)
+result_fp32 = branch1_fp32 + branch2_fp32
+
+# Quantize result (output scale=0.040123, zero_point=-128)
+result_int8 = clip(round(result_fp32 / 0.040123) + (-128), -128, 127)
+```
+
+**Trade-off:** Requires FP32 arithmetic for Add operation, but ensures mathematical correctness regardless of scale mismatch.
+
+### 5.3 Alternative Approaches (For Reference)
+
+Other quantization frameworks use different approaches:
+
+**Approach 1: Scale Matching (Hardware Optimization)**
+
+Force both branches to use identical scales during calibration:
+```
+Branch 1: ... → INT8 (scale=S) → \
+                                   Add(INT8, both use scale S) → INT8
+Branch 2: ... → INT8 (scale=S) → /
+```
+
+- **Pro**: Pure INT8 addition possible (faster on some hardware)
+- **Con**: Constrains calibration, may reduce accuracy
+- **Requires**: Special calibration strategy to match scales
+
+**Approach 2: INT8 Addition with Rescaling**
+
+Rescale one branch to match the other before adding:
+```
+# Rescale Branch 2 to Branch 1's scale
+scale_factor = scale₂ / scale₁
+branch2_rescaled = (branch2_int8 * scale_factor).round().clip(-128, 127)
+result_int8 = branch1_int8 + branch2_rescaled
+```
+
+- **Pro**: No FP32 required
+- **Con**: Additional rounding error, complex implementation
+- **Requires**: Runtime rescaling logic
+
+**Approach 3: PyTorch FloatFunctional**
+
+PyTorch's quantization-aware approach:
+```python
+# In model definition:
+self.add = torch.ao.nn.quantized.FloatFunctional()
+
+# In forward pass:
+out = self.add.add(branch1, branch2)
+```
+
+- Wraps add operation to track quantization statistics
+- Automatically handles scale/zero-point mismatches
+- Exports to ONNX as QDQ pattern (same as Section 5.2)
+
+For more details, see [PyTorch FloatFunctional documentation](https://pytorch.org/docs/stable/generated/torch.ao.nn.quantized.FloatFunctional.html).
+
+### 5.4 ResNet8 Specific Analysis
+
+ResNet8 has **3 primary residual skip connections** where different computational paths merge:
+
+| Add Node | Branch 1 Scale | Branch 2 Scale | Scale Ratio |
+|----------|----------------|----------------|-------------|
+| `model_1/add_1/Add` | 0.046150 | 0.122343 | 2.65× |
+| `model_1/add_1_2/Add` | 0.045742 | 0.151687 | 3.32× |
+| `model_1/add_2_1/Add` | 0.086567 | 0.239572 | 2.77× |
+
+**Key observations:**
+
+1. **Significant scale mismatches**: Ratios range from 2.65× to 3.32×, making direct INT8 addition impossible
+2. **All use QDQ pattern**: Each Add node receives inputs from two DequantizeLinear nodes
+3. **Different scales per connection**: Each residual point has unique scale values based on calibration
+
+**Full pattern for residual connection 1:**
+```
+Skip path (Branch 1):
+  model_1/activation_1/Relu:0 (INT8)
+  → DequantizeLinear(scale=0.046150, zero_point=-128)
+  → FP32
+
+Main path (Branch 2):
+  model_1/batch_normalization_2_1/batchnorm/add_1:0 (INT8)
+  → DequantizeLinear(scale=0.122343, zero_point=1)
+  → FP32
+
+Merge:
+  FP32 + FP32 → Add → FP32
+  → QuantizeLinear(scale=0.040123)
+  → model_1/activation_2_1/Relu:0 (INT8)
+```
+
+**Additional Add operations**: ResNet8 also contains 8 Add operations within batch normalization layers (adding bias terms). These also use the QDQ pattern but operate on weight initializers rather than dual activation branches.
+
+**Verification**: Use `scripts/extract_operations.py` to inspect Add nodes and their feeding DequantizeLinear operations to confirm scales:
+
+```bash
+python scripts/extract_operations.py --model models/resnet8_int8.onnx
+# Then inspect operations JSON for Add nodes and trace back to DequantizeLinear scales
+```
+
+---
+
 ## Scale and Zero-Point Parameter Locations
 
 ### Initializers vs Runtime Inputs
