@@ -201,8 +201,15 @@ def test_resnet8_fc_layer() -> bool:
 
     # Manual computation (verbose for first output)
     y_manual = qlinear_matmul_manual(
-        a, a_scale, a_zero_point, b, b_scale, b_zero_point,
-        y_scale, y_zero_point, verbose=True
+        a,
+        a_scale,
+        a_zero_point,
+        b,
+        b_scale,
+        b_zero_point,
+        y_scale,
+        y_zero_point,
+        verbose=True,
     )
 
     print(f"Output y shape: {y_manual.shape}")
@@ -256,8 +263,15 @@ def test_asymmetric_quantization() -> bool:
     print()
 
     y_manual = qlinear_matmul_manual(
-        a, a_scale, a_zero_point, b, b_scale, b_zero_point,
-        y_scale, y_zero_point, verbose=True
+        a,
+        a_scale,
+        a_zero_point,
+        b,
+        b_scale,
+        b_zero_point,
+        y_scale,
+        y_zero_point,
+        verbose=True,
     )
 
     # Reference implementation
@@ -348,8 +362,7 @@ def main():
         description="Validate QLinearMatMul implementation"
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Show detailed computation steps"
+        "--verbose", "-v", action="store_true", help="Show detailed computation steps"
     )
     parser.parse_args()
 
