@@ -568,6 +568,186 @@ class QuantizedBlock(nn.Module):
 
 ---
 
+## PyTorch Quantized Operation Equivalents
+
+For developers working with PyTorch quantization, this section maps PyTorch quantized operations to their ONNX QDQ pattern equivalents. Understanding this mapping helps when converting models between frameworks or implementing custom quantization logic.
+
+### 6.1 Mapping Table
+
+The following table shows how PyTorch quantized operations correspond to ONNX QDQ patterns:
+
+| PyTorch Quantized Op | ONNX QDQ Pattern | Notes |
+|---------------------|------------------|-------|
+| `torch.nn.quantized.Conv2d` | `QuantizeLinear → DequantizeLinear → Conv → QuantizeLinear → DequantizeLinear` | Weight dequantized, conv in FP32, output quantized |
+| `torch.nn.quantized.Linear` | `QuantizeLinear → DequantizeLinear → MatMul → QuantizeLinear → DequantizeLinear` | Same pattern as Conv2d |
+| `torch.nn.quantized.ReLU` | `QuantizeLinear → DequantizeLinear → Relu → QuantizeLinear → DequantizeLinear` | Activation function wrapped in Q/DQ |
+| `torch.ao.nn.quantized.FloatFunctional.add` | `DequantizeLinear (×2) → Add → QuantizeLinear` | Both inputs dequantized, handles scale mismatches |
+| `torch.quantization.QuantStub` | `QuantizeLinear` | Explicit FP32 → INT8 conversion point |
+| `torch.quantization.DeQuantStub` | `DequantizeLinear` | Explicit INT8 → FP32 conversion point |
+
+**Key insight:** All PyTorch quantized operations follow the same QDQ pattern used in ONNX - operations compute in FP32 while activations are stored as INT8.
+
+### 6.2 Important Notes on Conversion
+
+While the conceptual mapping is straightforward, **direct PyTorch quantized model export to ONNX has known limitations**:
+
+**Known limitation:** `aten::quantize_per_channel` operator is not supported in ONNX export for most opset versions.
+
+**Error example:**
+```
+RuntimeError: Exporting the operator 'aten::quantize_per_channel' to ONNX opset version 15 is not supported.
+```
+
+**Recommended workflow for PyTorch → ONNX quantization:**
+
+1. **Export FP32 model** from PyTorch to ONNX:
+   ```python
+   import torch.onnx
+
+   model_fp32 = ResNet8()  # Your PyTorch model
+   dummy_input = torch.randn(1, 3, 32, 32)
+
+   torch.onnx.export(
+       model_fp32,
+       dummy_input,
+       "resnet8_fp32.onnx",
+       opset_version=15,
+       input_names=['input'],
+       output_names=['output']
+   )
+   ```
+
+2. **Quantize with ONNX Runtime tools**:
+   ```python
+   from onnxruntime.quantization import quantize_dynamic, QuantType
+
+   quantize_dynamic(
+       "resnet8_fp32.onnx",
+       "resnet8_int8.onnx",
+       weight_type=QuantType.QInt8
+   )
+   ```
+
+This two-step approach avoids PyTorch export limitations and leverages ONNX Runtime's mature quantization infrastructure.
+
+**Alternative for static quantization:**
+```python
+from onnxruntime.quantization import quantize_static, CalibrationDataReader
+
+# Define calibration data reader
+class ResNet8DataReader(CalibrationDataReader):
+    def __init__(self, calibration_data):
+        self.data = calibration_data
+        self.iter = iter(self.data)
+
+    def get_next(self):
+        try:
+            return next(self.iter)
+        except StopIteration:
+            return None
+
+# Quantize with calibration
+quantize_static(
+    "resnet8_fp32.onnx",
+    "resnet8_int8.onnx",
+    calibration_data_reader=ResNet8DataReader(calibration_data)
+)
+```
+
+### 6.3 FloatFunctional for Residual Connections
+
+PyTorch provides a special wrapper for operations that need quantization awareness, particularly useful for residual connections:
+
+```python
+import torch
+import torch.nn as nn
+from torch.ao.nn.quantized import FloatFunctional
+
+class ResNetBlock(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.relu = nn.ReLU()
+
+        # FloatFunctional for quantization-aware addition
+        self.add = FloatFunctional()
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.relu(out)
+        out = self.conv2(out)
+
+        # Use FloatFunctional.add instead of torch.add or +
+        out = self.add.add(out, identity)
+        out = self.relu(out)
+
+        return out
+```
+
+**How FloatFunctional works:**
+
+1. **During calibration**: Tracks statistics for both input branches
+2. **During quantization**: Inserts appropriate QuantizeLinear/DequantizeLinear nodes
+3. **In ONNX export**: Converts to the QDQ pattern shown in Section 5.2
+
+**Why it's needed:** Standard PyTorch `+` operator doesn't track quantization metadata. Using `FloatFunctional.add` ensures the addition operation is properly quantized during QAT (Quantization-Aware Training) or PTQ (Post-Training Quantization).
+
+**Alternative without FloatFunctional:** Manually insert QuantStub/DeQuantStub:
+
+```python
+def forward(self, x):
+    identity = x
+
+    out = self.conv1(x)
+    out = self.relu(out)
+    out = self.conv2(out)
+
+    # Manual quantization handling (more verbose)
+    identity_q = self.quant_skip(identity)
+    out_q = self.quant_out(out)
+
+    identity_dq = self.dequant_skip(identity_q)
+    out_dq = self.dequant_out(out_q)
+
+    result = identity_dq + out_dq
+    result_q = self.quant_result(result)
+
+    return result_q
+```
+
+The `FloatFunctional` approach is cleaner and handles scale/zero-point management automatically.
+
+### 6.4 Cross-Reference to Core Operations
+
+This section provides a high-level mapping between PyTorch and ONNX. For detailed mathematical operations:
+
+**QDQ boundary operations:**
+- For QuantizeLinear/DequantizeLinear formulas, saturation behavior, and round-trip error bounds, see [01-boundary-operations.md](01-boundary-operations.md)
+
+**Core quantized computations:**
+- For the INT8×INT8→INT32 accumulation pattern used inside convolutions, see [02-qlinearconv.md](02-qlinearconv.md)
+- For matrix multiplication with INT32 accumulator and requantization, see [03-qlinearmatmul.md](03-qlinearmatmul.md)
+
+**Important note on QLinear operators:**
+
+The ONNX specification defines `QLinearConv` and `QLinearMatMul` operators that represent the two-stage computation (INT8×INT8→INT32 MAC followed by requantization) as single fused operations. These operators are documented in detail in Phases 10-11.
+
+However, **actual ONNX models use QDQ format** (as documented in this Phase 12), where:
+- Standard `Conv` and `MatMul` operators compute in FP32
+- QuantizeLinear/DequantizeLinear pairs manage INT8 storage
+- ONNX Runtime fuses these patterns into INT8 kernels at inference time
+
+The **two-stage computation pattern** (INT8×INT8→INT32 accumulation, then requantization) documented in Phases 10-11 **still applies** - it's just implemented differently:
+- **QLinear operator approach**: Fused operator contains both stages
+- **QDQ format approach**: Runtime fuses Q-DQ-Op pattern into equivalent INT8 kernel
+
+Both approaches execute the same underlying mathematics, just with different graph representations.
+
+---
+
 ## Cross-References
 
 For implementation details of specific operations:
