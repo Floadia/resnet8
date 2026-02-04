@@ -2,26 +2,26 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-28)
+See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** v1.2 PTQ Evaluation COMPLETE
+**Current focus:** All milestones complete (v1.0-v1.3)
 
 ## Current Position
 
-Phase: 8 of 8 (Comparison Analysis)
-Plan: 1 of 1 in current phase
-Status: Project complete
-Last activity: 2026-01-28 — Completed quick task 003: Add CI linting with ruff
+Phase: 12 of 12 (Architecture Documentation)
+Plan: 2 of 2
+Status: All phases complete
+Last activity: 2026-02-03 — Phase 13 removed, milestone v1.3 complete
 
-Progress: [██████████] 100% (8/8 phases complete)
+Progress: [████████████] 100% (12/12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 4.25min (v1.2 tracking started)
-- Total execution time: 17min (v1.2 only)
+- Total plans completed: 14
+- Average duration: 3.93min (v1.2+ tracking)
+- Total execution time: 55min (v1.2-v1.3)
 
 **By Phase:**
 
@@ -35,10 +35,14 @@ Progress: [██████████] 100% (8/8 phases complete)
 | 6. ONNX Runtime Quantization | 1/1 | 6min | 6min |
 | 7. PyTorch Quantization | 1/1 | 6min | 6min |
 | 8. Comparison Analysis | 1/1 | 3min | 3min |
+| 9. Operation Extraction Scripts | 1/1 | 2min | 2min |
+| 10. Boundary Operations Documentation | 1/1 | 2min | 2min |
+| 11. Core Operations Documentation | 2/2 | 9min | 4.5min |
+| 12. Architecture Documentation | 2/2 | 9min | 4.5min |
 
 **Recent Trend:**
-- Last plan: 08-01 (3min)
-- Analysis/documentation phases faster than implementation phases
+- Last 3 plans: 11-02 (4min), 12-01 (6min), 12-02 (3min)
+- Documentation phases maintaining excellent pace (cross-referencing pattern established)
 
 ## Accumulated Context
 
@@ -51,79 +55,82 @@ Recent decisions from PROJECT.md Key Decisions table:
 - Separate converter/eval scripts: Reusability and clarity (Good)
 - Raw pixel values (0-255): Match Keras training preprocessing (Good)
 
-From Phase 5 (Calibration Infrastructure):
-- 1000 calibration samples (100 per class): Exceeds roadmap minimum (200) for better quantization quality
-- Load from training batches: Prevents data leakage, maintains evaluation integrity
-- Preprocessing matches evaluate.py exactly: Critical to avoid 10-40% accuracy drops from mismatches
-
-From Phase 6 (ONNX Runtime Quantization):
-- QDQ format for CPU inference: Recommended by ONNX Runtime for better tool support
-- MinMax calibration method: Simpler and faster than Entropy/Percentile, good baseline
-- Uint8 outperforms Int8: 86.75% vs 85.58% accuracy (both above 85% threshold)
-- Per-channel quantization disabled: Start with per-tensor for initial validation
-- Fresh CalibrationDataReader per quantization: Iterator consumed after first use
-
-From Phase 7 (PyTorch Quantization):
-- FX graph mode for onnx2torch models: Eager mode doesn't support custom ONNX ops
-- JIT tracing for serialization: FX GraphModule has pickle issues, TorchScript works
-- fbgemm uint8 limitation: PyTorch requires qint8 weights, uint8-only not supported
-- PyTorch int8 matches ONNX Runtime int8: 85.68% vs 85.58% accuracy
-
-From Phase 8 (Comparison Analysis):
+From v1.2 (PTQ Evaluation):
 - ONNX Runtime uint8 recommended for best accuracy retention (86.75%, -0.44% drop)
 - All quantized models meet >85% accuracy and <5% drop requirements
 - PyTorch uint8 documented as not supported (fbgemm limitation)
+- Per-channel quantization disabled for initial validation (per-tensor used)
+
+From v1.3 roadmap creation:
+- 5 phases derived from requirements (9-13): extraction scripts, boundary ops, core ops, architecture, hardware guide
+- Research suggests minimal stack additions: only pydot + graphviz for visualization
+- GitHub MathJax support validated for LaTeX math in documentation
+
+From Phase 9 (Operation Extraction Scripts):
+- Use onnx.helper.get_attribute_value() instead of direct .f/.i/.s access for proper union type handling
+- Build initializer lookup dict once at start to avoid repeated iteration (O(N) not O(N*M))
+- Convert numpy types to Python types for JSON serialization (float()/int() for scalars, tolist() for arrays)
+- Use subprocess.run() for dot command instead of deprecated pydot.write_png()
+
+From Phase 10 (Boundary Operations Documentation):
+- Use exact ONNX specification variable names (y_scale, y_zero_point, x_scale, x_zero_point) for consistency
+- Document symmetric (zero_point=0) and asymmetric quantization cases separately for clarity
+- GitHub markdown math syntax: $$...$$ for display, $...$ for inline, escape underscores (y\_scale)
+- Round-trip error bound: |x - Dequant(Quant(x))| ≤ y_scale/2 for values within quantization range
+- Hardware pseudocode deferred for boundary operations per user decision (focusing on integer matmul instead)
+
+From Phase 11 (Core Operations Documentation):
+- QDQ format (QuantizeLinear/DequantizeLinear pairs) used in actual models instead of QLinearConv operations
+- Document operations based on ONNX specification when model format differs - spec is authoritative source
+- INT32 accumulator is non-negotiable: 64 channels × 3×3 kernel = 9.3M accumulator (283.5× INT16 max)
+- Per-channel quantization overhead is negligible for typical layers (0.17% for 256-channel conv)
+- Two-stage computation pattern (INT8×INT8→INT32 MAC, then requantization) is universal across quantized ops
+- Validation scripts with multiple test cases demonstrate correctness and edge case handling
+- Cross-referencing pattern: Link to detailed explanations in related operation docs instead of duplicating content
+- QLinearMatMul shares identical arithmetic pattern with QLinearConv (only structural differences: no spatial dims, different input names)
+
+From Phase 12 (Architecture Documentation):
+- QDQ format operations process FP32 data, not INT8 (critical distinction: INT8 storage, FP32 computation)
+- ONNX Runtime fuses Q-DQ-Op patterns into INT8 kernels at inference time for performance
+- ResNet8 has 32 QuantizeLinear + 66 DequantizeLinear = 98 QDQ nodes (75% of graph)
+- Asymmetry in Q vs DQ counts due to pre-quantized weights stored as initializers
+- JSON-driven visualization more portable than ONNX-driven (no library dependencies)
+- Conceptual diagrams more effective than full graph for understanding (130 nodes overwhelming)
+- Scale/zero-point parameters stored as initializers with systematic naming convention
+- Residual connections have significant scale mismatches (2.65×-3.32× ratios in ResNet8)
+- QDQ dequant-add-quant pattern required for mathematically correct residual addition
+- Direct INT8 addition fails when branches have different scales (same value represents different magnitudes)
+- PyTorch→ONNX conversion: export FP32 then quantize with ONNX Runtime (avoids aten::quantize_per_channel limitation)
+- Two-stage computation pattern applies to both QLinear operators (spec) and QDQ format (implementation)
 
 ### Pending Todos
 
-None - project complete.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 001 | Use uv instead of old python management system | 2026-01-28 | 62cd2a0 | [001-use-uv-instead-of-old-python-management-](./quick/001-use-uv-instead-of-old-python-management-/) |
-| 002 | Add comprehensive README.md | 2026-01-28 | 8ca7d31 | [002-add-readme](./quick/002-add-readme/) |
-| 003 | Add CI that lint by ruff | 2026-01-28 | cc40f18 | [003-add-ci-that-lint-by-ruff](./quick/003-add-ci-that-lint-by-ruff/) |
+None - all milestones complete
 
 ### Blockers/Concerns
 
-**All risks resolved:**
-- ✓ Calibration data quality: RESOLVED - Stratified sampling with 1000 samples (100 per class)
-- ✓ Preprocessing mismatches: RESOLVED - Verified identical to evaluate.py (float32, 0-255, NHWC)
-- ✓ ONNX Runtime quantization: RESOLVED - Both int8/uint8 achieve >85% accuracy (85.58%/86.75%)
-- ✓ PyTorch FX mode: RESOLVED - FX graph mode works with onnx2torch models
-- ✓ PyTorch serialization: RESOLVED - JIT tracing enables model serialization
-- ✓ PyTorch uint8: DOCUMENTED - fbgemm requires qint8 weights, uint8-only not possible
-- ✓ Comparison analysis: COMPLETE - Analysis document with recommendations
+**No blockers.** All planned work complete.
 
-## Final Results Summary
+## v1.3 Milestone Overview
 
-**v1.2 PTQ Evaluation milestone complete.**
+**Goal:** Create reference documentation explaining quantized inference calculations for hardware implementation
 
-| Model | Accuracy | Delta | Size | Reduction |
-|-------|----------|-------|------|-----------|
-| FP32 baseline | 87.19% | - | 315KB | - |
-| ONNX Runtime uint8 | 86.75% | -0.44% | 123KB | 61% |
-| ONNX Runtime int8 | 85.58% | -1.61% | 123KB | 61% |
-| PyTorch int8 | 85.68% | -1.51% | 165KB | 52% |
-| PyTorch uint8 | N/A | N/A | N/A | Not supported |
+**Phase structure:**
+- Phase 9: Operation extraction/visualization tools (enables data-driven documentation)
+- Phase 10: Boundary operations (QuantizeLinear/DequantizeLinear)
+- Phase 11: Core operations (QLinearConv/QLinearMatMul)
+- Phase 12: Architecture (data flow, residual connections, PyTorch equivalents)
 
-**Recommendation:** ONNX Runtime uint8 for best accuracy-to-size ratio.
+**Status:** COMPLETE (Phase 13 removed - hardware guide deferred)
 
 ## Session Continuity
 
-Last session: 2026-01-28
-Stopped at: Completed quick task 003 (Add CI linting with ruff)
+Last session: 2026-02-03
+Stopped at: All milestones complete
 Resume file: None
 
-**Project deliverables:**
-- README.md - Comprehensive project documentation with usage examples
-- docs/QUANTIZATION_ANALYSIS.md - Complete PTQ evaluation analysis
-- models/resnet8_int8.onnx - ONNX int8 quantized model
-- models/resnet8_uint8.onnx - ONNX uint8 quantized model
-- models/resnet8_int8.pt - PyTorch int8 quantized model
+**Next action:** Start new milestone with `/gsd:new-milestone` or review completed work
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-28 after completing Phase 8 (v1.2 milestone complete)*
+*Last updated: 2026-02-03 with Phase 13 removed, v1.3 milestone complete*

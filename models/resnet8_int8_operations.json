@@ -1,0 +1,1896 @@
+{
+  "model_path": "/var/tmp/vibe-kanban/worktrees/acc8-gsd-execute-phas/resnet8/models/resnet8_int8.onnx",
+  "opset_version": 15,
+  "operations": [
+    {
+      "name": "const_fold_opt__139_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__139_quantized",
+        "const_fold_opt__139_scale",
+        "const_fold_opt__139_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__139_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__139_scale": 0.026842771098017693
+      },
+      "zero_points": {
+        "const_fold_opt__139_zero_point": -79
+      }
+    },
+    {
+      "name": "const_fold_opt__140_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__140_quantized",
+        "const_fold_opt__140_scale",
+        "const_fold_opt__140_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__140_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__140_scale": 0.018708016723394394
+      },
+      "zero_points": {
+        "const_fold_opt__140_zero_point": 18
+      }
+    },
+    {
+      "name": "const_fold_opt__141_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__141_quantized",
+        "const_fold_opt__141_scale",
+        "const_fold_opt__141_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__141_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__141_scale": 0.009354062378406525
+      },
+      "zero_points": {
+        "const_fold_opt__141_zero_point": -28
+      }
+    },
+    {
+      "name": "const_fold_opt__142_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__142_quantized",
+        "const_fold_opt__142_scale",
+        "const_fold_opt__142_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__142_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__142_scale": 0.03265303745865822
+      },
+      "zero_points": {
+        "const_fold_opt__142_zero_point": 12
+      }
+    },
+    {
+      "name": "const_fold_opt__144_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__144_quantized",
+        "const_fold_opt__144_scale",
+        "const_fold_opt__144_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__144_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__144_scale": 0.02403012476861477
+      },
+      "zero_points": {
+        "const_fold_opt__144_zero_point": -26
+      }
+    },
+    {
+      "name": "const_fold_opt__145_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__145_quantized",
+        "const_fold_opt__145_scale",
+        "const_fold_opt__145_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__145_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__145_scale": 0.017351027578115463
+      },
+      "zero_points": {
+        "const_fold_opt__145_zero_point": -34
+      }
+    },
+    {
+      "name": "const_fold_opt__146_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "const_fold_opt__146_quantized",
+        "const_fold_opt__146_scale",
+        "const_fold_opt__146_zero_point"
+      ],
+      "outputs": [
+        "const_fold_opt__146_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "const_fold_opt__146_scale": 0.009673087857663631
+      },
+      "zero_points": {
+        "const_fold_opt__146_zero_point": 5
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1/batchnorm/mul:0_scale": 0.00010408125672256574
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1_2/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_scale": 0.007590615656226873
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1_2/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_2_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_scale": 0.00399066461250186
+      },
+      "zero_points": {
+        "model_1/batch_normalization_2_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_3_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_scale": 0.0048174019902944565
+      },
+      "zero_points": {
+        "model_1/batch_normalization_3_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_4_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_scale": 0.007842693477869034
+      },
+      "zero_points": {
+        "model_1/batch_normalization_4_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_5_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_scale": 0.002693440765142441
+      },
+      "zero_points": {
+        "model_1/batch_normalization_5_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_6_1/batchnorm/mul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_quantized",
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_scale",
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_scale": 0.03581476956605911
+      },
+      "zero_points": {
+        "model_1/batch_normalization_6_1/batchnorm/mul:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/Squeeze:0_quantized",
+        "model_1/conv2d_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/Squeeze:0_quantized_scale": [
+          0.007152073550969362
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_scale": 0.007152073550969362
+      },
+      "zero_points": {
+        "model_1/conv2d_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_1_2/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1_2/Squeeze:0_quantized",
+        "model_1/conv2d_1_2/Squeeze:0_quantized_scale",
+        "model_1/conv2d_1_2/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1_2/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1_2/Squeeze:0_quantized_scale": [
+          0.0002460358664393425
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_1_2/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_1_2/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_scale": 0.005331262480467558
+      },
+      "zero_points": {
+        "model_1/conv2d_1_2/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_2_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_2_1/Squeeze:0_quantized",
+        "model_1/conv2d_2_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_2_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_2_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_2_1/Squeeze:0_quantized_scale": [
+          0.0003172798315063119
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_2_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_2_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_scale": 0.004260702524334192
+      },
+      "zero_points": {
+        "model_1/conv2d_2_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_3_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_3_1/Squeeze:0_quantized",
+        "model_1/conv2d_3_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_3_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_3_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_3_1/Squeeze:0_quantized_scale": [
+          0.00023887556744739413
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_3_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_3_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_scale": 0.003803231520578265
+      },
+      "zero_points": {
+        "model_1/conv2d_3_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_4_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_4_1/Squeeze:0_quantized",
+        "model_1/conv2d_4_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_4_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_4_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_4_1/Squeeze:0_quantized_scale": [
+          0.00015560651081614196
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_4_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_4_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_scale": 0.003269040724262595
+      },
+      "zero_points": {
+        "model_1/conv2d_4_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_5_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_5_1/Squeeze:0_quantized",
+        "model_1/conv2d_5_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_5_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_5_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_5_1/Squeeze:0_quantized_scale": [
+          0.0002941790735349059
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_5_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_5_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_scale": 0.004683739971369505
+      },
+      "zero_points": {
+        "model_1/conv2d_5_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_6_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_6_1/Squeeze:0_quantized",
+        "model_1/conv2d_6_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_6_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_6_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_6_1/Squeeze:0_quantized_scale": [
+          0.0001606724108569324
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_6_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_6_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_scale": 0.002540475456044078
+      },
+      "zero_points": {
+        "model_1/conv2d_6_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_7_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_7_1/Squeeze:0_quantized",
+        "model_1/conv2d_7_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_7_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_7_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_7_1/Squeeze:0_quantized_scale": [
+          6.547239172505215e-05
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_7_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_7_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_scale": 0.002151779131963849
+      },
+      "zero_points": {
+        "model_1/conv2d_7_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_8_1/Squeeze:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_8_1/Squeeze:0_quantized",
+        "model_1/conv2d_8_1/Squeeze:0_quantized_scale",
+        "model_1/conv2d_8_1/Squeeze:0_quantized_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_8_1/Squeeze:0"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_8_1/Squeeze:0_quantized_scale": [
+          0.00034484214847907424
+        ]
+      },
+      "zero_points": {
+        "model_1/conv2d_8_1/Squeeze:0_quantized_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_8_1/convolution/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_quantized",
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_scale",
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_scale": 0.00545247970148921
+      },
+      "zero_points": {
+        "model_1/conv2d_8_1/convolution/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/dense_1/BiasAdd/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_quantized",
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_scale",
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_scale": 0.0013158880174160004
+      },
+      "zero_points": {
+        "model_1/dense_1/BiasAdd/ReadVariableOp:0_zero_point": -9
+      }
+    },
+    {
+      "name": "model_1/dense_1/Cast/ReadVariableOp:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/dense_1/Cast/ReadVariableOp:0_quantized",
+        "model_1/dense_1/Cast/ReadVariableOp:0_scale",
+        "model_1/dense_1/Cast/ReadVariableOp:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/Cast/ReadVariableOp:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/Cast/ReadVariableOp:0_scale": 0.0305543914437294
+      },
+      "zero_points": {
+        "model_1/dense_1/Cast/ReadVariableOp:0_zero_point": 0
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/BiasAdd__6:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/BiasAdd__6:0",
+        "model_1/conv2d_1/BiasAdd__6:0_scale",
+        "model_1/conv2d_1/BiasAdd__6:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/BiasAdd__6:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/BiasAdd__6:0_scale": 1.0
+      },
+      "zero_points": {
+        "model_1/conv2d_1/BiasAdd__6:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/BiasAdd__6:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/BiasAdd__6:0_QuantizeLinear_Output",
+        "model_1/conv2d_1/BiasAdd__6:0_scale",
+        "model_1/conv2d_1/BiasAdd__6:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/BiasAdd__6:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/BiasAdd__6:0_scale": 1.0
+      },
+      "zero_points": {
+        "model_1/conv2d_1/BiasAdd__6:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/BiasAdd:0",
+        "model_1/conv2d_1/BiasAdd:0_scale",
+        "model_1/conv2d_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/BiasAdd:0_scale": 4.170417785644531
+      },
+      "zero_points": {
+        "model_1/conv2d_1/BiasAdd:0_zero_point": 1
+      }
+    },
+    {
+      "name": "model_1/conv2d_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_1/BiasAdd:0_scale",
+        "model_1/conv2d_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1/BiasAdd:0_scale": 4.170417785644531
+      },
+      "zero_points": {
+        "model_1/conv2d_1/BiasAdd:0_zero_point": 1
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_scale": 0.07434156537055969
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_zero_point": -12
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_scale": 0.07434156537055969
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1/batchnorm/mul_1:0_zero_point": -12
+      }
+    },
+    {
+      "name": "model_1/activation_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_1/Relu:0",
+        "model_1/activation_1/Relu:0_scale",
+        "model_1/activation_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_1/Relu:0_scale": 0.04614964500069618
+      },
+      "zero_points": {
+        "model_1/activation_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_1/Relu:0_scale",
+        "model_1/activation_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_1/Relu:0_scale": 0.04614964500069618
+      },
+      "zero_points": {
+        "model_1/activation_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_1_2/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1_2/BiasAdd:0",
+        "model_1/conv2d_1_2/BiasAdd:0_scale",
+        "model_1/conv2d_1_2/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1_2/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1_2/BiasAdd:0_scale": 0.10935613512992859
+      },
+      "zero_points": {
+        "model_1/conv2d_1_2/BiasAdd:0_zero_point": 8
+      }
+    },
+    {
+      "name": "model_1/conv2d_1_2/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_1_2/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_1_2/BiasAdd:0_scale",
+        "model_1/conv2d_1_2/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_1_2/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_1_2/BiasAdd:0_scale": 0.10935613512992859
+      },
+      "zero_points": {
+        "model_1/conv2d_1_2/BiasAdd:0_zero_point": 8
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1_2/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0",
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_scale": 0.15587007999420166
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_zero_point": 5
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_1_2/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_scale": 0.15587007999420166
+      },
+      "zero_points": {
+        "model_1/batch_normalization_1_2/batchnorm/mul_1:0_zero_point": 5
+      }
+    },
+    {
+      "name": "model_1/activation_1_2/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_1_2/Relu:0",
+        "model_1/activation_1_2/Relu:0_scale",
+        "model_1/activation_1_2/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_1_2/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_1_2/Relu:0_scale": 0.07446655631065369
+      },
+      "zero_points": {
+        "model_1/activation_1_2/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_1_2/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_1_2/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_1_2/Relu:0_scale",
+        "model_1/activation_1_2/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_1_2/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_1_2/Relu:0_scale": 0.07446655631065369
+      },
+      "zero_points": {
+        "model_1/activation_1_2/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_2_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_2_1/BiasAdd:0",
+        "model_1/conv2d_2_1/BiasAdd:0_scale",
+        "model_1/conv2d_2_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_2_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_2_1/BiasAdd:0_scale": 0.14032161235809326
+      },
+      "zero_points": {
+        "model_1/conv2d_2_1/BiasAdd:0_zero_point": 2
+      }
+    },
+    {
+      "name": "model_1/conv2d_2_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_2_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_2_1/BiasAdd:0_scale",
+        "model_1/conv2d_2_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_2_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_2_1/BiasAdd:0_scale": 0.14032161235809326
+      },
+      "zero_points": {
+        "model_1/conv2d_2_1/BiasAdd:0_zero_point": 2
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_2_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_scale": 0.12234301120042801
+      },
+      "zero_points": {
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_zero_point": 2
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_2_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_scale": 0.12234301120042801
+      },
+      "zero_points": {
+        "model_1/batch_normalization_2_1/batchnorm/mul_1:0_zero_point": 2
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_2_1/batchnorm/add_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0",
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_scale": 0.12234301120042801
+      },
+      "zero_points": {
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_zero_point": 1
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_2_1/batchnorm/add_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_scale": 0.12234301120042801
+      },
+      "zero_points": {
+        "model_1/batch_normalization_2_1/batchnorm/add_1:0_zero_point": 1
+      }
+    },
+    {
+      "name": "model_1/activation_2_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_2_1/Relu:0",
+        "model_1/activation_2_1/Relu:0_scale",
+        "model_1/activation_2_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_2_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_2_1/Relu:0_scale": 0.0628085806965828
+      },
+      "zero_points": {
+        "model_1/activation_2_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_2_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_2_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_2_1/Relu:0_scale",
+        "model_1/activation_2_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_2_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_2_1/Relu:0_scale": 0.0628085806965828
+      },
+      "zero_points": {
+        "model_1/activation_2_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_5_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_5_1/BiasAdd:0",
+        "model_1/conv2d_5_1/BiasAdd:0_scale",
+        "model_1/conv2d_5_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_5_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_5_1/BiasAdd:0_scale": 0.04574236273765564
+      },
+      "zero_points": {
+        "model_1/conv2d_5_1/BiasAdd:0_zero_point": -15
+      }
+    },
+    {
+      "name": "model_1/conv2d_3_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_3_1/BiasAdd:0",
+        "model_1/conv2d_3_1/BiasAdd:0_scale",
+        "model_1/conv2d_3_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_3_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_3_1/BiasAdd:0_scale": 0.10834036767482758
+      },
+      "zero_points": {
+        "model_1/conv2d_3_1/BiasAdd:0_zero_point": 19
+      }
+    },
+    {
+      "name": "model_1/conv2d_5_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_5_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_5_1/BiasAdd:0_scale",
+        "model_1/conv2d_5_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_5_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_5_1/BiasAdd:0_scale": 0.04574236273765564
+      },
+      "zero_points": {
+        "model_1/conv2d_5_1/BiasAdd:0_zero_point": -15
+      }
+    },
+    {
+      "name": "model_1/conv2d_3_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_3_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_3_1/BiasAdd:0_scale",
+        "model_1/conv2d_3_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_3_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_3_1/BiasAdd:0_scale": 0.10834036767482758
+      },
+      "zero_points": {
+        "model_1/conv2d_3_1/BiasAdd:0_zero_point": 19
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_3_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_scale": 0.10563547164201736
+      },
+      "zero_points": {
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_zero_point": 19
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_3_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_scale": 0.10563547164201736
+      },
+      "zero_points": {
+        "model_1/batch_normalization_3_1/batchnorm/mul_1:0_zero_point": 19
+      }
+    },
+    {
+      "name": "model_1/activation_3_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_3_1/Relu:0",
+        "model_1/activation_3_1/Relu:0_scale",
+        "model_1/activation_3_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_3_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_3_1/Relu:0_scale": 0.04760005325078964
+      },
+      "zero_points": {
+        "model_1/activation_3_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_3_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_3_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_3_1/Relu:0_scale",
+        "model_1/activation_3_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_3_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_3_1/Relu:0_scale": 0.04760005325078964
+      },
+      "zero_points": {
+        "model_1/activation_3_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_4_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_4_1/BiasAdd:0",
+        "model_1/conv2d_4_1/BiasAdd:0_scale",
+        "model_1/conv2d_4_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_4_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_4_1/BiasAdd:0_scale": 0.12225698679685593
+      },
+      "zero_points": {
+        "model_1/conv2d_4_1/BiasAdd:0_zero_point": 32
+      }
+    },
+    {
+      "name": "model_1/conv2d_4_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_4_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_4_1/BiasAdd:0_scale",
+        "model_1/conv2d_4_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_4_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_4_1/BiasAdd:0_scale": 0.12225698679685593
+      },
+      "zero_points": {
+        "model_1/conv2d_4_1/BiasAdd:0_zero_point": 32
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_4_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_scale": 0.16288341581821442
+      },
+      "zero_points": {
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_zero_point": 35
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_4_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_scale": 0.16288341581821442
+      },
+      "zero_points": {
+        "model_1/batch_normalization_4_1/batchnorm/mul_1:0_zero_point": 35
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_4_1/batchnorm/add_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0",
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_scale": 0.15168708562850952
+      },
+      "zero_points": {
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_zero_point": 25
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_4_1/batchnorm/add_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_scale": 0.15168708562850952
+      },
+      "zero_points": {
+        "model_1/batch_normalization_4_1/batchnorm/add_1:0_zero_point": 25
+      }
+    },
+    {
+      "name": "model_1/activation_4_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_4_1/Relu:0",
+        "model_1/activation_4_1/Relu:0_scale",
+        "model_1/activation_4_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_4_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_4_1/Relu:0_scale": 0.0632450133562088
+      },
+      "zero_points": {
+        "model_1/activation_4_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_4_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_4_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_4_1/Relu:0_scale",
+        "model_1/activation_4_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_4_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_4_1/Relu:0_scale": 0.0632450133562088
+      },
+      "zero_points": {
+        "model_1/activation_4_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_8_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_8_1/BiasAdd:0",
+        "model_1/conv2d_8_1/BiasAdd:0_scale",
+        "model_1/conv2d_8_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_8_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_8_1/BiasAdd:0_scale": 0.08656688779592514
+      },
+      "zero_points": {
+        "model_1/conv2d_8_1/BiasAdd:0_zero_point": 30
+      }
+    },
+    {
+      "name": "model_1/conv2d_6_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_6_1/BiasAdd:0",
+        "model_1/conv2d_6_1/BiasAdd:0_scale",
+        "model_1/conv2d_6_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_6_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_6_1/BiasAdd:0_scale": 0.1489672213792801
+      },
+      "zero_points": {
+        "model_1/conv2d_6_1/BiasAdd:0_zero_point": 5
+      }
+    },
+    {
+      "name": "model_1/conv2d_8_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_8_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_8_1/BiasAdd:0_scale",
+        "model_1/conv2d_8_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_8_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_8_1/BiasAdd:0_scale": 0.08656688779592514
+      },
+      "zero_points": {
+        "model_1/conv2d_8_1/BiasAdd:0_zero_point": 30
+      }
+    },
+    {
+      "name": "model_1/conv2d_6_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_6_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_6_1/BiasAdd:0_scale",
+        "model_1/conv2d_6_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_6_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_6_1/BiasAdd:0_scale": 0.1489672213792801
+      },
+      "zero_points": {
+        "model_1/conv2d_6_1/BiasAdd:0_zero_point": 5
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_5_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_scale": 0.08652074635028839
+      },
+      "zero_points": {
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_zero_point": 22
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_5_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_scale": 0.08652074635028839
+      },
+      "zero_points": {
+        "model_1/batch_normalization_5_1/batchnorm/mul_1:0_zero_point": 22
+      }
+    },
+    {
+      "name": "model_1/activation_5_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_5_1/Relu:0",
+        "model_1/activation_5_1/Relu:0_scale",
+        "model_1/activation_5_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_5_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_5_1/Relu:0_scale": 0.030427098274230957
+      },
+      "zero_points": {
+        "model_1/activation_5_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_5_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_5_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_5_1/Relu:0_scale",
+        "model_1/activation_5_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_5_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_5_1/Relu:0_scale": 0.030427098274230957
+      },
+      "zero_points": {
+        "model_1/activation_5_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/conv2d_7_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/conv2d_7_1/BiasAdd:0",
+        "model_1/conv2d_7_1/BiasAdd:0_scale",
+        "model_1/conv2d_7_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_7_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_7_1/BiasAdd:0_scale": 0.0400211475789547
+      },
+      "zero_points": {
+        "model_1/conv2d_7_1/BiasAdd:0_zero_point": -3
+      }
+    },
+    {
+      "name": "model_1/conv2d_7_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/conv2d_7_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/conv2d_7_1/BiasAdd:0_scale",
+        "model_1/conv2d_7_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/conv2d_7_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/conv2d_7_1/BiasAdd:0_scale": 0.0400211475789547
+      },
+      "zero_points": {
+        "model_1/conv2d_7_1/BiasAdd:0_zero_point": -3
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_6_1/batchnorm/mul_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0",
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_scale": 0.25284406542778015
+      },
+      "zero_points": {
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_zero_point": -1
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_6_1/batchnorm/mul_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_scale",
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_scale": 0.25284406542778015
+      },
+      "zero_points": {
+        "model_1/batch_normalization_6_1/batchnorm/mul_1:0_zero_point": -1
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_6_1/batchnorm/add_1:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0",
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_scale": 0.23957160115242004
+      },
+      "zero_points": {
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_zero_point": -4
+      }
+    },
+    {
+      "name": "model_1/batch_normalization_6_1/batchnorm/add_1:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_QuantizeLinear_Output",
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_scale",
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_scale": 0.23957160115242004
+      },
+      "zero_points": {
+        "model_1/batch_normalization_6_1/batchnorm/add_1:0_zero_point": -4
+      }
+    },
+    {
+      "name": "model_1/activation_6_1/Relu:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/activation_6_1/Relu:0",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_6_1/Relu:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/activation_6_1/Relu:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/activation_6_1/Relu:0_QuantizeLinear_Output",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/activation_6_1/Relu:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/average_pooling2d_1/AvgPool:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/average_pooling2d_1/AvgPool:0",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/average_pooling2d_1/AvgPool:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/average_pooling2d_1/AvgPool:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/average_pooling2d_1/AvgPool:0_QuantizeLinear_Output",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/average_pooling2d_1/AvgPool:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/flatten_1/Reshape:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/flatten_1/Reshape:0",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/flatten_1/Reshape:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/flatten_1/Reshape:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/flatten_1/Reshape:0_QuantizeLinear_Output",
+        "model_1/activation_6_1/Relu:0_scale",
+        "model_1/activation_6_1/Relu:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/flatten_1/Reshape:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/activation_6_1/Relu:0_scale": 0.1211385652422905
+      },
+      "zero_points": {
+        "model_1/activation_6_1/Relu:0_zero_point": -128
+      }
+    },
+    {
+      "name": "model_1/dense_1/MatMul:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/dense_1/MatMul:0",
+        "model_1/dense_1/MatMul:0_scale",
+        "model_1/dense_1/MatMul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/MatMul:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/MatMul:0_scale": 0.19026829302310944
+      },
+      "zero_points": {
+        "model_1/dense_1/MatMul:0_zero_point": 20
+      }
+    },
+    {
+      "name": "model_1/dense_1/MatMul:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/dense_1/MatMul:0_QuantizeLinear_Output",
+        "model_1/dense_1/MatMul:0_scale",
+        "model_1/dense_1/MatMul:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/MatMul:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/MatMul:0_scale": 0.19026829302310944
+      },
+      "zero_points": {
+        "model_1/dense_1/MatMul:0_zero_point": 20
+      }
+    },
+    {
+      "name": "model_1/dense_1/BiasAdd:0_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "model_1/dense_1/BiasAdd:0",
+        "model_1/dense_1/BiasAdd:0_scale",
+        "model_1/dense_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/BiasAdd:0_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/BiasAdd:0_scale": 0.18968191742897034
+      },
+      "zero_points": {
+        "model_1/dense_1/BiasAdd:0_zero_point": 21
+      }
+    },
+    {
+      "name": "model_1/dense_1/BiasAdd:0_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "model_1/dense_1/BiasAdd:0_QuantizeLinear_Output",
+        "model_1/dense_1/BiasAdd:0_scale",
+        "model_1/dense_1/BiasAdd:0_zero_point"
+      ],
+      "outputs": [
+        "model_1/dense_1/BiasAdd:0_DequantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "model_1/dense_1/BiasAdd:0_scale": 0.18968191742897034
+      },
+      "zero_points": {
+        "model_1/dense_1/BiasAdd:0_zero_point": 21
+      }
+    },
+    {
+      "name": "dense_QuantizeLinear",
+      "op_type": "QuantizeLinear",
+      "inputs": [
+        "dense_QuantizeLinear_Input",
+        "dense_scale",
+        "dense_zero_point"
+      ],
+      "outputs": [
+        "dense_QuantizeLinear_Output"
+      ],
+      "attributes": {},
+      "scales": {
+        "dense_scale": 0.003921568859368563
+      },
+      "zero_points": {
+        "dense_zero_point": -128
+      }
+    },
+    {
+      "name": "dense_DequantizeLinear",
+      "op_type": "DequantizeLinear",
+      "inputs": [
+        "dense_QuantizeLinear_Output",
+        "dense_scale",
+        "dense_zero_point"
+      ],
+      "outputs": [
+        "dense"
+      ],
+      "attributes": {},
+      "scales": {
+        "dense_scale": 0.003921568859368563
+      },
+      "zero_points": {
+        "dense_zero_point": -128
+      }
+    }
+  ],
+  "summary": {
+    "total_nodes": 130,
+    "qlinear_nodes": 98,
+    "op_type_counts": {
+      "QLinearConv": 0,
+      "QLinearMatMul": 0,
+      "QuantizeLinear": 32,
+      "DequantizeLinear": 66
+    }
+  }
+}
