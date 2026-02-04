@@ -111,7 +111,7 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
             ' fillcolor="#90EE90"];',
             '    pattern_dq [label="DequantizeLinear\\n(INT8 → FP32)",'
             ' fillcolor="#FFB6C1"];',
-            '    pattern_op [label="Operation\\n(Conv, Add, etc.)\\n[Operates on FP32]",'
+            '    pattern_op [label="Operation\\n(Conv, Add, etc.)",'
             ' fillcolor="#87CEEB"];',
             '    pattern_q -> pattern_dq [label="INT8"];',
             '    pattern_dq -> pattern_op [label="FP32"];',
@@ -149,14 +149,16 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         [
             "  // Typical Data Flow (simplified)",
             '  q_input -> layer1_dq [label="INT8"];',
-            '  layer1_dq [label="DequantizeLinear\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
+            '  layer1_dq [label="DequantizeLinear\\n[INT8→FP32]",'
+            ' fillcolor="#FFB6C1"];',
             '  layer1_dq -> layer1_conv [label="FP32"];',
             '  layer1_conv [label="Conv2D\\n[FP32 compute]", fillcolor="#87CEEB"];',
             '  layer1_conv -> layer1_q [label="FP32"];',
             '  layer1_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
             "",
             '  layer1_q -> layer2_dq [label="INT8"];',
-            '  layer2_dq [label="DequantizeLinear\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
+            '  layer2_dq [label="DequantizeLinear\\n[INT8→FP32]",'
+            ' fillcolor="#FFB6C1"];',
             '  layer2_dq -> layer2_op [label="FP32"];',
             '  layer2_op [label="...\\n(more layers)\\n[FP32]", fillcolor="#87CEEB"];',
             "",
@@ -168,7 +170,8 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
             '  output_dq -> output [label="FP32"];',
             "",
             "  // Output",
-            '  output [label="Model Output\\n(batch, 10)\\n[FP32]", fillcolor="#FFE0E0"];',
+            '  output [label="Model Output\\n(batch, 10)\\n[FP32]",'
+            ' fillcolor="#FFE0E0"];',
             "",
         ]
     )
