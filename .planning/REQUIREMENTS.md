@@ -200,22 +200,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HW-01 | Phase 13 | Complete |
 | HW-02 | Phase 13 | Complete |
 | HW-03 | Phase 13 | Complete |
-| NB-01 | Phase — | Pending |
-| NB-02 | Phase — | Pending |
-| NB-03 | Phase — | Pending |
-| NB-04 | Phase — | Pending |
-| INSP-01 | Phase — | Pending |
-| INSP-02 | Phase — | Pending |
-| INSP-03 | Phase — | Pending |
-| INSP-04 | Phase — | Pending |
-| INSP-05 | Phase — | Pending |
-| CAP-01 | Phase — | Pending |
-| CAP-02 | Phase — | Pending |
-| CAP-03 | Phase — | Pending |
-| CAP-04 | Phase — | Pending |
-| MOD-01 | Phase — | Pending |
-| MOD-02 | Phase — | Pending |
-| MOD-03 | Phase — | Pending |
+| NB-01 | Phase 14 | Pending |
+| NB-02 | Phase 14 | Pending |
+| NB-03 | Phase 14 | Pending |
+| NB-04 | Phase 14 | Pending |
+| INSP-01 | Phase 15 | Pending |
+| INSP-02 | Phase 15 | Pending |
+| INSP-03 | Phase 15 | Pending |
+| INSP-04 | Phase 15 | Pending |
+| INSP-05 | Phase 15 | Pending |
+| CAP-01 | Phase 16 | Pending |
+| CAP-02 | Phase 16 | Pending |
+| CAP-03 | Phase 16 | Pending |
+| CAP-04 | Phase 16 | Pending |
+| MOD-01 | Phase 17 | Pending |
+| MOD-02 | Phase 17 | Pending |
+| MOD-03 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
@@ -223,8 +223,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - v1.2 requirements: 12 total (Complete)
 - v1.3 requirements: 14 total (Complete)
 - v1.4 requirements: 16 total (Pending)
-- Mapped to phases: 37/37 v1.0-v1.3 (100% coverage), v1.4 pending roadmap
+- Mapped to phases: 53/53 (100% coverage)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-05 with v1.4 requirements added*
+*Last updated: 2026-02-05 with v1.4 phase mappings*
