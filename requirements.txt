@@ -13,3 +13,5 @@ onnxruntime>=1.23.2
 torch>=2.0.0
 torchvision>=0.15.0
 onnx2torch>=1.5.15
+# Interactive notebook for quantization playground
+marimo>=0.15.5
