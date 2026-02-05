@@ -15,9 +15,9 @@ def __():
     """Import dependencies."""
     import marimo as mo
     from pathlib import Path
-    from playground.utils import load_model_variants, get_model_summary
+    from playground.utils import load_model_variants, get_model_summary, get_all_layer_names, get_layer_type
 
-    return mo, Path, load_model_variants, get_model_summary
+    return mo, Path, load_model_variants, get_model_summary, get_all_layer_names, get_layer_type
 
 
 @app.cell
@@ -106,6 +106,78 @@ def __(mo, folder_picker, models_summary, load_error):
 def __(display):
     """Render the display."""
     display
+
+
+@app.cell
+def __(models, get_all_layer_names):
+    """Extract layer names from loaded models."""
+    layer_data = None
+    layer_names = []
+    layer_source = None
+
+    if models:
+        layer_data = get_all_layer_names(models)
+        layer_names = layer_data.get('layer_names', [])
+        layer_source = layer_data.get('source')
+
+    return layer_data, layer_names, layer_source
+
+
+@app.cell
+def __(mo, layer_names):
+    """Layer selection dropdown."""
+    layer_selector = mo.ui.dropdown(
+        options=layer_names if layer_names else ["Select a layer..."],
+        value=None,
+        allow_select_none=True,
+        label="Layer to analyze"
+    )
+
+    return layer_selector,
+
+
+@app.cell
+def __(mo, layer_selector):
+    """Display layer selector."""
+    layer_selector
+
+
+@app.cell
+def __(mo, layer_selector, models, layer_source, get_layer_type):
+    """Display layer information (reactive to dropdown selection)."""
+    layer_info_display = None
+
+    if not layer_selector.value:
+        # No selection - show placeholder
+        layer_info_display = mo.md("**Select a layer from the dropdown above to view details.**").callout(kind="neutral")
+    else:
+        # Layer selected - show info
+        selected_layer = layer_selector.value
+
+        # Get layer type
+        layer_type = None
+        if models and layer_source:
+            model_key = f"{layer_source}_float" if layer_source in ['onnx', 'pytorch'] else None
+            if model_key and models.get(model_key):
+                layer_type = get_layer_type(models[model_key], selected_layer)
+
+        type_text = f" ({layer_type})" if layer_type else ""
+
+        layer_info_text = f"""
+        **Layer:** `{selected_layer}`{type_text}
+
+        **Source:** {layer_source.upper() if layer_source else 'Unknown'}
+        """
+
+        layer_info_display = mo.md(layer_info_text).callout(kind="info")
+
+    return layer_info_display,
+
+
+@app.cell
+def __(layer_info_display):
+    """Render layer info display."""
+    layer_info_display
 
 
 if __name__ == "__main__":
