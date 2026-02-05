@@ -8,15 +8,16 @@ Multi-framework evaluation of ResNet8 for CIFAR-10, converted from the MLCommons
 
 Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
 
-## Current Milestone: v1.3 Quantized Operations Documentation
+## Current Milestone: v1.4 Quantization Playground
 
-**Goal:** Create reference documentation explaining the calculations needed to implement quantized inference in hardware, with ONNX graph visualization
+**Goal:** Interactive Marimo notebook environment to experiment with quantization and inspect all values
 
 **Target features:**
-- QLinear operation internals (QLinearConv, QLinearMatMul) — integer arithmetic for hardware implementation
-- QuantizeLinear / DequantizeLinear — input/output boundary operations
-- PyTorch quantized operation equivalents — same calculation-level understanding
-- ONNX graph visualization — Netron-style diagrams of v1.2 quantized models
+- Load and visualize quantized model structure (ONNX and PyTorch)
+- Inspect all quantization parameters (scale, zero-point per layer)
+- Run inference and capture intermediate values at each layer
+- Modify parameters interactively and re-run experiments
+- Compare original vs modified outputs
 
 ## Requirements
 
@@ -40,10 +41,12 @@ Accurate model conversion across frameworks — converted models must produce eq
 
 ### Active
 
-- [ ] QLinear operation math documentation (scale, zero-point, integer arithmetic)
-- [ ] QuantizeLinear/DequantizeLinear boundary operations
-- [ ] PyTorch quantized operation equivalents
-- [ ] ONNX graph visualization of quantized models
+- [ ] Marimo notebook setup for quantization experiments
+- [ ] Model loading utilities (ONNX and PyTorch quantized models)
+- [ ] Quantization parameter inspection (scale, zero-point per layer)
+- [ ] Intermediate value capture during inference
+- [ ] Interactive parameter modification and re-evaluation
+- [ ] Comparison visualization (original vs modified)
 
 ### Out of Scope
 
@@ -92,4 +95,4 @@ Accurate model conversion across frameworks — converted models must produce eq
 | onnx2torch for ONNX→PyTorch | Leverage existing ONNX model | — Pending |
 
 ---
-*Last updated: 2026-02-02 after v1.3 milestone start*
+*Last updated: 2026-02-05 after v1.4 milestone start*
