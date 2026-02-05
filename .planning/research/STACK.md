@@ -1020,3 +1020,318 @@ resnet8/
 8. **Cross-reference official docs** - Link to ONNX operator documentation
 
 Each script follows existing project patterns: argparse CLI, clear logging, error handling.
+
+---
+
+# Milestone v1.4: Quantization Playground Stack Additions
+
+**Researched:** 2026-02-05
+**Confidence:** HIGH
+
+## Executive Summary
+
+The existing stack (PyTorch, ONNX Runtime, onnx2torch) provides the quantization foundation. This milestone identifies **minimal additions** needed for interactive experimentation: **Marimo** for reactive notebooks and **Plotly** for visualization.
+
+**Key insight:** The project already has `extract_operations.py` which extracts quantization parameters from ONNX models. The playground should leverage this existing infrastructure rather than adding heavy dependencies like onnx-graphsurgeon.
+
+## Recommended Stack Additions for v1.4
+
+### Interactive Notebook
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **marimo** | >=0.19.7 | Reactive notebook environment | Pure Python files (git-friendly), reactive execution, built-in widgets. No callback boilerplate. |
+
+**Version rationale:** v0.19.7 (Jan 29, 2026) is current stable with PDF export and improved sandboxing. Requires Python >=3.10; project uses 3.12.
+
+**Why marimo over Jupyter:**
+- Pure Python files (`.py`) - git-friendly, easy to diff and review
+- Reactive execution - slider changes automatically re-run dependent cells
+- Built-in UI widgets (`mo.ui.slider`, `mo.ui.table`) - no ipywidgets complexity
+- Deployable as web apps with zero changes
+- No hidden state issues - DAG-based execution model
+
+**Source:** [PyPI marimo](https://pypi.org/project/marimo/) - version verified 2026-02-05
+
+### Visualization
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **plotly** | >=6.5.0 | Interactive heatmaps, charts | Native marimo integration via `mo.ui.plotly()`. Heatmaps ideal for visualizing weight/activation tensors. |
+
+**Version rationale:** v6.5.2 (Jan 14, 2026) is current. v6.x has improved performance and supports Python 3.8-3.13.
+
+**Why Plotly over matplotlib:**
+- Matplotlib plots are **not reactive** in marimo
+- Plotly integrates with marimo's reactive model - automatic updates when sliders change
+- `mo.ui.plotly()` enables selection callbacks (click on heatmap cell to inspect values)
+- Better suited for tensor heatmaps with zoom/pan/hover
+
+**Why Plotly over Altair:**
+- Altair excels at statistical charts but Plotly's `px.imshow()` is more mature for 2D tensor visualization
+- Plotly heatmaps support annotation text, custom colorscales, aspect ratio control
+- Both work with marimo, but Plotly better matches this use case
+
+**Source:** [PyPI plotly](https://pypi.org/project/plotly/) - version verified 2026-02-05
+
+### Supporting Libraries (Already in Stack - No Changes)
+
+| Library | Current Version | Playground Use |
+|---------|-----------------|----------------|
+| onnx | >=1.17.0 | Load models, extract graph structure |
+| onnxruntime | >=1.23.2 | Run inference, capture outputs |
+| torch | >=2.0.0 | PyTorch quantized model inspection |
+| numpy | >=1.26.4 | Tensor manipulation |
+
+**No version changes needed** for existing dependencies.
+
+## What NOT to Add
+
+| Library | Why Not |
+|---------|---------|
+| **onnx-graphsurgeon** | Heavy NVIDIA dependency. Existing `extract_operations.py` already handles parameter extraction using standard `onnx` APIs. |
+| **altair** | Plotly better suited for tensor heatmaps. Adding both creates confusion for which to use. |
+| **ipywidgets** | Marimo has its own widget system (`mo.ui`). ipywidgets are Jupyter-specific. |
+| **jupyter/jupyterlab** | Marimo is the chosen notebook environment. Don't mix notebook systems. |
+| **tensorboard** | Overkill for this use case. Plotly heatmaps sufficient for weight visualization. |
+| **netron** | External GUI tool. `visualize_graph.py` already exists for static diagrams; notebook doesn't need another viewer. |
+| **sklearn-onnx helpers** | Only needed for intermediate output extraction pattern; we'll implement our own simpler approach. |
+
+## Integration Patterns
+
+### ONNX Model Inspection
+
+Reuse existing infrastructure:
+
+```python
+# Existing: scripts/extract_operations.py
+# Extracts: QLinearConv, QLinearMatMul, QuantizeLinear, DequantizeLinear
+# Returns: scales, zero_points, attributes per node
+
+# In notebook:
+import sys
+sys.path.insert(0, "/path/to/scripts")
+from extract_operations import extract_qlinear_operations
+
+ops = extract_qlinear_operations("models/resnet8_int8.onnx")
+# ops["operations"] contains all QLinear nodes with scales/zero_points
+```
+
+**Confidence:** HIGH - existing working code in project
+
+### ONNX Intermediate Tensor Capture
+
+ONNX Runtime does **not** support direct intermediate output extraction. Standard approach:
+
+```python
+import onnx
+from onnx import helper
+import onnxruntime as ort
+
+def add_intermediate_output(model_path, tensor_name, output_path):
+    """Modify ONNX model to expose an intermediate tensor as output."""
+    model = onnx.load(model_path)
+
+    # Add the intermediate tensor to graph outputs
+    intermediate = helper.make_value_info(tensor_name, onnx.TensorProto.FLOAT, None)
+    model.graph.output.append(intermediate)
+
+    onnx.save(model, output_path)
+    return output_path
+
+# Run inference with modified model
+modified_path = add_intermediate_output("model.onnx", "layer3_output", "model_debug.onnx")
+sess = ort.InferenceSession(modified_path)
+outputs = sess.run(None, {"input": input_data})
+# outputs now includes the intermediate tensor
+```
+
+**Confidence:** HIGH - verified via [sklearn-onnx documentation](http://onnx.ai/sklearn-onnx/auto_examples/plot_intermediate_outputs.html)
+
+### PyTorch Intermediate Tensor Capture
+
+Use forward hooks (standard PyTorch API):
+
+```python
+activations = {}
+
+def make_hook(name):
+    def hook_fn(module, input, output):
+        activations[name] = output.detach().cpu().numpy()
+    return hook_fn
+
+# Register hooks on quantized model
+model = torch.jit.load("models/resnet8_int8.pt")
+for name, module in model.named_modules():
+    if "conv" in name or "linear" in name:  # Filter to layers of interest
+        module.register_forward_hook(make_hook(name))
+
+# Run inference
+with torch.no_grad():
+    _ = model(input_tensor)
+
+# activations dict now contains all intermediate outputs
+```
+
+**Confidence:** HIGH - standard PyTorch API, verified via [PyTorch docs](https://docs.pytorch.org/docs/stable/generated/torch.nn.modules.module.register_module_forward_hook.html)
+
+**Note for JIT models:** PyTorch JIT-traced models may have limited hook support. If FX-quantized model hooks fail, the fallback is to load the pre-traced model and add hooks before tracing.
+
+### PyTorch Quantization Parameter Inspection
+
+Quantized tensors store scale/zero_point directly:
+
+```python
+def extract_quant_params(model):
+    """Extract quantization parameters from PyTorch quantized model."""
+    params = {}
+    for name, module in model.named_modules():
+        if hasattr(module, 'weight') and callable(module.weight):
+            try:
+                w = module.weight()
+                if w.is_quantized:
+                    params[name] = {
+                        "scale": w.q_scale(),
+                        "zero_point": w.q_zero_point(),
+                        "dtype": str(w.dtype),
+                        "shape": list(w.shape)
+                    }
+            except Exception:
+                pass  # Skip modules without quantized weights
+    return params
+```
+
+**Confidence:** HIGH - standard `torch.ao.quantization` API
+
+### Marimo UI Integration
+
+```python
+import marimo as mo
+import plotly.express as px
+import pandas as pd
+
+# Reactive slider for scale modification
+scale_slider = mo.ui.slider(
+    start=0.001, stop=0.1, step=0.001,
+    value=0.01,
+    label="Scale factor",
+    show_value=True
+)
+
+# Table for displaying quantization parameters
+ops_df = pd.DataFrame([
+    {"layer": op["name"], "scale": op["scales"].get("x_scale", "N/A"), ...}
+    for op in ops["operations"]
+])
+params_table = mo.ui.table(ops_df, selection="single")
+
+# Plotly heatmap for tensor visualization (reactive with marimo)
+weight_tensor = np.array(...)  # Shape: (out_channels, in_channels, H, W)
+# Reshape to 2D for visualization
+weight_2d = weight_tensor.reshape(weight_tensor.shape[0], -1)
+
+fig = px.imshow(
+    weight_2d,
+    color_continuous_scale="RdBu",
+    aspect="auto",
+    labels={"x": "Flattened spatial/channel", "y": "Output channel"}
+)
+mo.ui.plotly(fig)  # Reactive plot - updates when dependent data changes
+```
+
+**Confidence:** HIGH - verified via [marimo interactivity docs](https://docs.marimo.io/guides/interactivity/)
+
+## Installation
+
+### Add to pyproject.toml
+
+```toml
+[project]
+dependencies = [
+    # ... existing deps ...
+    "marimo>=0.19.7",
+    "plotly>=6.5.0",
+]
+```
+
+### Direct install
+
+```bash
+# Using uv (recommended for this project)
+uv add marimo plotly
+
+# Or using pip
+pip install "marimo>=0.19.7" "plotly>=6.5.0"
+```
+
+## Development Workflow
+
+```bash
+# Start marimo editor (opens browser)
+marimo edit notebooks/quantization_playground.py
+
+# Or edit with VS Code extension
+code notebooks/quantization_playground.py
+# Then: Ctrl+Shift+P -> "Marimo: Open in browser"
+
+# Run as script (for CI/testing)
+python notebooks/quantization_playground.py
+
+# Export to static HTML (for sharing)
+marimo export html notebooks/quantization_playground.py -o playground.html
+
+# Export to PDF
+marimo export pdf notebooks/quantization_playground.py -o playground.pdf
+```
+
+## Project Structure Additions
+
+```
+resnet8/
+├── notebooks/                    # NEW - Marimo notebooks
+│   ├── quantization_playground.py  # Main interactive playground
+│   └── __init__.py               # (optional) for imports
+├── scripts/
+│   ├── extract_operations.py     # (existing) - reuse in notebook
+│   ├── ...
+└── pyproject.toml               # Add marimo, plotly
+```
+
+## Confidence Assessment
+
+| Area | Level | Reason |
+|------|-------|--------|
+| marimo version | HIGH | Verified via PyPI 2026-02-05, v0.19.7 current |
+| plotly version | HIGH | Verified via PyPI 2026-02-05, v6.5.2 current |
+| marimo-plotly integration | HIGH | Documented `mo.ui.plotly()` API in official docs |
+| ONNX intermediate capture | HIGH | sklearn-onnx docs confirm approach; standard pattern |
+| PyTorch hooks | HIGH | Standard torch API, well documented |
+| Quantization param access | MEDIUM | Standard API but JIT models may differ from eager mode |
+
+## Open Questions for Implementation
+
+1. **JIT model hook compatibility:** PyTorch JIT-traced models (from FX quantization) may have limited hook support. Needs validation during implementation - may need to capture activations before JIT tracing.
+
+2. **Parameter modification persistence:** Modifying scale/zero_point in-memory is straightforward; saving modified models back to disk requires careful reconstruction of the ONNX graph or PyTorch state dict.
+
+3. **Large tensor visualization:** For high-dimensional weights (e.g., 64x64x3x3 conv), need strategy for reducing to 2D display (mean over channels, PCA, etc.).
+
+## Sources
+
+### Version Information (HIGH confidence)
+- [marimo PyPI](https://pypi.org/project/marimo/) - version 0.19.7 verified 2026-02-05
+- [plotly PyPI](https://pypi.org/project/plotly/) - version 6.5.2 verified 2026-02-05
+
+### marimo Documentation (HIGH confidence)
+- [marimo interactivity guide](https://docs.marimo.io/guides/interactivity/)
+- [marimo plotting guide](https://docs.marimo.io/guides/working_with_data/plotting/)
+- [marimo slider API](https://docs.marimo.io/api/inputs/slider/)
+- [marimo table API](https://docs.marimo.io/api/inputs/table/)
+
+### Intermediate Tensor Capture (HIGH confidence)
+- [sklearn-onnx intermediate outputs](http://onnx.ai/sklearn-onnx/auto_examples/plot_intermediate_outputs.html)
+- [PyTorch forward hooks](https://docs.pytorch.org/docs/stable/generated/torch.nn.modules.module.register_module_forward_hook.html)
+
+### Quantization APIs (HIGH confidence)
+- [PyTorch quantization docs](https://docs.pytorch.org/docs/stable/quantization.html)
+- [ONNX Runtime quantization](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
