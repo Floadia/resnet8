@@ -56,7 +56,7 @@
 - [x] **ANL-01**: Comparison table showing all quantization results (framework × dtype)
 - [x] **ANL-02**: Flag any configuration with accuracy drop >5%
 
-## v1.3 Requirements (Current Milestone)
+## v1.3 Requirements (Complete)
 
 ### Extraction & Visualization Tools
 
@@ -83,9 +83,39 @@
 
 ### Hardware Implementation Guide
 
-- [ ] **HW-01**: Critical pitfalls checklist with 6 items (accumulator overflow, rounding, scale precision, per-channel, fusion, clipping)
-- [ ] **HW-02**: Hardware pseudocode (C-style) with exact bit-widths for each operation
-- [ ] **HW-03**: Verification test vectors from ResNet8 for hardware validation
+- [x] **HW-01**: Critical pitfalls checklist with 6 items (accumulator overflow, rounding, scale precision, per-channel, fusion, clipping)
+- [x] **HW-02**: Hardware pseudocode (C-style) with exact bit-widths for each operation
+- [x] **HW-03**: Verification test vectors from ResNet8 for hardware validation
+
+## v1.4 Requirements (Current Milestone)
+
+### Notebook Foundation
+
+- [ ] **NB-01**: User can launch Marimo notebook for quantization experiments
+- [ ] **NB-02**: User can load ONNX quantized model with caching (no memory leak on re-run)
+- [ ] **NB-03**: User can load PyTorch quantized model with caching
+- [ ] **NB-04**: User can select layer/operation from model structure
+
+### Parameter Inspection
+
+- [ ] **INSP-01**: User can view scale and zero-point for each layer
+- [ ] **INSP-02**: User can view weight tensor shapes and dtypes
+- [ ] **INSP-03**: User can navigate model structure (tree/list view)
+- [ ] **INSP-04**: User can compare FP32 vs quantized values side-by-side
+- [ ] **INSP-05**: User can view activation histograms per layer
+
+### Value Capture
+
+- [ ] **CAP-01**: User can run inference on sample CIFAR-10 images
+- [ ] **CAP-02**: User can capture intermediate activations at each layer
+- [ ] **CAP-03**: User can see SQNR (Signal-to-Quantization-Noise Ratio) per layer
+- [ ] **CAP-04**: User can see per-layer accuracy contribution analysis
+
+### Interactive Modification
+
+- [ ] **MOD-01**: User can modify scale/zero-point values via UI
+- [ ] **MOD-02**: User can re-run inference with modified parameters
+- [ ] **MOD-03**: User can compare original vs modified outputs
 
 ## Future Requirements
 
@@ -107,6 +137,11 @@ Deferred to future release. Tracked but not in current roadmap.
 - **DOC-01**: Dynamic quantization documentation
 - **DOC-02**: Calibration methodology deep-dive
 - **DOC-03**: Performance profiling documentation (MACs/FLOPs)
+
+### Playground Extensions (Deferred from v1.4)
+
+- **PG-01**: Sensitivity ranking (which layers matter most)
+- **PG-02**: Export modified model
 
 ## Out of Scope
 
@@ -162,17 +197,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ARCH-02 | Phase 12 | Complete |
 | ARCH-03 | Phase 12 | Complete |
 | ARCH-04 | Phase 12 | Complete |
-| HW-01 | Phase 13 | Pending |
-| HW-02 | Phase 13 | Pending |
-| HW-03 | Phase 13 | Pending |
+| HW-01 | Phase 13 | Complete |
+| HW-02 | Phase 13 | Complete |
+| HW-03 | Phase 13 | Complete |
+| NB-01 | Phase — | Pending |
+| NB-02 | Phase — | Pending |
+| NB-03 | Phase — | Pending |
+| NB-04 | Phase — | Pending |
+| INSP-01 | Phase — | Pending |
+| INSP-02 | Phase — | Pending |
+| INSP-03 | Phase — | Pending |
+| INSP-04 | Phase — | Pending |
+| INSP-05 | Phase — | Pending |
+| CAP-01 | Phase — | Pending |
+| CAP-02 | Phase — | Pending |
+| CAP-03 | Phase — | Pending |
+| CAP-04 | Phase — | Pending |
+| MOD-01 | Phase — | Pending |
+| MOD-02 | Phase — | Pending |
+| MOD-03 | Phase — | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
 - v1.2 requirements: 12 total (Complete)
-- v1.3 requirements: 14 total (Pending)
-- Mapped to phases: 37/37 (100% coverage)
+- v1.3 requirements: 14 total (Complete)
+- v1.4 requirements: 16 total (Pending)
+- Mapped to phases: 37/37 v1.0-v1.3 (100% coverage), v1.4 pending roadmap
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-03 with Phase 12 requirements complete*
+*Last updated: 2026-02-05 with v1.4 requirements added*
