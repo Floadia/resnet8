@@ -53,7 +53,14 @@ def load_pytorch_model(path: Path | str) -> torch.nn.Module:
 
     logger.info(f"Loading PyTorch model from {path}")
     # weights_only=False needed for quantized models
-    model = torch.load(str(path), weights_only=False)
+    loaded = torch.load(str(path), weights_only=False)
+
+    # Handle dict format (e.g., {'model': ..., 'state_dict': ..., ...})
+    if isinstance(loaded, dict) and 'model' in loaded:
+        model = loaded['model']
+    else:
+        model = loaded
+
     model.eval()
     return model
 

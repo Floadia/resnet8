@@ -43,7 +43,7 @@ def __(mo):
 def __(mo):
     """File picker for selecting model folder."""
     folder_picker = mo.ui.file_browser(
-        initial_path="./models",
+        initial_path="../models",
         selection_mode="directory",
         multiple=False,
         label="Select model folder"
