@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 14 of 17 (Notebook Foundation)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In progress
-Last activity: 2026-02-05 -- Completed 14-01-PLAN.md
+Last activity: 2026-02-06 -- Completed 14-02-PLAN.md
 
-Progress: [==============......] 14/17 phases (82% milestone progress)
+Progress: [===============.....] 17/20 plans (85% completion)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: ~28 min
-- Total execution time: ~7.6 hours
+- Total plans completed: 17
+- Average duration: ~1h 42min
+- Total execution time: ~29 hours
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [==============......] 14/17 phases (82% milestone progress)
 | v1.1 (3-4) | 2 | ~1h | ~30min |
 | v1.2 (5-8) | 4 | ~2h | ~30min |
 | v1.3 (9-13) | 7 | ~3.5h | ~30min |
-| v1.4 (14+) | 1 | ~3min | ~3min |
+| v1.4 (14+) | 2 | ~21.5h | ~10h 45min |
 
 **Recent Trend:**
-- Last 5 plans: 11-02, 12-01, 12-02, 13-01, 14-01
-- Trend: Faster execution for focused tasks
+- Last 5 plans: 12-01, 12-02, 13-01, 14-01, 14-02
+- Trend: Phase 14-02 required debugging across sessions (path/import issues)
 
 *Updated after each plan completion*
 
@@ -63,6 +63,10 @@ From v1.4 (Quantization Playground):
 - Wrapper pattern: Marimo notebook calls existing scripts/, not reimplementation
 - weights_only=False needed for PyTorch quantized models (full object deserialization)
 - Graceful missing file handling: return None instead of raising errors
+- Extract ONNX layers from both graph.node (operations) and graph.initializer (parameters)
+- Filter out PyTorch root module (empty name from named_modules) for clean layer lists
+- File selection mode (not directory mode) more reliable for Marimo file browser
+- PyTorch quantized models saved as dict {'model': ..., 'epoch': ...} - extract 'model' key
 
 ### Pending Todos
 
@@ -74,12 +78,12 @@ None
 
 ## Session Continuity
 
-Last session: 2026-02-05
-Stopped at: Completed 14-01-PLAN.md (Notebook Foundation)
+Last session: 2026-02-06
+Stopped at: Completed 14-02-PLAN.md (Layer Inspection Utilities)
 Resume file: None
 
-**Next action:** Continue Phase 14 with remaining plans (scale visualization, distributions)
+**Next action:** Continue Phase 14 with Plan 03 (scale parameter visualization)
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-05 with Phase 14 Plan 01 completion*
+*Last updated: 2026-02-06 with Phase 14 Plan 02 completion*
