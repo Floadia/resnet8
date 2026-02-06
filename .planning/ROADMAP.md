@@ -241,8 +241,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — Notebook skeleton with cached model loading utilities
-- [ ] 14-02-PLAN.md — Layer inspection utilities and complete UI wiring
+- [x] 14-01-PLAN.md — Notebook skeleton with cached model loading utilities
+- [x] 14-02-PLAN.md — Layer inspection utilities and complete UI wiring
 
 #### Phase 15: Parameter Inspection
 **Goal**: Users can explore all quantization parameters (scales, zero-points, weights) with comparison to FP32 values
@@ -306,11 +306,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. Core Operations Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 1/1 | Complete | 2026-02-05 |
-| 14. Notebook Foundation | v1.4 | 0/2 | Not started | - |
+| 14. Notebook Foundation | v1.4 | 2/2 | Complete | 2026-02-06 |
 | 15. Parameter Inspection | v1.4 | 0/TBD | Not started | - |
 | 16. Inference and Value Capture | v1.4 | 0/TBD | Not started | - |
 | 17. Interactive Modification | v1.4 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-05 with Phase 14 plans*
+*Last updated: 2026-02-06 with Phase 14 complete*
