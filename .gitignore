@@ -25,3 +25,10 @@ __pycache__/
 *.swp
 *.swo
 *~
+
+# Marimo cache
+__marimo__/
+*/__marimo__/
+
+# Temporary verification reports (canonical ones in .planning/)
+PHASE_*_VERIFICATION_REPORT.md
