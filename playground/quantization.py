@@ -6,12 +6,17 @@ Usage:
 
 import marimo
 
-__generated_with = "0.15.5"
+__generated_with = "0.19.7"
 app = marimo.App()
 
 
 @app.cell
-def __():
+def _():
+    return
+
+
+@app.cell
+def _():
     """Import dependencies."""
     import marimo as mo
     from pathlib import Path
@@ -23,65 +28,68 @@ def __():
         sys.path.insert(0, str(project_root))
 
     from playground.utils import load_model_variants, get_model_summary, get_all_layer_names, get_layer_type
-
-    return mo, Path, load_model_variants, get_model_summary, get_all_layer_names, get_layer_type
+    return (
+        Path,
+        get_all_layer_names,
+        get_layer_type,
+        get_model_summary,
+        load_model_variants,
+        mo,
+        project_root,
+    )
 
 
 @app.cell
-def __(mo):
+def _():
     """Display notebook header and instructions."""
-    return mo.md(
-        """
-        # Quantization Playground
-
-        Interactive notebook for exploring ONNX and PyTorch quantization.
-        """
-    )
+    return
 
 
 @app.cell
-def __(mo):
-    """File picker for selecting model folder."""
+def _(mo, project_root):
+    """File picker for selecting model file (folder derived from selection)."""
     folder_picker = mo.ui.file_browser(
-        initial_path="../models",
-        selection_mode="directory",
+        initial_path=str(project_root / "models"),
+        selection_mode="file",
         multiple=False,
-        label="Select model folder"
+        label="Select any model file to load the folder",
+        filetypes=[".onnx", ".pt"],
     )
-
-    return folder_picker,
+    return (folder_picker,)
 
 
 @app.cell
-def __(mo, folder_picker):
+def _(folder_picker):
     """Display folder picker."""
     folder_picker
+    return
 
 
 @app.cell
-def __(mo, folder_picker, load_model_variants, get_model_summary):
+def _(Path, folder_picker, get_model_summary, load_model_variants, mo):
     """Load models from selected folder with spinner."""
     models = None
     models_summary = None
     load_error = None
+    selected_folder = None
 
     if folder_picker.value:
         try:
+            selected_folder = Path(folder_picker.path(0)).parent
             with mo.status.spinner(title="Loading models..."):
-                models = load_model_variants(folder_picker.path(0))
+                models = load_model_variants(selected_folder)
                 models_summary = get_model_summary(models)
         except Exception as e:
             load_error = str(e)
-
-    return models, models_summary, load_error
+    return load_error, models, models_summary, selected_folder
 
 
 @app.cell
-def __(mo, folder_picker, models_summary, load_error):
+def _(folder_picker, load_error, mo, models_summary, selected_folder):
     """Display model loading status and summary."""
     if not folder_picker.value:
         # Initial state - show instructions
-        display = mo.md("**Select a model folder to begin**").callout(kind="info")
+        display = mo.md("**Select a model file to load the folder**").callout(kind="info")
     elif load_error:
         # Error state - show error message
         display = mo.md(f"**Error loading models:** {load_error}").callout(kind="danger")
@@ -93,7 +101,7 @@ def __(mo, folder_picker, models_summary, load_error):
         summary_text = f"""
         **Models loaded successfully!**
 
-        **Folder:** `{folder_picker.path(0)}`
+        **Folder:** `{selected_folder}`
 
         **Total models:** {models_summary['total_loaded']}
 
@@ -104,19 +112,19 @@ def __(mo, folder_picker, models_summary, load_error):
         display = mo.md(summary_text).callout(kind="success")
     else:
         # No models found
-        display = mo.md(f"**No models found in:** `{folder_picker.path(0)}`").callout(kind="warn")
-
-    return display,
+        display = mo.md(f"**No models found in:** `{selected_folder}`").callout(kind="warn")
+    return (display,)
 
 
 @app.cell
-def __(display):
+def _(display):
     """Render the display."""
     display
+    return
 
 
 @app.cell
-def __(models, get_all_layer_names):
+def _(get_all_layer_names, models):
     """Extract layer names from loaded models."""
     layer_data = None
     layer_names = []
@@ -126,12 +134,11 @@ def __(models, get_all_layer_names):
         layer_data = get_all_layer_names(models)
         layer_names = layer_data.get('layer_names', [])
         layer_source = layer_data.get('source')
-
-    return layer_data, layer_names, layer_source
+    return layer_names, layer_source
 
 
 @app.cell
-def __(mo, layer_names):
+def _(layer_names, mo):
     """Layer selection dropdown."""
     layer_selector = mo.ui.dropdown(
         options=layer_names if layer_names else ["Select a layer..."],
@@ -139,18 +146,18 @@ def __(mo, layer_names):
         allow_select_none=True,
         label="Layer to analyze"
     )
-
-    return layer_selector,
+    return (layer_selector,)
 
 
 @app.cell
-def __(mo, layer_selector):
+def _(layer_selector):
     """Display layer selector."""
     layer_selector
+    return
 
 
 @app.cell
-def __(mo, layer_selector, models, layer_source, get_layer_type):
+def _(get_layer_type, layer_selector, layer_source, mo, models):
     """Display layer information (reactive to dropdown selection)."""
     layer_info_display = None
 
@@ -177,14 +184,14 @@ def __(mo, layer_selector, models, layer_source, get_layer_type):
         """
 
         layer_info_display = mo.md(layer_info_text).callout(kind="info")
-
-    return layer_info_display,
+    return (layer_info_display,)
 
 
 @app.cell
-def __(layer_info_display):
+def _(layer_info_display):
     """Render layer info display."""
     layer_info_display
+    return
 
 
 if __name__ == "__main__":
