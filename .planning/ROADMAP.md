@@ -257,8 +257,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md — Parameter extraction utilities and enhanced layer dropdown
-- [ ] 15-02-PLAN.md — Heatmap overview, parameter table, and weight histograms
+- [x] 15-01-PLAN.md — Parameter extraction utilities and enhanced layer dropdown
+- [x] 15-02-PLAN.md — Heatmap overview, parameter table, and weight histograms
 
 #### Phase 16: Inference and Value Capture
 **Goal**: Users can run inference and capture intermediate activations to understand quantization effects at each layer
@@ -308,10 +308,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 1/1 | Complete | 2026-02-05 |
 | 14. Notebook Foundation | v1.4 | 2/2 | Complete | 2026-02-06 |
-| 15. Parameter Inspection | v1.4 | 0/2 | Planned | - |
+| 15. Parameter Inspection | v1.4 | 2/2 | Complete | 2026-02-07 |
 | 16. Inference and Value Capture | v1.4 | 0/TBD | Not started | - |
 | 17. Interactive Modification | v1.4 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-07 with Phase 15 planned*
+*Last updated: 2026-02-07 with Phase 15 complete*

@@ -91,18 +91,18 @@
 
 ### Notebook Foundation
 
-- [ ] **NB-01**: User can launch Marimo notebook for quantization experiments
-- [ ] **NB-02**: User can load ONNX quantized model with caching (no memory leak on re-run)
-- [ ] **NB-03**: User can load PyTorch quantized model with caching
-- [ ] **NB-04**: User can select layer/operation from model structure
+- [x] **NB-01**: User can launch Marimo notebook for quantization experiments
+- [x] **NB-02**: User can load ONNX quantized model with caching (no memory leak on re-run)
+- [x] **NB-03**: User can load PyTorch quantized model with caching
+- [x] **NB-04**: User can select layer/operation from model structure
 
 ### Parameter Inspection
 
-- [ ] **INSP-01**: User can view scale and zero-point for each layer
-- [ ] **INSP-02**: User can view weight tensor shapes and dtypes
-- [ ] **INSP-03**: User can navigate model structure (tree/list view)
-- [ ] **INSP-04**: User can compare FP32 vs quantized values side-by-side
-- [ ] **INSP-05**: User can view activation histograms per layer
+- [x] **INSP-01**: User can view scale and zero-point for each layer
+- [x] **INSP-02**: User can view weight tensor shapes and dtypes
+- [x] **INSP-03**: User can navigate model structure (tree/list view)
+- [x] **INSP-04**: User can compare FP32 vs quantized values side-by-side
+- [x] **INSP-05**: User can view activation histograms per layer
 
 ### Value Capture
 
@@ -200,15 +200,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HW-01 | Phase 13 | Complete |
 | HW-02 | Phase 13 | Complete |
 | HW-03 | Phase 13 | Complete |
-| NB-01 | Phase 14 | Pending |
-| NB-02 | Phase 14 | Pending |
-| NB-03 | Phase 14 | Pending |
-| NB-04 | Phase 14 | Pending |
-| INSP-01 | Phase 15 | Pending |
-| INSP-02 | Phase 15 | Pending |
-| INSP-03 | Phase 15 | Pending |
-| INSP-04 | Phase 15 | Pending |
-| INSP-05 | Phase 15 | Pending |
+| NB-01 | Phase 14 | Complete |
+| NB-02 | Phase 14 | Complete |
+| NB-03 | Phase 14 | Complete |
+| NB-04 | Phase 14 | Complete |
+| INSP-01 | Phase 15 | Complete |
+| INSP-02 | Phase 15 | Complete |
+| INSP-03 | Phase 15 | Complete |
+| INSP-04 | Phase 15 | Complete |
+| INSP-05 | Phase 15 | Complete |
 | CAP-01 | Phase 16 | Pending |
 | CAP-02 | Phase 16 | Pending |
 | CAP-03 | Phase 16 | Pending |
