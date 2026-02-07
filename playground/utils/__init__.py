@@ -12,6 +12,12 @@ from .model_loader import (
     load_onnx_model,
     load_pytorch_model,
 )
+from .parameter_inspector import (
+    compute_all_layer_ranges,
+    extract_layer_params,
+    extract_weight_tensors,
+    get_layers_with_params,
+)
 
 __all__ = [
     "load_onnx_model",
@@ -22,4 +28,8 @@ __all__ = [
     "get_pytorch_layer_names",
     "get_all_layer_names",
     "get_layer_type",
+    "extract_layer_params",
+    "extract_weight_tensors",
+    "compute_all_layer_ranges",
+    "get_layers_with_params",
 ]

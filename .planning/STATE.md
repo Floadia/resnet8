@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Accurate model conversion across frameworks -- converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** v1.4 Quantization Playground - Phase 15 (Parameter Inspection)
+**Current focus:** v1.4 Quantization Playground - Phase 16 (Inference and Value Capture)
 
 ## Current Position
 
-Phase: 15 of 17 (Parameter Inspection)
-Plan: Ready to plan
-Status: Ready for Phase 15
-Last activity: 2026-02-06 -- Phase 14 complete (verified)
+Phase: 15 of 17 (Parameter Inspection) -- COMPLETE
+Plan: 02 of 02 (completed)
+Status: Phase 15 complete, ready for Phase 16
+Last activity: 2026-02-07 -- Phase 15 complete (verified)
 
-Progress: [===============.....] 17/20 plans (85% completion)
+Progress: [===================.] 19/20 plans (95% completion)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: ~1h 42min
-- Total execution time: ~29 hours
+- Total plans completed: 19
+- Average duration: ~1h 32min
+- Total execution time: ~29 hours 11min
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [===============.....] 17/20 plans (85% completion)
 | v1.1 (3-4) | 2 | ~1h | ~30min |
 | v1.2 (5-8) | 4 | ~2h | ~30min |
 | v1.3 (9-13) | 7 | ~3.5h | ~30min |
-| v1.4 (14+) | 2 | ~21.5h | ~10h 45min |
+| v1.4 (14+) | 4 | ~21.5h | ~5h 23min |
 
 **Recent Trend:**
-- Last 5 plans: 12-01, 12-02, 13-01, 14-01, 14-02
-- Trend: Phase 14-02 required debugging across sessions (path/import issues)
+- Last 5 plans: 13-01, 14-01, 14-02, 15-01, 15-02
+- Trend: Phase 15 completed in ~11min (both plans)
 
 *Updated after each plan completion*
 
@@ -57,7 +57,7 @@ From v1.3 (Documentation):
 - Residual connections have significant scale mismatches (2.65x-3.32x ratios in ResNet8)
 
 From v1.4 (Quantization Playground):
-- Stack additions: marimo (>=0.19.7), plotly (>=6.5.0) only
+- Stack additions: marimo (>=0.19.7), plotly (>=6.5.0), matplotlib only
 - Use mo.cache for model loading to prevent memory leaks on re-run
 - Avoid mutations -- return new objects for reactive updates
 - Wrapper pattern: Marimo notebook calls existing scripts/, not reimplementation
@@ -67,6 +67,13 @@ From v1.4 (Quantization Playground):
 - Filter out PyTorch root module (empty name from named_modules) for clean layer lists
 - File selection mode (not directory mode) more reliable for Marimo file browser
 - PyTorch quantized models saved as dict {'model': ..., 'epoch': ...} - extract 'model' key
+- Use onnx.numpy_helper.to_array for tensor extraction (not hand-rolled raw_data parsing)
+- Dequantization formula: (raw.astype(float32) - zero_point) * scale
+- Per-channel quantization detected via scale.ndim > 0 (1D array vs scalar)
+- Dict-based dropdown options {"Display [Q]": "value"} keeps .value clean while showing indicators
+- Prefix all local variables in Marimo cells with _ to avoid variable redefinition errors
+- plt.close('all') before creating figures to prevent matplotlib memory leaks
+- Return figure objects (not plt.show()) for Marimo rendering
 
 ### Pending Todos
 
@@ -78,12 +85,12 @@ None
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Phase 14 complete (Notebook Foundation verified)
+Last session: 2026-02-07
+Stopped at: Phase 15 complete (Parameter Inspection verified)
 Resume file: None
 
-**Next action:** Run `/gsd:discuss-phase 15` or `/gsd:plan-phase 15` for Parameter Inspection
+**Next action:** Plan Phase 16 (Inference and Value Capture)
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-06 with Phase 14 complete*
+*Last updated: 2026-02-07 with Phase 15 complete*

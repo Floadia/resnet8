@@ -15,6 +15,7 @@ dependencies = [
     "torchvision>=0.15.0",
     "onnx2torch>=1.5.15",
     "marimo>=0.15.5",
+    "matplotlib>=3.10.8",
 ]
 
 [build-system]
