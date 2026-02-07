@@ -31,6 +31,7 @@ def _():
     from playground.utils import (
         get_all_layer_names,
         get_layer_type,
+        get_layers_with_params,
         get_model_summary,
         load_model_variants,
     )
@@ -39,6 +40,7 @@ def _():
         Path,
         get_all_layer_names,
         get_layer_type,
+        get_layers_with_params,
         get_model_summary,
         load_model_variants,
         mo,
@@ -139,24 +141,49 @@ def _(display):
 
 
 @app.cell
-def _(get_all_layer_names, models):
-    """Extract layer names from loaded models."""
+def _(get_all_layer_names, get_layers_with_params, models):
+    """Extract layer names from loaded models and identify layers with params."""
     layer_data = None
     layer_names = []
     layer_source = None
+    layers_with_params = set()
 
     if models:
         layer_data = get_all_layer_names(models)
         layer_names = layer_data.get("layer_names", [])
         layer_source = layer_data.get("source")
-    return layer_names, layer_source
+
+        # Get layers with quantization parameters (from INT8 model if available)
+        if models.get("onnx_int8") is not None:
+            layers_with_params = get_layers_with_params(models["onnx_int8"])
+
+    return layer_names, layer_source, layers_with_params
 
 
 @app.cell
-def _(layer_names, mo):
-    """Layer selection dropdown."""
+def _(layer_names, layers_with_params, mo):
+    """Layer selection dropdown with quantization parameter indicators."""
+    # Create options dict mapping display strings to raw layer names
+    # Add [Q] indicator for layers with quantization parameters
+    dropdown_options = {}
+
+    if layer_names:
+        for layer in layer_names:
+            # Check if layer or any substring matches layers_with_params
+            has_params = any(layer in param_layer or param_layer in layer
+                           for param_layer in layers_with_params)
+
+            if has_params:
+                display_name = f"{layer} [Q]"
+            else:
+                display_name = layer
+
+            dropdown_options[display_name] = layer
+    else:
+        dropdown_options = {"Select a layer...": None}
+
     layer_selector = mo.ui.dropdown(
-        options=layer_names if layer_names else ["Select a layer..."],
+        options=dropdown_options,
         value=None,
         allow_select_none=True,
         label="Layer to analyze",
