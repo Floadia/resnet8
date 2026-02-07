@@ -14,7 +14,7 @@ import json
 import os
 import subprocess
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 
 def check_graphviz_installation() -> bool:
@@ -70,7 +70,8 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         '  edge [fontname="Arial", fontsize=9];',
         "",
         "  // Input",
-        '  input [label="Model Input\\n(batch, 32, 32, 3)\\n[FP32]", fillcolor="#E0F0FF"];',
+        '  input [label="Model Input\\n(batch, 32, 32, 3)\\n[FP32]",'
+        ' fillcolor="#E0F0FF"];',
         "",
     ]
 
@@ -78,7 +79,11 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
     # For ResNet8: conv1 -> block1 -> block2 -> block3 -> pool -> dense
 
     # Add input quantization
-    input_quant = [op for op in quantize_ops if "input" in op["name"].lower() or op == quantize_ops[0]]
+    input_quant = [
+        op
+        for op in quantize_ops
+        if "input" in op["name"].lower() or op == quantize_ops[0]
+    ]
     if input_quant:
         op = input_quant[0]
         scale_str = ""
@@ -88,88 +93,109 @@ def create_conceptual_qdq_diagram(ops_data: Dict[str, Any]) -> str:
         for zp_name, zp_val in op["zero_points"].items():
             zp_str = f"\\nzp={zp_val}"
 
-        dot_lines.append('  // Input Quantization')
-        dot_lines.append(f'  q_input [label="QuantizeLinear{scale_str}{zp_str}\\n[FP32 → INT8]", fillcolor="#90EE90"];')
+        dot_lines.append("  // Input Quantization")
+        q_label = f"QuantizeLinear{scale_str}{zp_str}\\n[FP32 → INT8]"
+        dot_lines.append(f'  q_input [label="{q_label}", fillcolor="#90EE90"];')
         dot_lines.append('  input -> q_input [label="FP32"];')
-        dot_lines.append('')
+        dot_lines.append("")
 
     # Create layered representation
-    dot_lines.extend([
-        '  // QDQ Pattern Blocks',
-        '  subgraph cluster_legend {',
-        '    label="QDQ Format Pattern";',
-        '    style=filled;',
-        '    fillcolor="#F0F0F0";',
-        '    pattern_q [label="QuantizeLinear\\n(FP32 → INT8)", fillcolor="#90EE90"];',
-        '    pattern_dq [label="DequantizeLinear\\n(INT8 → FP32)", fillcolor="#FFB6C1"];',
-        '    pattern_op [label="Operation\\n(Conv, Add, etc.)\\n[Operates on FP32]", fillcolor="#87CEEB"];',
-        '    pattern_q -> pattern_dq [label="INT8"];',
-        '    pattern_dq -> pattern_op [label="FP32"];',
-        '  }',
-        '',
-    ])
+    dot_lines.extend(
+        [
+            "  // QDQ Pattern Blocks",
+            "  subgraph cluster_legend {",
+            '    label="QDQ Format Pattern";',
+            "    style=filled;",
+            '    fillcolor="#F0F0F0";',
+            "    pattern_q"
+            ' [label="QuantizeLinear\\n(FP32 → INT8)",'
+            ' fillcolor="#90EE90"];',
+            '    pattern_dq [label="DequantizeLinear\\n(INT8 → FP32)",'
+            ' fillcolor="#FFB6C1"];',
+            '    pattern_op [label="Operation\\n(Conv, Add, etc.)'
+            '\\n[Operates on FP32]", fillcolor="#87CEEB"];',
+            '    pattern_q -> pattern_dq [label="INT8"];',
+            '    pattern_dq -> pattern_op [label="FP32"];',
+            "  }",
+            "",
+        ]
+    )
 
     # Add summary statistics
-    dot_lines.extend([
-        '  // Architecture Summary',
-        '  subgraph cluster_stats {',
-        '    label="ResNet8 QDQ Statistics";',
-        '    style=filled;',
-        '    fillcolor="#FFF8DC";',
-        f'    stats [shape=plaintext, label=<',
-        f'      <table border="0" cellborder="1" cellspacing="0">',
-        f'        <tr><td><b>Operation</b></td><td><b>Count</b></td></tr>',
-        f'        <tr><td>QuantizeLinear</td><td>{len(quantize_ops)}</td></tr>',
-        f'        <tr><td>DequantizeLinear</td><td>{len(dequantize_ops)}</td></tr>',
-        f'        <tr><td>Total QDQ nodes</td><td>{len(quantize_ops) + len(dequantize_ops)}</td></tr>',
-        f'        <tr><td>Total graph nodes</td><td>{ops_data["summary"]["total_nodes"]}</td></tr>',
-        f'      </table>',
-        f'    >];',
-        '  }',
-        '',
-    ])
+    dot_lines.extend(
+        [
+            "  // Architecture Summary",
+            "  subgraph cluster_stats {",
+            '    label="ResNet8 QDQ Statistics";',
+            "    style=filled;",
+            '    fillcolor="#FFF8DC";',
+            "    stats [shape=plaintext, label=<",
+            '      <table border="0" cellborder="1" cellspacing="0">',
+            "        <tr><td><b>Operation</b></td><td><b>Count</b></td></tr>",
+            f"        <tr><td>QuantizeLinear</td><td>{len(quantize_ops)}</td></tr>",
+            f"        <tr><td>DequantizeLinear</td><td>{len(dequantize_ops)}</td></tr>",
+            f"        <tr><td>Total QDQ nodes</td>"
+            f"<td>{len(quantize_ops) + len(dequantize_ops)}</td></tr>",
+            f"        <tr><td>Total graph nodes</td>"
+            f"<td>{ops_data['summary']['total_nodes']}</td></tr>",
+            "      </table>",
+            "    >];",
+            "  }",
+            "",
+        ]
+    )
 
     # Add flow representation showing typical Q-DQ-Op pattern
-    dot_lines.extend([
-        '  // Typical Data Flow (simplified)',
-        '  q_input -> layer1_dq [label="INT8"];',
-        '  layer1_dq [label="DequantizeLinear\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
-        '  layer1_dq -> layer1_conv [label="FP32"];',
-        '  layer1_conv [label="Conv2D\\n[FP32 compute]", fillcolor="#87CEEB"];',
-        '  layer1_conv -> layer1_q [label="FP32"];',
-        '  layer1_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
-        '',
-        '  layer1_q -> layer2_dq [label="INT8"];',
-        '  layer2_dq [label="DequantizeLinear\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
-        '  layer2_dq -> layer2_op [label="FP32"];',
-        '  layer2_op [label="...\\n(more layers)\\n[FP32]", fillcolor="#87CEEB"];',
-        '',
-        '  layer2_op -> output_q [label="FP32"];',
-        '  output_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
-        '  output_q -> output_dq [label="INT8"];',
-        '  output_dq [label="DequantizeLinear\\n(final)\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
-        '  output_dq -> output [label="FP32"];',
-        '',
-        '  // Output',
-        '  output [label="Model Output\\n(batch, 10)\\n[FP32]", fillcolor="#FFE0E0"];',
-        '',
-    ])
+    dot_lines.extend(
+        [
+            "  // Typical Data Flow (simplified)",
+            '  q_input -> layer1_dq [label="INT8"];',
+            "  layer1_dq"
+            ' [label="DequantizeLinear\\n[INT8 → FP32]",'
+            ' fillcolor="#FFB6C1"];',
+            '  layer1_dq -> layer1_conv [label="FP32"];',
+            '  layer1_conv [label="Conv2D\\n[FP32 compute]", fillcolor="#87CEEB"];',
+            '  layer1_conv -> layer1_q [label="FP32"];',
+            '  layer1_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
+            "",
+            '  layer1_q -> layer2_dq [label="INT8"];',
+            "  layer2_dq"
+            ' [label="DequantizeLinear\\n[INT8 → FP32]",'
+            ' fillcolor="#FFB6C1"];',
+            '  layer2_dq -> layer2_op [label="FP32"];',
+            '  layer2_op [label="...\\n(more layers)\\n[FP32]", fillcolor="#87CEEB"];',
+            "",
+            '  layer2_op -> output_q [label="FP32"];',
+            '  output_q [label="QuantizeLinear\\n[FP32 → INT8]", fillcolor="#90EE90"];',
+            '  output_q -> output_dq [label="INT8"];',
+            '  output_dq [label="DequantizeLinear\\n(final)'
+            '\\n[INT8 → FP32]", fillcolor="#FFB6C1"];',
+            '  output_dq -> output [label="FP32"];',
+            "",
+            "  // Output",
+            '  output [label="Model Output\\n(batch, 10)\\n[FP32]",'
+            ' fillcolor="#FFE0E0"];',
+            "",
+        ]
+    )
 
     # Add notes about scale/zero-point storage
-    dot_lines.extend([
-        '  // Parameter Storage Note',
-        '  note [shape=note, fillcolor="#FFFACD", ',
-        '        label="Scale and Zero-Point Parameters\\n\\n',
-        'Stored as initializers in ONNX graph.\\n',
-        'Each Q/DQ node references 2-3 inputs:\\n',
-        '  1. Data tensor (from previous layer)\\n',
-        '  2. scale (FP32 initializer)\\n',
-        '  3. zero_point (INT8 initializer, optional)\\n\\n',
-        'Example from this model:\\n',
-        f'  QuantizeLinear nodes: {len(quantize_ops)}\\n',
-        f'  DequantizeLinear nodes: {len(dequantize_ops)}"];',
-        '',
-    ])
+    dot_lines.extend(
+        [
+            "  // Parameter Storage Note",
+            '  note [shape=note, fillcolor="#FFFACD", ',
+            '        label="Scale and Zero-Point Parameters\\n\\n',
+            "Stored as initializers in ONNX graph.\\n",
+            "Each Q/DQ node references 2-3 inputs:\\n",
+            "  1. Data tensor (from previous layer)\\n",
+            "  2. scale (FP32 initializer)\\n",
+            "  3. zero_point (INT8 initializer, optional)\\n\\n",
+            "Example from this model:\\n",
+            f"  QuantizeLinear nodes: {len(quantize_ops)}\\n",
+            f'  DequantizeLinear nodes: {len(dequantize_ops)}"];',
+            "",
+        ]
+    )
 
     dot_lines.append("}")
     return "\n".join(dot_lines)
@@ -194,12 +220,13 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
     dot_lines = [
         "digraph ResNet8_QDQ_Details {",
         '  rankdir="TB";',
-        '  node [shape=plaintext];',
-        '',
-        '  quantize_table [label=<',
+        "  node [shape=plaintext];",
+        "",
+        "  quantize_table [label=<",
         '    <table border="1" cellborder="1" cellspacing="0">',
         '      <tr><td colspan="4"><b>QuantizeLinear Nodes</b></td></tr>',
-        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td><td><b>Zero Point</b></td><td><b>Output</b></td></tr>',
+        "      <tr><td><b>Node Name</b></td><td><b>Scale</b></td>"
+        "<td><b>Zero Point</b></td><td><b>Output</b></td></tr>",
     ]
 
     # Add first 10 quantize operations as examples
@@ -214,22 +241,30 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         else:
             scale_str = str(scale_val)
 
+        out_trunc = output[:30]
         dot_lines.append(
-            f'      <tr><td>{name}</td><td>{scale_str}</td><td>{zp_val}</td><td>{output[:30]}...</td></tr>'
+            f"      <tr><td>{name}</td><td>{scale_str}</td>"
+            f"<td>{zp_val}</td><td>{out_trunc}...</td></tr>"
         )
 
     if len(quantize_ops) > 10:
-        dot_lines.append(f'      <tr><td colspan="4">... and {len(quantize_ops) - 10} more</td></tr>')
+        remaining = len(quantize_ops) - 10
+        dot_lines.append(
+            f'      <tr><td colspan="4">... and {remaining} more</td></tr>'
+        )
 
-    dot_lines.extend([
-        '    </table>',
-        '  >];',
-        '',
-        '  dequantize_table [label=<',
-        '    <table border="1" cellborder="1" cellspacing="0">',
-        '      <tr><td colspan="4"><b>DequantizeLinear Nodes</b></td></tr>',
-        '      <tr><td><b>Node Name</b></td><td><b>Scale</b></td><td><b>Zero Point</b></td><td><b>Input</b></td></tr>',
-    ])
+    dot_lines.extend(
+        [
+            "    </table>",
+            "  >];",
+            "",
+            "  dequantize_table [label=<",
+            '    <table border="1" cellborder="1" cellspacing="0">',
+            '      <tr><td colspan="4"><b>DequantizeLinear Nodes</b></td></tr>',
+            "      <tr><td><b>Node Name</b></td><td><b>Scale</b></td>"
+            "<td><b>Zero Point</b></td><td><b>Input</b></td></tr>",
+        ]
+    )
 
     # Add first 10 dequantize operations as examples
     for i, op in enumerate(dequantize_ops[:10]):
@@ -243,18 +278,25 @@ def create_detailed_table(ops_data: Dict[str, Any]) -> str:
         else:
             scale_str = str(scale_val)
 
+        in_trunc = input_tensor[:30]
         dot_lines.append(
-            f'      <tr><td>{name}</td><td>{scale_str}</td><td>{zp_val}</td><td>{input_tensor[:30]}...</td></tr>'
+            f"      <tr><td>{name}</td><td>{scale_str}</td>"
+            f"<td>{zp_val}</td><td>{in_trunc}...</td></tr>"
         )
 
     if len(dequantize_ops) > 10:
-        dot_lines.append(f'      <tr><td colspan="4">... and {len(dequantize_ops) - 10} more</td></tr>')
+        remaining = len(dequantize_ops) - 10
+        dot_lines.append(
+            f'      <tr><td colspan="4">... and {remaining} more</td></tr>'
+        )
 
-    dot_lines.extend([
-        '    </table>',
-        '  >];',
-        '}',
-    ])
+    dot_lines.extend(
+        [
+            "    </table>",
+            "  >];",
+            "}",
+        ]
+    )
 
     return "\n".join(dot_lines)
 
@@ -274,8 +316,9 @@ def generate_diagrams(operations_json: str, output_dir: str) -> Tuple[str, str]:
     ops_data = load_operations_json(operations_json)
 
     print(f"Found {ops_data['summary']['qlinear_nodes']} QDQ nodes")
-    print(f"  QuantizeLinear: {ops_data['summary']['op_type_counts']['QuantizeLinear']}")
-    print(f"  DequantizeLinear: {ops_data['summary']['op_type_counts']['DequantizeLinear']}")
+    op_counts = ops_data["summary"]["op_type_counts"]
+    print(f"  QuantizeLinear: {op_counts['QuantizeLinear']}")
+    print(f"  DequantizeLinear: {op_counts['DequantizeLinear']}")
     print()
 
     # Create output directory if needed
@@ -324,7 +367,8 @@ def main():
     parser.add_argument(
         "--operations-json",
         default="models/resnet8_int8_operations.json",
-        help="Path to operations JSON file (default: models/resnet8_int8_operations.json)",
+        help="Path to operations JSON file"
+        " (default: models/resnet8_int8_operations.json)",
     )
     parser.add_argument(
         "--output-dir",

@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import onnx
 import onnx.numpy_helper as nph
@@ -122,9 +122,7 @@ def main():
     # Check if model exists
     if not os.path.exists(args.model):
         print(f"Error: Model file not found: {args.model}", file=sys.stderr)
-        print(
-            "Please ensure the ONNX model has been created.", file=sys.stderr
-        )
+        print("Please ensure the ONNX model has been created.", file=sys.stderr)
         sys.exit(1)
 
     # Extract operations

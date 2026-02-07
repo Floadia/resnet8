@@ -10,7 +10,6 @@ import argparse
 import os
 import subprocess
 import sys
-from typing import Optional
 
 import onnx
 
@@ -125,7 +124,7 @@ def main():
         "--rankdir",
         default="TB",
         choices=["TB", "LR"],
-        help="Graph layout direction: TB (top-to-bottom) or LR (left-to-right) (default: TB)",
+        help="Graph layout direction: TB or LR (default: TB)",
     )
     args = parser.parse_args()
 
@@ -141,7 +140,10 @@ def main():
         print("Install with:", file=sys.stderr)
         print("  Ubuntu/Debian: sudo apt-get install graphviz", file=sys.stderr)
         print("  macOS: brew install graphviz", file=sys.stderr)
-        print("  Windows: Download from https://graphviz.org/download/", file=sys.stderr)
+        print(
+            "  Windows: https://graphviz.org/download/",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Generate visualizations

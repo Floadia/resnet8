@@ -3,12 +3,13 @@
 Uses @mo.cache decorator to prevent ONNX Runtime memory leaks on cell re-execution.
 """
 
+import logging
+from pathlib import Path
+from typing import Any, Dict, Optional
+
 import marimo as mo
 import onnx
 import torch
-from pathlib import Path
-from typing import Dict, Optional, Any
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ def load_pytorch_model(path: Path | str) -> torch.nn.Module:
     loaded = torch.load(str(path), weights_only=False)
 
     # Handle dict format (e.g., {'model': ..., 'state_dict': ..., ...})
-    if isinstance(loaded, dict) and 'model' in loaded:
-        model = loaded['model']
+    if isinstance(loaded, dict) and "model" in loaded:
+        model = loaded["model"]
     else:
         model = loaded
 
@@ -83,18 +84,18 @@ def load_model_variants(folder_path: Path | str) -> Dict[str, Optional[Any]]:
     folder = Path(folder_path)
 
     models = {
-        'onnx_float': None,
-        'onnx_int8': None,
-        'onnx_uint8': None,
-        'pytorch_float': None,
-        'pytorch_int8': None,
+        "onnx_float": None,
+        "onnx_int8": None,
+        "onnx_uint8": None,
+        "pytorch_float": None,
+        "pytorch_int8": None,
     }
 
     # ONNX variants
     onnx_files = {
-        'onnx_float': folder / 'resnet8.onnx',
-        'onnx_int8': folder / 'resnet8_int8.onnx',
-        'onnx_uint8': folder / 'resnet8_uint8.onnx',
+        "onnx_float": folder / "resnet8.onnx",
+        "onnx_int8": folder / "resnet8_int8.onnx",
+        "onnx_uint8": folder / "resnet8_uint8.onnx",
     }
 
     for key, path in onnx_files.items():
@@ -107,8 +108,8 @@ def load_model_variants(folder_path: Path | str) -> Dict[str, Optional[Any]]:
 
     # PyTorch variants
     pytorch_files = {
-        'pytorch_float': folder / 'resnet8.pt',
-        'pytorch_int8': folder / 'resnet8_int8.pt',
+        "pytorch_float": folder / "resnet8.pt",
+        "pytorch_int8": folder / "resnet8_int8.pt",
     }
 
     for key, path in pytorch_files.items():
@@ -134,17 +135,17 @@ def get_model_summary(models_dict: Dict[str, Optional[Any]]) -> Dict[str, Any]:
         - 'onnx_available': list of available ONNX variants
         - 'pytorch_available': list of available PyTorch variants
     """
-    onnx_keys = ['onnx_float', 'onnx_int8', 'onnx_uint8']
-    pytorch_keys = ['pytorch_float', 'pytorch_int8']
+    onnx_keys = ["onnx_float", "onnx_int8", "onnx_uint8"]
+    pytorch_keys = ["pytorch_float", "pytorch_int8"]
 
     onnx_available = [
-        key.replace('onnx_', '')
+        key.replace("onnx_", "")
         for key in onnx_keys
         if models_dict.get(key) is not None
     ]
 
     pytorch_available = [
-        key.replace('pytorch_', '')
+        key.replace("pytorch_", "")
         for key in pytorch_keys
         if models_dict.get(key) is not None
     ]
@@ -152,7 +153,7 @@ def get_model_summary(models_dict: Dict[str, Optional[Any]]) -> Dict[str, Any]:
     total_loaded = len(onnx_available) + len(pytorch_available)
 
     return {
-        'total_loaded': total_loaded,
-        'onnx_available': onnx_available,
-        'pytorch_available': pytorch_available,
+        "total_loaded": total_loaded,
+        "onnx_available": onnx_available,
+        "pytorch_available": pytorch_available,
     }

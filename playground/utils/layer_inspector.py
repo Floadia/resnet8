@@ -1,8 +1,9 @@
-"""Layer inspection utilities for extracting layer names from ONNX and PyTorch models."""
+"""Layer inspection utilities for extracting layer names."""
+
+from typing import Any, Dict, List, Optional
 
 import onnx
 import torch
-from typing import Dict, List, Optional, Any
 
 
 def get_onnx_layer_names(model: onnx.ModelProto) -> List[str]:
@@ -68,39 +69,36 @@ def get_all_layer_names(models_dict: Dict[str, Optional[Any]]) -> Dict[str, Any]
         - 'source': 'onnx' or 'pytorch' indicating source model type
     """
     # Try ONNX float first
-    if models_dict.get('onnx_float') is not None:
+    if models_dict.get("onnx_float") is not None:
         return {
-            'layer_names': get_onnx_layer_names(models_dict['onnx_float']),
-            'source': 'onnx'
+            "layer_names": get_onnx_layer_names(models_dict["onnx_float"]),
+            "source": "onnx",
         }
 
     # Fall back to PyTorch float
-    if models_dict.get('pytorch_float') is not None:
+    if models_dict.get("pytorch_float") is not None:
         return {
-            'layer_names': get_pytorch_layer_names(models_dict['pytorch_float']),
-            'source': 'pytorch'
+            "layer_names": get_pytorch_layer_names(models_dict["pytorch_float"]),
+            "source": "pytorch",
         }
 
     # Try any ONNX model
-    for key in ['onnx_int8', 'onnx_uint8']:
+    for key in ["onnx_int8", "onnx_uint8"]:
         if models_dict.get(key) is not None:
             return {
-                'layer_names': get_onnx_layer_names(models_dict[key]),
-                'source': 'onnx'
+                "layer_names": get_onnx_layer_names(models_dict[key]),
+                "source": "onnx",
             }
 
     # Try any PyTorch model
-    if models_dict.get('pytorch_int8') is not None:
+    if models_dict.get("pytorch_int8") is not None:
         return {
-            'layer_names': get_pytorch_layer_names(models_dict['pytorch_int8']),
-            'source': 'pytorch'
+            "layer_names": get_pytorch_layer_names(models_dict["pytorch_int8"]),
+            "source": "pytorch",
         }
 
     # No models available
-    return {
-        'layer_names': [],
-        'source': None
-    }
+    return {"layer_names": [], "source": None}
 
 
 def get_layer_type(model: Any, layer_name: str) -> Optional[str]:

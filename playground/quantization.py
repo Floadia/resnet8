@@ -18,16 +18,23 @@ def _():
 @app.cell
 def _():
     """Import dependencies."""
-    import marimo as mo
-    from pathlib import Path
     import sys
+    from pathlib import Path
+
+    import marimo as mo
 
     # Add project root to path for imports
     project_root = Path(__file__).parent.parent
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
-    from playground.utils import load_model_variants, get_model_summary, get_all_layer_names, get_layer_type
+    from playground.utils import (
+        get_all_layer_names,
+        get_layer_type,
+        get_model_summary,
+        load_model_variants,
+    )
+
     return (
         Path,
         get_all_layer_names,
@@ -89,21 +96,27 @@ def _(folder_picker, load_error, mo, models_summary, selected_folder):
     """Display model loading status and summary."""
     if not folder_picker.value:
         # Initial state - show instructions
-        display = mo.md("**Select a model file to load the folder**").callout(kind="info")
+        display = mo.md("**Select a model file to load the folder**").callout(
+            kind="info"
+        )
     elif load_error:
         # Error state - show error message
-        display = mo.md(f"**Error loading models:** {load_error}").callout(kind="danger")
-    elif models_summary and models_summary['total_loaded'] > 0:
+        display = mo.md(f"**Error loading models:** {load_error}").callout(
+            kind="danger"
+        )
+    elif models_summary and models_summary["total_loaded"] > 0:
         # Success state - show summary
-        onnx_list = ", ".join(models_summary['onnx_available']) if models_summary['onnx_available'] else "None"
-        pytorch_list = ", ".join(models_summary['pytorch_available']) if models_summary['pytorch_available'] else "None"
+        onnx_avail = models_summary["onnx_available"]
+        pytorch_avail = models_summary["pytorch_available"]
+        onnx_list = ", ".join(onnx_avail) if onnx_avail else "None"
+        pytorch_list = ", ".join(pytorch_avail) if pytorch_avail else "None"
 
         summary_text = f"""
         **Models loaded successfully!**
 
         **Folder:** `{selected_folder}`
 
-        **Total models:** {models_summary['total_loaded']}
+        **Total models:** {models_summary["total_loaded"]}
 
         **ONNX variants:** {onnx_list}
 
@@ -112,7 +125,9 @@ def _(folder_picker, load_error, mo, models_summary, selected_folder):
         display = mo.md(summary_text).callout(kind="success")
     else:
         # No models found
-        display = mo.md(f"**No models found in:** `{selected_folder}`").callout(kind="warn")
+        display = mo.md(f"**No models found in:** `{selected_folder}`").callout(
+            kind="warn"
+        )
     return (display,)
 
 
@@ -132,8 +147,8 @@ def _(get_all_layer_names, models):
 
     if models:
         layer_data = get_all_layer_names(models)
-        layer_names = layer_data.get('layer_names', [])
-        layer_source = layer_data.get('source')
+        layer_names = layer_data.get("layer_names", [])
+        layer_source = layer_data.get("source")
     return layer_names, layer_source
 
 
@@ -144,7 +159,7 @@ def _(layer_names, mo):
         options=layer_names if layer_names else ["Select a layer..."],
         value=None,
         allow_select_none=True,
-        label="Layer to analyze"
+        label="Layer to analyze",
     )
     return (layer_selector,)
 
@@ -163,7 +178,9 @@ def _(get_layer_type, layer_selector, layer_source, mo, models):
 
     if not layer_selector.value:
         # No selection - show placeholder
-        layer_info_display = mo.md("**Select a layer from the dropdown above to view details.**").callout(kind="neutral")
+        layer_info_display = mo.md(
+            "**Select a layer from the dropdown above to view details.**"
+        ).callout(kind="neutral")
     else:
         # Layer selected - show info
         selected_layer = layer_selector.value
@@ -171,7 +188,8 @@ def _(get_layer_type, layer_selector, layer_source, mo, models):
         # Get layer type
         layer_type = None
         if models and layer_source:
-            model_key = f"{layer_source}_float" if layer_source in ['onnx', 'pytorch'] else None
+            valid = ["onnx", "pytorch"]
+            model_key = f"{layer_source}_float" if layer_source in valid else None
             if model_key and models.get(model_key):
                 layer_type = get_layer_type(models[model_key], selected_layer)
 
@@ -180,7 +198,7 @@ def _(get_layer_type, layer_selector, layer_source, mo, models):
         layer_info_text = f"""
         **Layer:** `{selected_layer}`{type_text}
 
-        **Source:** {layer_source.upper() if layer_source else 'Unknown'}
+        **Source:** {layer_source.upper() if layer_source else "Unknown"}
         """
 
         layer_info_display = mo.md(layer_info_text).callout(kind="info")
