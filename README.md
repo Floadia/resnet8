@@ -171,6 +171,41 @@ Outputs: `models/resnet8_int8.pt`
 - TorchScript serialization (JIT tracing)
 - Accuracy: 85.68%
 
+## Development
+
+### Linting
+
+This project uses [ruff](https://docs.astral.sh/ruff/) for linting and formatting. CI enforces these checks on all PRs.
+
+```bash
+# Check for lint errors
+uv run ruff check .
+
+# Check formatting
+uv run ruff format --check .
+
+# Auto-fix lint errors
+uv run ruff check --fix .
+
+# Auto-format code
+uv run ruff format .
+```
+
+Run both checks before committing:
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+```
+
+### Quantization Playground
+
+Interactive Marimo notebook for exploring quantization parameters:
+
+```bash
+uv sync
+marimo edit playground/quantization.py
+```
+
 ## License
 
 This project uses the ResNet8 model from [MLCommons TinyMLPerf](https://github.com/mlcommons/tiny), which is licensed under Apache 2.0.
