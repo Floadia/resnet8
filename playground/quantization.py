@@ -22,6 +22,8 @@ def _():
     from pathlib import Path
 
     import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
 
     # Add project root to path for imports
     project_root = Path(__file__).parent.parent
@@ -29,6 +31,9 @@ def _():
         sys.path.insert(0, str(project_root))
 
     from playground.utils import (
+        compute_all_layer_ranges,
+        extract_layer_params,
+        extract_weight_tensors,
         get_all_layer_names,
         get_layer_type,
         get_layers_with_params,
@@ -38,12 +43,17 @@ def _():
 
     return (
         Path,
+        compute_all_layer_ranges,
+        extract_layer_params,
+        extract_weight_tensors,
         get_all_layer_names,
         get_layer_type,
         get_layers_with_params,
         get_model_summary,
         load_model_variants,
         mo,
+        np,
+        plt,
         project_root,
     )
 
@@ -137,6 +147,122 @@ def _(folder_picker, load_error, mo, models_summary, selected_folder):
 def _(display):
     """Render the display."""
     display
+    return
+
+
+@app.cell
+def _(compute_all_layer_ranges, models):
+    """Compute weight ranges for all layers (for heatmap visualization)."""
+    layer_ranges = None
+
+    if models:
+        onnx_float = models.get("onnx_float")
+        onnx_int8 = models.get("onnx_int8")
+
+        # Only compute if both models are available
+        if onnx_float is not None and onnx_int8 is not None:
+            layer_ranges = compute_all_layer_ranges(onnx_float, onnx_int8)
+
+    return (layer_ranges,)
+
+
+@app.cell
+def _(layer_ranges, mo, np, plt):
+    """Visualize weight ranges as heatmap for whole-model overview."""
+    heatmap_fig = None
+
+    if layer_ranges is not None and len(layer_ranges) > 0:
+        # Close any previous figures to prevent memory leaks
+        plt.close("all")
+
+        # Create subplots for FP32 and INT8 side-by-side
+        num_layers = len(layer_ranges)
+        fig_height = max(6, num_layers * 0.35)
+        fig, (ax_fp32, ax_int8) = plt.subplots(1, 2, figsize=(14, fig_height))
+
+        # Extract data for plotting
+        layer_names = [lr["name"] for lr in layer_ranges]
+        fp32_mins = [lr["fp32_min"] for lr in layer_ranges]
+        fp32_maxs = [lr["fp32_max"] for lr in layer_ranges]
+        fp32_ranges = [lr["fp32_range"] for lr in layer_ranges]
+        int8_mins = [lr["int8_min"] for lr in layer_ranges]
+        int8_maxs = [lr["int8_max"] for lr in layer_ranges]
+        int8_ranges = [lr["int8_range"] for lr in layer_ranges]
+
+        # Y positions for layers (reversed so first layer is on top)
+        y_positions = np.arange(num_layers)[::-1]
+
+        # Normalize range magnitudes for color mapping
+        all_ranges = fp32_ranges + int8_ranges
+        range_min = min(all_ranges) if all_ranges else 0
+        range_max = max(all_ranges) if all_ranges else 1
+
+        # FP32 subplot - horizontal bars from min to max
+        for i, (y_pos, fp32_min, fp32_max, fp32_range) in enumerate(
+            zip(y_positions, fp32_mins, fp32_maxs, fp32_ranges)
+        ):
+            # Color based on range magnitude
+            color_val = (fp32_range - range_min) / (
+                range_max - range_min + 1e-10
+            )
+            color = plt.cm.viridis(color_val)
+
+            # Horizontal bar from min to max
+            ax_fp32.barh(
+                y_pos,
+                width=fp32_max - fp32_min,
+                left=fp32_min,
+                height=0.8,
+                color=color,
+            )
+
+        ax_fp32.set_yticks(y_positions)
+        ax_fp32.set_yticklabels(layer_names, fontsize=8)
+        ax_fp32.set_xlabel("Weight Value")
+        ax_fp32.set_title("FP32 Weight Ranges")
+        ax_fp32.grid(axis="x", alpha=0.3)
+
+        # INT8 subplot - same layout
+        for i, (y_pos, int8_min, int8_max, int8_range) in enumerate(
+            zip(y_positions, int8_mins, int8_maxs, int8_ranges)
+        ):
+            # Color based on range magnitude
+            color_val = (int8_range - range_min) / (
+                range_max - range_min + 1e-10
+            )
+            color = plt.cm.viridis(color_val)
+
+            # Horizontal bar from min to max
+            ax_int8.barh(
+                y_pos,
+                width=int8_max - int8_min,
+                left=int8_min,
+                height=0.8,
+                color=color,
+            )
+
+        ax_int8.set_yticks(y_positions)
+        ax_int8.set_yticklabels(layer_names, fontsize=8)
+        ax_int8.set_xlabel("Weight Value")
+        ax_int8.set_title("INT8 Weight Ranges (Dequantized)")
+        ax_int8.grid(axis="x", alpha=0.3)
+
+        plt.tight_layout()
+        heatmap_fig = fig
+
+    elif layer_ranges is None:
+        # Models not loaded yet
+        heatmap_fig = mo.md(
+            "**Load ONNX float and int8 models to see weight range heatmap.**"
+        ).callout(kind="info")
+
+    return (heatmap_fig,)
+
+
+@app.cell
+def _(heatmap_fig):
+    """Render heatmap figure."""
+    heatmap_fig
     return
 
 
@@ -236,6 +362,182 @@ def _(get_layer_type, layer_selector, layer_source, mo, models):
 def _(layer_info_display):
     """Render layer info display."""
     layer_info_display
+    return
+
+
+@app.cell
+def _(extract_layer_params, layer_selector, models):
+    """Extract quantization parameters for selected layer (reactive to dropdown)."""
+    layer_params = None
+
+    if layer_selector.value and models:
+        onnx_int8 = models.get("onnx_int8")
+        if onnx_int8 is not None:
+            layer_params = extract_layer_params(onnx_int8, layer_selector.value)
+
+    return (layer_params,)
+
+
+@app.cell
+def _(layer_params, layer_selector, mo, np):
+    """Display parameter table for selected layer."""
+    param_table_display = None
+
+    if not layer_selector.value:
+        # No layer selected - show nothing
+        param_table_display = None
+    elif layer_params is None:
+        # Layer selected but no parameters found
+        param_table_display = mo.md(
+            "**No quantization parameters found for this layer.**"
+        ).callout(kind="neutral")
+    else:
+        # Parameters found - create formatted table
+        scale = layer_params["scale"]
+        zero_point = layer_params["zero_point"]
+        weight_shape = layer_params["weight_shape"]
+        weight_dtype = layer_params["weight_dtype"]
+        node_type = layer_params["node_type"]
+        is_per_channel = layer_params["is_per_channel"]
+
+        # Format scale value
+        if is_per_channel:
+            scale_min = np.min(scale)
+            scale_max = np.max(scale)
+            scale_mean = np.mean(scale)
+            scale_str = (
+                f"min={scale_min:.6f}, max={scale_max:.6f}, "
+                f"mean={scale_mean:.6f}"
+            )
+        else:
+            scale_str = f"{float(scale):.6f}"
+
+        # Format zero-point value
+        if is_per_channel and zero_point.ndim > 0:
+            zp_min = int(np.min(zero_point))
+            zp_max = int(np.max(zero_point))
+            zp_mean = float(np.mean(zero_point))
+            zp_str = f"min={zp_min}, max={zp_max}, mean={zp_mean:.1f}"
+        else:
+            zp_str = str(int(zero_point))
+
+        # Format shape and dtype
+        shape_str = str(weight_shape) if weight_shape else "N/A"
+        dtype_str = weight_dtype if weight_dtype else "N/A"
+
+        # Create markdown table
+        table_md = f"""
+**Quantization Parameters**
+
+| Parameter | Value |
+|-----------|-------|
+| **Node Type** | {node_type} |
+| **Scale** | {scale_str} |
+| **Zero-point** | {zp_str} |
+| **Weight Shape** | {shape_str} |
+| **Weight Dtype** | {dtype_str} |
+| **Per-channel** | {is_per_channel} |
+        """
+
+        param_table_display = mo.md(table_md.strip()).callout(kind="info")
+
+    return (param_table_display,)
+
+
+@app.cell
+def _(param_table_display):
+    """Render parameter table."""
+    param_table_display
+    return
+
+
+@app.cell
+def _(extract_weight_tensors, layer_selector, models):
+    """Extract weight tensors for histogram visualization (reactive to dropdown)."""
+    weight_tensors = None
+
+    if layer_selector.value and models:
+        fp32_model = models.get("onnx_float")
+        int8_model = models.get("onnx_int8")
+        uint8_model = models.get("onnx_uint8")
+
+        weight_tensors = extract_weight_tensors(
+            fp32_model, int8_model, layer_selector.value, uint8_model
+        )
+
+    return (weight_tensors,)
+
+
+@app.cell
+def _(layer_selector, mo, np, plt, weight_tensors):
+    """Display weight distribution histograms for selected layer."""
+    histogram_fig = None
+
+    if not layer_selector.value:
+        # No layer selected - show nothing
+        histogram_fig = None
+    elif weight_tensors is None:
+        # Extraction failed
+        histogram_fig = mo.md(
+            "**No weight tensors found for this layer.**"
+        ).callout(kind="neutral")
+    else:
+        # Check which variants are available
+        fp32 = weight_tensors.get("fp32")
+        int8_dq = weight_tensors.get("int8_dequantized")
+        uint8_dq = weight_tensors.get("uint8_dequantized")
+
+        available = []
+        if fp32 is not None:
+            available.append(("FP32 Weights", fp32.flatten()))
+        if int8_dq is not None:
+            available.append(("INT8 (Dequantized)", int8_dq.flatten()))
+        if uint8_dq is not None:
+            available.append(("UINT8 (Dequantized)", uint8_dq.flatten()))
+
+        if len(available) == 0:
+            # No weights found
+            histogram_fig = mo.md(
+                "**No weight tensors found for this layer.**"
+            ).callout(kind="neutral")
+        else:
+            # Close any previous figures to prevent memory leaks
+            plt.close("all")
+
+            # Create subplots
+            num_variants = len(available)
+            fig, axes = plt.subplots(1, num_variants, figsize=(5 * num_variants, 4))
+
+            # Ensure axes is always a list
+            if num_variants == 1:
+                axes = [axes]
+
+            # Determine consistent bin range across all variants
+            all_weights = np.concatenate([w for _, w in available])
+            bin_range = (float(np.min(all_weights)), float(np.max(all_weights)))
+            bins = 50
+
+            # Plot each variant
+            for ax, (label, weights) in zip(axes, available):
+                ax.hist(
+                    weights, bins=bins, range=bin_range, alpha=0.7,
+                    edgecolor="black"
+                )
+                ax.set_xlabel("Weight Value")
+                ax.set_ylabel("Count")
+                ax.set_title(label)
+                ax.grid(axis="y", alpha=0.3)
+
+            plt.tight_layout()
+            histogram_fig = fig
+
+    return (histogram_fig,)
+
+
+@app.cell
+def _(histogram_fig):
+    """Render histogram figure."""
+    histogram_fig
     return
 
 
