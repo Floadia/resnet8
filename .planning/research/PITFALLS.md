@@ -1,838 +1,1121 @@
-# Pitfalls Research: Post-Training Quantization (PTQ) for ResNet8
+# Domain Pitfalls: Marimo Quantization Playground
 
-**Domain:** Adding static PTQ to existing CNN model evaluation
-**Context:** ResNet8 CIFAR-10 (87.19% full-precision baseline), ONNX Runtime + PyTorch quantization
-**Researched:** 2026-01-28
-**Confidence:** HIGH (Context7, official documentation, recent community discussions)
+**Domain:** Interactive Marimo notebook for quantization parameter inspection and modification
+**Context:** ResNet8 ONNX and PyTorch quantized models, CIFAR-10 evaluation
+**Purpose:** Prevent common mistakes when building interactive ML experimentation tools
+**Researched:** 2026-02-05
+**Confidence:** HIGH (Marimo official docs, PyTorch quantization APIs, ONNX Runtime documentation)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause incorrect quantized models, severe accuracy degradation, or require complete rework.
+Mistakes that cause broken interactivity, incorrect results, or unusable notebooks.
 
 ---
 
-### Pitfall 1: Random or Insufficient Calibration Data
+### Pitfall 1: Model Reloading on Every Cell Rerun Exhausts Memory
 
-**What goes wrong:** Using random data for calibration or too few calibration samples produces incorrect quantization parameters (scale and zero_point), causing severe accuracy drops (20-70% degradation).
-
-**Why it happens:**
-- Code examples use random data for convenience (`torch.randn(...)`)
-- Developers don't understand that calibration determines fixed quantization ranges for all future inputs
-- Insufficient calibration samples fail to capture activation distribution
-- Calibration dataset doesn't match inference distribution
-
-**Consequences:**
-- Quantized model accuracy drops from 87.19% to 10-50% (near-random or severely degraded)
-- int8/uint8 ranges are incorrectly computed, causing clipping or poor utilization
-- Quantization parameters don't generalize to test set
-- PyTorch: Observers collect incorrect statistics
-- ONNX Runtime: Calibration table contains wrong scale/zero_point values
-
-**Prevention:**
-1. **NEVER use random data** — always use real CIFAR-10 samples
-2. Use **100+ mini-batches** for calibration (PyTorch recommendation: ~100, minimum 32)
-3. Draw calibration data from training set (not test set to avoid data leakage)
-4. Ensure calibration data is **representative** of inference distribution
-5. For CIFAR-10: Use 1000-3200 images (100 batches × 32 batch_size, or 32 batches × 100 batch_size)
-6. Apply exact same preprocessing as inference (raw pixels 0-255, no normalization)
-7. Verify calibration statistics make sense (check min/max ranges per layer)
-
-**Detection:**
-- Quantized accuracy drops below 60% (expected: 85-87%)
-- Activation ranges in calibration table show unusual values (all zeros, extreme outliers)
-- Different calibration runs produce wildly different accuracy
-- First quantized layer has scale/zero_point that clips most inputs
-
-**Phase to address:** Calibration Data Preparation phase — create proper calibration subset before quantization
-
-**Warning signs:**
-- Calibration code uses `torch.randn()` or `np.random.randn()`
-- Calibration loop iterates fewer than 32 times
-- Calibration uses different preprocessing than evaluation
-- No verification of calibration data distribution
-
----
-
-### Pitfall 2: Model Not in Eval Mode During Calibration
-
-**What goes wrong:** Calibrating in training mode causes BatchNorm layers to update running statistics instead of using frozen statistics, producing incorrect quantization ranges and poor accuracy.
+**What goes wrong:** Loading ONNX or PyTorch models inside reactive cells causes the model to reload every time a UI slider changes, eventually exhausting memory and crashing the kernel.
 
 **Why it happens:**
-- Developers forget `model.eval()` is required before calibration
-- Confusion between training/eval mode in PyTorch
-- Copy-paste from training code where `.train()` is set
-- Assuming calibration is "training the quantization"
+- Marimo's reactive execution reruns cells when dependencies change
+- Model loading cell depends on a file path or configuration variable
+- Any UI element change that triggers the dependency chain causes full reload
+- Each reload creates a new model instance in memory
+- ONNX Runtime sessions and PyTorch models are not garbage collected immediately
+
+**This project's exposure:**
+```python
+# WRONG: Model reloads every time any upstream variable changes
+model_path = "models/resnet8_int8.onnx"  # Cell A
+model = onnx.load(model_path)             # Cell B (reruns when A changes)
+slider = mo.ui.slider(1, 100)             # Cell C
+# If slider is accidentally referenced in A or B, model reloads on every slider move
+```
 
 **Consequences:**
-- BatchNorm uses batch statistics during calibration instead of learned running mean/variance
-- Quantization observers collect wrong activation ranges
-- Quantized model accuracy degrades by 10-20%
-- Results are inconsistent across calibration runs
-- Small calibration batches cause catastrophic BatchNorm instability
+- Memory usage grows with each interaction
+- Eventually kernel crashes with OOM error
+- Notebook becomes unusable after a few slider adjustments
+- GPU memory not released (if using PyTorch with CUDA)
+- User must restart kernel frequently
 
 **Prevention:**
-1. **Always call `model.eval()`** before calibration:
+
+1. **Isolate model loading in dedicated cells with no UI dependencies:**
    ```python
-   model.eval()  # CRITICAL: Must be before prepare()
-   model_prepared = torch.quantization.prepare(model, inplace=False)
+   # Cell 1: Constants only (no UI elements)
+   MODEL_PATH = "models/resnet8_int8.onnx"
+
+   # Cell 2: Model loading (only depends on constants)
+   @mo.cache  # Cache the expensive load
+   def load_model(path):
+       return onnx.load(path)
+
+   model = load_model(MODEL_PATH)
    ```
-2. Verify model mode: `assert not model.training, "Model must be in eval mode"`
-3. Use `torch.no_grad()` context during calibration (prevents gradient computation)
-4. Document this requirement prominently in calibration script
-5. Test with single-image input — if results vary, mode is wrong
 
-**Detection:**
-- Quantized accuracy varies significantly between runs
-- Single-image predictions from quantized model are unstable
-- BatchNorm layers show changing statistics during calibration
-- Calibration with batch_size=1 produces very different results than batch_size=32
-
-**Phase to address:** Quantization Preparation phase — set eval mode before prepare()
-
-**Warning signs:**
-- No `model.eval()` call before `torch.quantization.prepare()`
-- Calibration loop doesn't use `with torch.no_grad():`
-- Model mode check not asserted
-
----
-
-### Pitfall 3: Forgetting Module Fusion for Conv-BatchNorm-ReLU
-
-**What goes wrong:** Not fusing Conv→BatchNorm→ReLU sequences before quantization causes incorrect quantization boundaries, missing optimization opportunities, and accuracy degradation.
-
-**Why it happens:**
-- Developers skip fusion step in quantization workflow
-- Unfamiliarity with `fuse_modules()` requirement
-- Assumption that quantization handles this automatically
-- Module fusion requires explicit module names, causing confusion
-
-**Consequences:**
-- BatchNorm cannot be quantized standalone — quantization fails or skips BatchNorm
-- Quantization/dequantization operations inserted between Conv-BatchNorm, causing numerical errors
-- Performance is degraded (extra quant/dequant ops)
-- Accuracy drops by 3-10% due to accumulated quantization errors
-- ONNX Runtime: Model optimization may warn about unfused patterns
-
-**Prevention:**
-1. **Fuse modules BEFORE quantization**:
+2. **Use mo.cache for expensive operations:**
    ```python
-   # Fusion must happen before prepare()
-   model = torch.quantization.fuse_modules(model, [
-       ['conv1', 'bn1', 'relu1'],      # Initial conv block
-       ['stack1.0.conv1', 'stack1.0.bn1', 'stack1.0.relu1'],  # Residual blocks
-       # ... list all Conv-BN-ReLU sequences
-   ], inplace=False)
+   @mo.cache
+   def get_onnx_session(model_path):
+       """Cache ONNX Runtime session - only creates once per path."""
+       return ort.InferenceSession(model_path)
+
+   session = get_onnx_session("models/resnet8_int8.onnx")
    ```
-2. Fusion order must be: **Conv → BatchNorm → ReLU** (not ReLU → BatchNorm)
-3. Supported fusion patterns: `[Conv, ReLU]`, `[Conv, BatchNorm]`, `[Conv, BatchNorm, ReLU]`, `[Linear, ReLU]`
-4. For ResNet8: Fuse main path and shortcut projection paths separately
-5. Verify fusion worked: `print(model)` should show fused modules
-6. ONNX Runtime: Use `onnxruntime.quantization.shape_inference` and model optimizer before quantization
 
-**Detection:**
-- BatchNorm layers appear separately in quantized model
-- Extra QuantizeLinear/DequantizeLinear pairs between Conv and BatchNorm
-- Warning: "Cannot quantize BatchNormalization by itself"
-- Accuracy significantly lower than expected (3-10% drop)
-- Quantized model is slower than expected
-
-**Phase to address:** Model Preparation phase — fuse modules before quantization workflow
-
-**Warning signs:**
-- No `fuse_modules()` call before `prepare()`
-- Module names are not explicitly listed
-- Fusion patterns don't match ResNet8 architecture
-
----
-
-### Pitfall 4: Skip Connections Not Prepared for Quantization
-
-**What goes wrong:** Residual addition operations (`out = x + residual`) fail during quantization or produce incorrect results because they aren't quantization-aware.
-
-**Why it happens:**
-- Standard Python `+` operator doesn't support quantization
-- torch.nn.Identity is not inserted for activation quantization tracking
-- Developers don't know to use `torch.nn.quantized.FloatFunctional`
-- ResNet shortcuts seem to "just work" in floating point
-
-**Consequences:**
-- Runtime error: "Cannot add quantized and non-quantized tensors"
-- No activation quantization for skip connection additions
-- Erroneous quantization calibration (observers miss skip connection statistics)
-- Silent failure: addition works but produces incorrect results
-- Accuracy drops by 5-15% due to quantization range mismatch
-
-**Prevention:**
-1. **Replace `+` with FloatFunctional** for skip connections:
+3. **Separate UI cells from model cells:**
    ```python
-   # WRONG: out = x + residual
-   # RIGHT:
-   self.skip_add = torch.nn.quantized.FloatFunctional()
-   out = self.skip_add.add(x, residual)
+   # Cell A: UI elements (can change freely)
+   scale_slider = mo.ui.slider(0.001, 0.1, value=0.01, label="Scale")
+
+   # Cell B: Model loading (does NOT reference scale_slider)
+   model = load_cached_model()  # No reactive dependency on slider
+
+   # Cell C: Computation (combines model + slider)
+   result = modify_and_run(model, scale_slider.value)  # This cell reruns, not Cell B
    ```
-2. Insert `torch.nn.Identity()` before additions to flag activation quantization
-3. Apply this to ALL residual blocks (3 stacks × 2 blocks = 6 additions in ResNet8)
-4. Test each residual block independently after quantization
-5. Use QuantStub at model input and DeQuantStub at model output
 
 **Detection:**
-- Error during quantization: "Cannot quantize add operation"
-- Quantized model output differs significantly from float model on same input
-- Residual blocks show no observers for addition operations
-- Calibration warnings about skip connections
 
-**Phase to address:** Model Architecture Modification phase — update residual blocks before quantization
+Warning signs during development:
+- Memory usage steadily increases when moving sliders
+- Kernel becomes unresponsive after extended use
+- "Loading model..." message appears repeatedly in output
+- Variables panel shows multiple model instances
 
-**Warning signs:**
-- Residual blocks use standard `+` operator
-- No `FloatFunctional` imports or instances in model code
-- Model definition wasn't modified for quantization
+**Phase to address:** Phase 1 (Notebook Setup) - Establish model loading pattern before adding interactivity
+
+**Sources:**
+- [Marimo Expensive Notebooks Guide](https://docs.marimo.io/guides/expensive_notebooks/)
+- [Marimo Caching with mo.cache](https://docs.marimo.io/guides/best_practices/)
 
 ---
 
-### Pitfall 5: Observer Mismatch Between QConfig and Backend
+### Pitfall 2: Object Mutations Not Triggering Reactive Updates
 
-**What goes wrong:** Using incompatible QConfig for the target backend (CPU, GPU, CUDA) causes silent failures, numerical saturation, or wrong inference results.
+**What goes wrong:** Modifying quantization parameters in-place (mutating objects) doesn't trigger downstream cell updates, so visualizations and evaluations don't refresh.
 
 **Why it happens:**
-- Default QConfig doesn't match target hardware
-- OneDNN backend on non-VNNI CPUs causes saturation
-- Per-tensor vs per-channel observer mismatch
-- uint8 vs int8 activation dtype mismatch
+- Marimo tracks variable assignments, not object mutations
+- In-place modifications like `tensor[0] = new_value` or `dict["key"] = value` are invisible to the reactive engine
+- ONNX graph modifications and PyTorch weight updates are typically in-place
+- User changes a parameter but sees no update in downstream visualizations
+
+**This project's exposure:**
+```python
+# WRONG: In-place mutation not tracked
+scales = extract_scales(model)  # Cell A: extract scales dict
+scales["conv1_scale"] = 0.05    # Cell B: modify in place - NOT TRACKED
+display_scales(scales)          # Cell C: doesn't rerun after Cell B changes
+```
 
 **Consequences:**
-- **OneDNN backend without AVX-512 VNNI**: Silent numeric saturation, model outputs are wrong
-- Per-tensor quantization on efficient models (like MobileNet) causes severe accuracy drops
-- Quantization config is ignored, operators remain float32
-- Runtime error: "Backend does not support this quantization configuration"
+- Visualizations show stale data
+- User confusion: "I changed the parameter but nothing happened"
+- Inconsistent notebook state
+- Debugging nightmare: code looks correct but doesn't work
 
 **Prevention:**
-1. **Choose QConfig matching backend**:
+
+1. **Create new objects instead of mutating:**
    ```python
-   # CPU inference (most compatible)
-   model.qconfig = torch.quantization.get_default_qconfig('fbgemm')  # x86
-   # or
-   model.qconfig = torch.quantization.get_default_qconfig('qnnpack')  # ARM
+   # CORRECT: Create new dict with modified value
+   original_scales = extract_scales(model)
+
+   # In modification cell:
+   modified_scales = {
+       **original_scales,
+       "conv1_scale": slider.value  # New value from UI
+   }  # This is a new object, triggers reactivity
    ```
-2. For ResNet8 on x86 CPU: Use `fbgemm` backend (Facebook GEMM)
-3. Verify backend support: Check `torch.backends.quantized.supported_engines`
-4. For OneDNN: Check CPU flags for AVX-512 VNNI support, or avoid OneDNN
-5. Use per-channel quantization for weights, per-tensor for activations (ResNet standard)
-6. ONNX Runtime: Verify execution provider supports quantized operators
+
+2. **Use mo.state for mutable state that must persist:**
+   ```python
+   # For state that needs to persist and trigger updates
+   get_scales, set_scales = mo.state(initial_scales)
+
+   # To update:
+   set_scales({**get_scales(), "conv1_scale": new_value})
+   ```
+
+3. **Return modified copies from functions:**
+   ```python
+   def modify_scale(model_params: dict, layer_name: str, new_scale: float) -> dict:
+       """Return a new dict with modified scale (don't mutate in place)."""
+       return {**model_params, layer_name: new_scale}
+
+   # Usage:
+   updated_params = modify_scale(params, "conv1", slider.value)
+   ```
+
+4. **For ONNX models, create modified copies:**
+   ```python
+   import copy
+
+   def modify_onnx_scale(model, node_name, new_scale):
+       """Create modified model copy."""
+       modified = copy.deepcopy(model)
+       # Modify the copy
+       for init in modified.graph.initializer:
+           if init.name == node_name:
+               # Update the initializer
+               ...
+       return modified  # Return new model, don't mutate original
+   ```
 
 **Detection:**
-- Model outputs are saturated (all same value, NaN, or inf)
-- CPU without VNNI shows wrong results but VNNI CPU is correct
-- Quantized model accuracy is 0-10% (catastrophic failure)
-- Logs show: "qconfig ignored for operator X"
-- ONNX Runtime error: "Unsupported quantized operator for execution provider"
 
-**Phase to address:** Quantization Configuration phase — select correct QConfig before prepare()
+Test during development:
+- Change a slider value - does the visualization update?
+- Check Marimo's dependency graph - is the downstream cell connected?
+- Add print statements in downstream cells - do they print on parameter change?
 
 **Warning signs:**
-- QConfig is default without backend specification
-- Code doesn't check hardware capabilities
-- Using OneDNN on older CPUs
+- Cells have no connecting edges in the dependency graph
+- UI changes don't trigger any cell execution
+- "Stale" indicators don't appear on dependent cells
+
+**Phase to address:** Phase 2 (Parameter Inspection) - Design data flow patterns before implementing interactions
+
+**Sources:**
+- [Marimo Best Practices - Mutations](https://docs.marimo.io/guides/best_practices/)
+- [Marimo Troubleshooting - Cells Not Running](https://docs.marimo.io/guides/troubleshooting/)
 
 ---
 
-### Pitfall 6: ONNX Runtime Quantization Without Model Optimization
+### Pitfall 3: UI Element Values Reset When Definition Cell Reruns
 
-**What goes wrong:** Quantizing ONNX model without pre-processing optimization causes unsupported operator errors, missed fusion opportunities, and accuracy degradation.
+**What goes wrong:** User adjusts a slider, then an unrelated change causes the slider's definition cell to rerun, resetting the slider to its initial value and losing user input.
 
 **Why it happens:**
-- Developers skip `onnxruntime.quantization.shape_inference` step
-- Model optimizer not run before quantization
-- ONNX graph contains patterns that cannot be quantized
-- BatchNorm not fused with Conv before quantization
+- UI elements are recreated when their definition cell runs
+- New UI element has default `value=` parameter, not the user's selection
+- Cell reruns can be triggered by any upstream dependency change
+- Users don't expect their manual adjustments to disappear
+
+**This project's exposure:**
+```python
+# PROBLEMATIC: Slider defined with formatting that depends on model
+model = load_model()  # Cell A
+layer_names = get_layer_names(model)  # Cell B
+
+# Cell C: Slider definition depends on layer_names
+layer_selector = mo.ui.dropdown(layer_names, label="Select Layer")
+scale_slider = mo.ui.slider(0.001, 0.1, value=0.01, label="Scale")
+
+# If model reloads or layer_names changes, both UI elements reset!
+```
 
 **Consequences:**
-- Error: "Cannot quantize BatchNormalization by itself"
-- Unsupported Conv nodes cannot be quantized
-- Missing tensor shape information prevents quantization
-- Quantization silently skips operators, leaving them in float32
-- Zero padding causes accuracy errors if zero cannot be represented uniquely
+- User frustration: spending time adjusting parameters, then losing them
+- Workflow interruption: must re-enter values repeatedly
+- Makes experimentation tedious
+- Users may stop using interactive features
 
 **Prevention:**
-1. **Run symbolic shape inference first**:
+
+1. **Isolate UI definitions in cells with minimal dependencies:**
    ```python
-   from onnxruntime.quantization import shape_inference
-   model_with_shapes = shape_inference.quant_pre_process(
-       input_model_path='resnet8.onnx',
-       output_model_path='resnet8_inferred.onnx'
+   # Cell A: UI elements with ONLY static configuration
+   scale_slider = mo.ui.slider(0.001, 0.1, value=0.01, label="Scale")
+   layer_dropdown = mo.ui.dropdown(
+       ["conv1", "conv2", "conv3"],  # Static list, not computed
+       label="Layer"
+   )
+
+   # Cell B: Model loading (completely separate)
+   model = load_model()
+
+   # Cell C: Combine UI values with model (this cell reruns, UI cells don't)
+   selected_layer = layer_dropdown.value
+   result = process(model, selected_layer, scale_slider.value)
+   ```
+
+2. **Use mo.state to persist values across cell reruns:**
+   ```python
+   # Persist slider value in state
+   get_scale, set_scale = mo.state(0.01)
+
+   # Slider that syncs with state
+   scale_slider = mo.ui.slider(
+       0.001, 0.1,
+       value=get_scale(),
+       on_change=lambda v: set_scale(v)
    )
    ```
-2. Use model optimizer to fuse Conv-BatchNorm-ReLU before quantization
-3. Verify all operators have shape information
-4. Check supported operators for execution provider (CPU, CUDA, TensorRT)
-5. For zero padding: Ensure zero is uniquely representable in quantization scheme
+
+3. **Compute dropdown options separately from dropdown definition:**
+   ```python
+   # Cell A: Compute options (may rerun)
+   layer_names = get_layer_names(model)
+
+   # Cell B: Dropdown definition (only reruns if layer_names changes structure)
+   layer_dropdown = mo.ui.dropdown(layer_names, label="Layer")
+   # Note: If layer_names content changes but structure is same, consider mo.state
+   ```
+
+4. **Use forms to batch UI elements:**
+   ```python
+   # Form batches updates - only triggers when submit is clicked
+   param_form = mo.ui.batch(
+       scale=mo.ui.slider(0.001, 0.1),
+       layer=mo.ui.dropdown(["conv1", "conv2"]),
+   ).form()
+
+   # Access with param_form.value["scale"], param_form.value["layer"]
+   ```
 
 **Detection:**
-- Error message: "Cannot quantize BatchNormalization"
-- Quantization log shows: "Unsupported operator X, skipping"
-- Quantized model has mix of quantized and float32 operators
-- Accuracy severely degraded (>20% drop)
 
-**Phase to address:** ONNX Model Preparation phase — pre-process before quantization
+During testing:
+- Make a notebook change and check if sliders reset
+- Observe which cells rerun when you make changes
+- Use Marimo's dependency graph to trace UI element dependencies
 
 **Warning signs:**
-- No shape inference call before quantization
-- ONNX model loaded directly into quantization without preprocessing
-- Quantization warnings about missing shape information
+- Users complaining about lost settings
+- Slider values jumping back to defaults
+- UI elements flickering during computation
+
+**Phase to address:** Phase 3 (Interactive Modification) - Design UI element isolation before building complex interactions
+
+**Sources:**
+- [Marimo FAQ - UI Elements](https://docs.marimo.io/faq/)
+- [Marimo Troubleshooting - UI Values Resetting](https://docs.marimo.io/guides/troubleshooting/)
 
 ---
 
-### Pitfall 7: Incorrect Calibration Data Preprocessing
+### Pitfall 4: Capturing Intermediate Values Requires Model Surgery
 
-**What goes wrong:** Calibration uses different preprocessing than the original model or evaluation script, causing quantization ranges to be computed for the wrong input distribution.
+**What goes wrong:** Attempting to capture intermediate layer outputs during ONNX or PyTorch inference requires non-trivial model modifications, not simple "print at this layer" debugging.
 
 **Why it happens:**
-- Calibration script normalizes inputs (divides by 255, or applies mean/std normalization)
-- Evaluation script uses raw pixels (0-255)
-- Copy-paste from ImageNet example that uses normalization
-- Misunderstanding of what the model expects
+- ONNX Runtime doesn't expose intermediate tensors by default
+- PyTorch quantized models don't have simple forward hooks on quantized layers
+- Model graphs are compiled/optimized, hiding intermediate nodes
+- Users expect Jupyter-like ability to inspect any variable
+
+**This project's exposure:**
+
+The existing codebase uses ONNX QDQ format which wraps operations:
+- 98 QDQ nodes (32 QuantizeLinear + 66 DequantizeLinear)
+- Intermediate values flow through the graph but aren't exposed
+- PyTorch JIT traced model has similar opacity
+
+```python
+# User expectation (doesn't work):
+model = load_model()
+output = model.run(input)
+print(model.intermediate["conv1_output"])  # No such API!
+
+# What's actually required:
+# 1. Modify ONNX graph to add intermediate outputs
+# 2. Or use specialized debugging APIs
+```
 
 **Consequences:**
-- Quantization ranges are computed for normalized data (0-1) but inference uses raw pixels (0-255)
-- Activation clipping or extreme underutilization of quantization range
-- Quantized accuracy drops to 10-40% (worse than random)
-- First layer weights have completely wrong quantization scale
+- Significant implementation effort to capture intermediates
+- May need to maintain two model versions (normal + debug)
+- Performance overhead from capturing all intermediate values
+- Memory explosion if capturing all activations
 
 **Prevention:**
-1. **Match preprocessing EXACTLY** between calibration and inference:
+
+1. **Use ONNX Runtime's quantization debug module:**
    ```python
-   # Check evaluate_pytorch.py: images are float32 in [0, 255]
-   # Calibration MUST use same format
-   images = images.astype(np.float32)  # NO divide by 255
+   from onnxruntime.quantization.qdq_loss_debug import (
+       modify_model_output_intermediate_tensors,
+       collect_activations
+   )
+
+   # Augment model to expose all intermediate tensors
+   augmented_model = modify_model_output_intermediate_tensors(model)
+
+   # Collect activations during inference
+   activations = collect_activations(augmented_model, calibration_reader)
    ```
-2. Review evaluation script preprocessing before writing calibration
-3. Test calibration with same images used in evaluation
-4. Verify input ranges: print min/max of calibration inputs
-5. Document preprocessing requirements in calibration script
+
+2. **Add specific intermediate outputs to ONNX graph:**
+   ```python
+   import onnx
+
+   def add_intermediate_output(model, tensor_name):
+       """Add a tensor as a model output for inspection."""
+       # Find the tensor in the graph
+       for value_info in model.graph.value_info:
+           if value_info.name == tensor_name:
+               model.graph.output.append(value_info)
+               return model
+
+       # If not found, create value_info (may need shape inference first)
+       new_output = onnx.helper.make_tensor_value_info(
+           tensor_name, onnx.TensorProto.FLOAT, None
+       )
+       model.graph.output.append(new_output)
+       return model
+   ```
+
+3. **For PyTorch, use register_forward_hook on the non-quantized model first:**
+   ```python
+   # Before quantization: attach hooks
+   intermediates = {}
+
+   def capture_hook(name):
+       def hook(module, input, output):
+           intermediates[name] = output.detach()
+       return hook
+
+   model.conv1.register_forward_hook(capture_hook("conv1"))
+   # Then quantize
+   ```
+
+4. **Create a dedicated "debug mode" model variant:**
+   ```python
+   def create_debug_model(model_path, layers_to_capture):
+       """Create model variant with intermediate outputs for playground use."""
+       model = onnx.load(model_path)
+       for layer in layers_to_capture:
+           add_intermediate_output(model, layer)
+       debug_path = model_path.replace(".onnx", "_debug.onnx")
+       onnx.save(model, debug_path)
+       return debug_path
+   ```
 
 **Detection:**
-- Quantized first Conv layer has scale >> 1 or scale << 0.01
-- Calibration input stats differ from evaluation input stats
-- Quantized accuracy catastrophically low (<50%)
-- Activations are clipped (all at min or max quantization range)
 
-**Phase to address:** Calibration Data Preparation phase — verify preprocessing pipeline
+Early warning during planning:
+- List the intermediate values you want to capture
+- Check if those tensors are exposed in the model format
+- Test capture mechanism on a small model first
 
 **Warning signs:**
-- Calibration code divides by 255, but evaluate_pytorch.py doesn't
-- Normalization transform applied in calibration but not evaluation
-- No documentation of expected input range
+- Simple print statements don't show intermediate values
+- Model.run() returns only final outputs
+- Documentation mentions "model modification required"
+
+**Phase to address:** Phase 2 (Parameter Inspection) - Implement intermediate capture infrastructure before building visualizations
+
+**Sources:**
+- [ONNX Runtime Quantization Debug](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
+- [sklearn-onnx Intermediate Results](https://onnx.ai/sklearn-onnx/auto_tutorial/plot_fbegin_investigate.html)
+- [PyTorch Register Forward Hook](https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_hook)
+
+---
+
+### Pitfall 5: Modifying Quantized Weights Requires Understanding Internal Representation
+
+**What goes wrong:** Attempting to modify quantized model parameters using familiar PyTorch patterns fails because quantized tensors have special internal representation.
+
+**Why it happens:**
+- Quantized weights are stored as `torch.qint8`, not regular tensors
+- Direct assignment to `state_dict()` doesn't update actual weights
+- ONNX initializers require specific modification patterns
+- Scale and zero-point are tied to weight tensors
+
+**This project's exposure:**
+
+From existing `quantize_pytorch.py`:
+```python
+# PyTorch quantized model uses FX mode with JIT tracing
+# Weights are qint8 with attached scale/zero_point
+```
+
+From existing `quantize_onnx.py`:
+```python
+# ONNX model has QDQ format with initializers
+# Scale and zero-point stored as separate initializers
+```
+
+**Consequences:**
+- Modifications appear to succeed but don't affect inference
+- User thinks they changed a parameter but model behaves identically
+- Debugging shows "correct" modified values but wrong outputs
+- Confusion between display values and actual model state
+
+**Prevention:**
+
+1. **For PyTorch quantized weights, access directly through module:**
+   ```python
+   # WRONG: state_dict is read-only copy
+   state = model.state_dict()
+   state['layer.weight'] = new_weight  # Doesn't affect model!
+
+   # CORRECT: Access through module directly
+   model.features[0].weight = new_quantized_weight
+   ```
+
+2. **Reconstruct quantized tensors properly:**
+   ```python
+   import torch
+
+   def modify_quantized_weight(weight_tensor, modification_fn):
+       """Safely modify a quantized weight tensor."""
+       # Get integer representation
+       int_repr = weight_tensor.int_repr()
+       scale = weight_tensor.q_per_channel_scales()
+       zero_point = weight_tensor.q_per_channel_zero_points()
+       axis = weight_tensor.q_per_channel_axis()
+
+       # Apply modification to int representation
+       modified_int = modification_fn(int_repr)
+
+       # Reconstruct quantized tensor
+       return torch._make_per_channel_quantized_tensor(
+           modified_int, scale, zero_point, axis
+       )
+   ```
+
+3. **For ONNX models, modify initializers directly:**
+   ```python
+   import numpy as np
+   from onnx import numpy_helper
+
+   def modify_onnx_initializer(model, initializer_name, new_value):
+       """Modify an ONNX model initializer (scale, zero-point, or weight)."""
+       for i, init in enumerate(model.graph.initializer):
+           if init.name == initializer_name:
+               # Create new initializer with modified value
+               new_init = numpy_helper.from_array(
+                   new_value.astype(numpy_helper.to_array(init).dtype),
+                   name=initializer_name
+               )
+               model.graph.initializer[i].CopyFrom(new_init)
+               return model
+       raise ValueError(f"Initializer {initializer_name} not found")
+   ```
+
+4. **Verify modifications with inference test:**
+   ```python
+   def verify_modification(model, test_input, expected_change):
+       """Verify that model modification actually changed outputs."""
+       output_before = run_inference(model, test_input)
+       # Apply modification
+       modify_parameter(model, ...)
+       output_after = run_inference(model, test_input)
+
+       # Check that outputs actually changed
+       assert not np.allclose(output_before, output_after), \
+           "Modification had no effect - check modification pattern"
+   ```
+
+**Detection:**
+
+During development:
+- Run inference before and after modification - do outputs change?
+- Print the modified parameter value - does it show expected value?
+- Check model.state_dict() vs model.layer.weight - are they the same?
+
+**Warning signs:**
+- Modifications "succeed" silently but outputs are unchanged
+- Documentation warns about "read-only copies"
+- Quantized tensor operations behave differently than regular tensors
+
+**Phase to address:** Phase 3 (Interactive Modification) - Implement and verify modification patterns before building UI
+
+**Sources:**
+- [PyTorch Forum: Changing Quantized Weights](https://discuss.pytorch.org/t/changing-quantized-weights/109060)
+- [PyTorch Quantization API](https://pytorch.org/docs/stable/quantization-support.html)
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays, confusing errors, or require careful debugging but don't break the entire system.
+Mistakes that cause confusion, performance issues, or maintenance burden.
 
 ---
 
-### Pitfall 8: Calibration vs Inference Batch Size Mismatch
+### Pitfall 6: Slider Interactions Trigger Full Recomputation
 
-**What goes wrong:** Calibrating with one batch size but evaluating with a different batch size causes unexpected behavior or performance issues.
-
-**Why it happens:**
-- Calibration uses large batches (batch_size=128) for speed
-- Evaluation uses small batches (batch_size=32) or single images
-- Assumption that batch size doesn't matter for static quantization
-- Dynamic batch dimensions not handled correctly
-
-**Consequences:**
-- Minor accuracy variations (1-2%) between calibration and evaluation batch sizes
-- Runtime errors with fixed-size operators (rare for ResNet)
-- Confusion during debugging when results differ
-- Performance not optimized for target batch size
-
-**Prevention:**
-1. Use **same batch size** for calibration and evaluation when possible
-2. For ResNet8 CIFAR-10: batch_size=32 or 100 is reasonable
-3. Document batch size in calibration script
-4. Test quantized model with multiple batch sizes
-5. For ONNX Runtime: Use dynamic batch dimension if varying batch sizes needed
-
-**Detection:**
-- Accuracy varies slightly with batch size
-- Runtime warnings about batch dimension
-- Performance degrades with certain batch sizes
-
-**Phase to address:** Calibration Configuration phase — align batch sizes
-
-**Warning signs:**
-- Calibration batch_size != evaluation batch_size
-- No testing with target batch size
-
----
-
-### Pitfall 9: Not Validating Quantized Model Before Comparison
-
-**What goes wrong:** Jumping directly to accuracy comparison without validating that quantization succeeded, wasting time debugging accuracy when quantization failed silently.
+**What goes wrong:** Moving a slider causes expensive recomputation even when only a display update is needed, making the UI sluggish and frustrating.
 
 **Why it happens:**
-- Eagerness to see accuracy results
-- Assumption that no error = success
-- Lack of quantization validation steps
-- Not checking for mixed float32/int8 operators
+- Every slider value change triggers reactive cell execution
+- If inference is in the reactive chain, it runs on every slider move
+- No debouncing by default in Marimo
+- Users expect instant feedback from sliders
+
+**This project's exposure:**
+```python
+# SLOW: Slider directly triggers inference
+scale_slider = mo.ui.slider(0.001, 0.1)
+modified_model = modify_scale(model, scale_slider.value)  # Runs on every slide
+result = run_inference(modified_model, test_data)          # EXPENSIVE - runs every time!
+display_result(result)
+```
 
 **Consequences:**
-- Hours debugging accuracy when model isn't actually quantized
-- Some operators remain float32, giving false sense of quantization
-- Quantization silently failed but no error was raised
-- Comparison is invalid (float vs partially-quantized)
+- UI feels unresponsive
+- Sliders stutter and lag
+- Users avoid using interactive features
+- May trigger memory issues from rapid model operations
 
 **Prevention:**
-1. **Validate quantization before accuracy testing**:
+
+1. **Use mo.ui.run_button to require explicit execution:**
    ```python
-   # Check model is actually quantized
-   print(quantized_model)  # Should show quantized operators
+   scale_slider = mo.ui.slider(0.001, 0.1, label="Scale")
+   run_button = mo.ui.run_button(label="Run Inference")
 
-   # PyTorch: Check for QuantStub/DeQuantStub
-   # ONNX: Check for QuantizeLinear/DequantizeLinear nodes
+   mo.stop(not run_button.value, "Click 'Run Inference' to execute")
+
+   # Only runs when button is clicked
+   result = run_inference(modified_model, test_data)
    ```
-2. Verify operator types: Conv should be quantized, not float
-3. Check model size: int8 model should be ~4× smaller than float32
-4. Run single-image sanity test: output should be close to float model (within 5%)
-5. Log quantization statistics: scale, zero_point for each layer
+
+2. **Use .form() to batch slider changes:**
+   ```python
+   param_form = mo.ui.batch(
+       scale=mo.ui.slider(0.001, 0.1),
+       zero_point=mo.ui.slider(-128, 127),
+   ).form(submit_button_label="Apply Changes")
+
+   # Only runs when form is submitted
+   modified_model = apply_params(model, param_form.value)
+   ```
+
+3. **Separate display from computation:**
+   ```python
+   # Cell A: Slider (changes freely)
+   scale_slider = mo.ui.slider(0.001, 0.1)
+
+   # Cell B: Display current value (fast, no inference)
+   mo.md(f"Selected scale: {scale_slider.value}")
+
+   # Cell C: Inference (only runs with explicit trigger)
+   run_btn = mo.ui.run_button()
+   mo.stop(not run_btn.value)
+   result = run_inference(model, scale=scale_slider.value)  # Heavy work
+   ```
+
+4. **Cache inference results:**
+   ```python
+   @mo.cache
+   def cached_inference(model_path, scale, zero_point):
+       """Cache inference results for parameter combinations."""
+       model = load_and_modify(model_path, scale, zero_point)
+       return run_inference(model, test_data)
+
+   # Repeated calls with same params use cache
+   result = cached_inference("model.onnx", scale_slider.value, zp_slider.value)
+   ```
 
 **Detection:**
-- Model size unchanged after quantization
-- Print shows float32 Conv2d instead of quantized operators
-- ONNX graph has no QuantizeLinear nodes
-- Single-image output identical to float (not approximately equal)
 
-**Phase to address:** Quantization Validation phase — verify before evaluation
+During development:
+- Move a slider slowly - does UI respond smoothly?
+- Check execution times in Marimo's status bar
+- Use profiling to identify slow cells
 
 **Warning signs:**
-- No validation step between quantization and accuracy evaluation
-- Model size not checked
-- Operator types not inspected
+- Visible lag between slider movement and display update
+- "Running..." indicator stays on for seconds during slider adjustment
+- Kernel CPU usage spikes when touching sliders
+
+**Phase to address:** Phase 3 (Interactive Modification) - Add execution controls before implementing modification logic
+
+**Sources:**
+- [Marimo Expensive Notebooks - mo.stop](https://docs.marimo.io/guides/expensive_notebooks/)
+- [Marimo UI Forms](https://docs.marimo.io/api/inputs/form.html)
 
 ---
 
-### Pitfall 10: Comparing Quantized Accuracy Without Baseline
+### Pitfall 7: PyTorch and ONNX Runtime Models Have Different Parameter Access Patterns
 
-**What goes wrong:** Evaluating quantized model without re-running full-precision baseline, assuming 87.19% is still correct, but environment/code changes altered baseline.
+**What goes wrong:** Code written for ONNX model parameter access fails on PyTorch model, or vice versa, because the two frameworks have fundamentally different APIs.
 
 **Why it happens:**
-- Trusting documented baseline without verification
-- Assuming evaluation script didn't change
-- Not running baseline and quantized in same session
-- Data loading or preprocessing changed
+- ONNX stores parameters as graph initializers (static tensors)
+- PyTorch stores parameters as module attributes (dynamic tensors)
+- ONNX uses string names for lookup; PyTorch uses module hierarchy
+- Quantization adds additional complexity in both frameworks
+
+**This project's exposure:**
+
+The project has both:
+- `models/resnet8_int8.onnx` - ONNX QDQ format
+- `models/resnet8_int8.pt` - PyTorch JIT TorchScript
+
+```python
+# ONNX parameter access
+for init in onnx_model.graph.initializer:
+    if "scale" in init.name:
+        scale = numpy_helper.to_array(init)
+
+# PyTorch parameter access (completely different!)
+for name, param in pytorch_model.named_parameters():
+    if "scale" in name:
+        scale = param.data
+```
 
 **Consequences:**
-- Reporting incorrect accuracy delta (e.g., "quantization dropped accuracy by 5%" when baseline also dropped)
-- Debugging accuracy issues that aren't related to quantization
-- False conclusions about quantization quality
-- Wasted effort optimizing quantization when problem is elsewhere
+- Duplicate code for each framework
+- Subtle bugs from framework-specific behavior
+- Maintenance burden when updating either framework
+- Confusion about which model is being modified
 
 **Prevention:**
-1. **Always run float baseline in same session**:
+
+1. **Create unified abstraction layer:**
    ```python
-   # Run both in same script
-   float_acc = evaluate_model(float_model, test_data)
-   quant_acc = evaluate_model(quant_model, test_data)
-   delta = float_acc - quant_acc
+   class QuantizedModel:
+       """Unified interface for ONNX and PyTorch quantized models."""
+
+       def __init__(self, path):
+           self.path = path
+           self.framework = "onnx" if path.endswith(".onnx") else "pytorch"
+           self._load()
+
+       def get_scales(self) -> Dict[str, np.ndarray]:
+           if self.framework == "onnx":
+               return self._get_onnx_scales()
+           else:
+               return self._get_pytorch_scales()
+
+       def set_scale(self, layer_name: str, value: np.ndarray):
+           if self.framework == "onnx":
+               self._set_onnx_scale(layer_name, value)
+           else:
+               self._set_pytorch_scale(layer_name, value)
    ```
-2. Use identical data loading, preprocessing, and evaluation code
-3. Document baseline accuracy with timestamp and commit hash
-4. Compare against freshly-computed baseline, not historical value
-5. Report delta as absolute percentage points (87.19% → 85.50% = 1.69pp drop)
+
+2. **Document framework differences explicitly:**
+   ```python
+   def get_layer_names(model, framework: str) -> List[str]:
+       """
+       Get layer names from model.
+
+       Note: ONNX uses node names like 'QuantizeLinear_0'
+             PyTorch uses module paths like 'features.0.weight'
+       """
+       ...
+   ```
+
+3. **Use framework-specific modules:**
+   ```python
+   # onnx_utils.py
+   def get_onnx_scales(model): ...
+   def set_onnx_scale(model, name, value): ...
+
+   # pytorch_utils.py
+   def get_pytorch_scales(model): ...
+   def set_pytorch_scale(model, name, value): ...
+
+   # main.py
+   if model_type == "onnx":
+       from onnx_utils import get_onnx_scales as get_scales
+   else:
+       from pytorch_utils import get_pytorch_scales as get_scales
+   ```
+
+4. **Add model type indicator in UI:**
+   ```python
+   # Clear indication of which model is being inspected
+   model_selector = mo.ui.dropdown(
+       ["ONNX (int8)", "ONNX (uint8)", "PyTorch (int8)"],
+       label="Model"
+   )
+
+   mo.md(f"**Currently inspecting:** {model_selector.value}")
+   ```
 
 **Detection:**
-- Baseline accuracy doesn't match documented 87.19%
-- Quantized accuracy higher than baseline (impossible)
-- Debugging quantization when baseline is broken
 
-**Phase to address:** Evaluation phase — run paired float/quantized evaluation
+During development:
+- Test every feature with both ONNX and PyTorch models
+- Check for framework-specific imports in shared code
+- Verify parameter names match between frameworks
 
 **Warning signs:**
-- Separate scripts for float and quantized evaluation
-- Baseline hardcoded as constant instead of computed
-- No freshness check on baseline
+- Feature works for one model but fails for another
+- KeyError or AttributeError with framework-specific messages
+- Inconsistent parameter names in UI
+
+**Phase to address:** Phase 2 (Parameter Inspection) - Design abstraction layer before implementing inspection features
+
+**Sources:**
+- [ONNX Python API](https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html)
+- [PyTorch Quantization API](https://pytorch.org/docs/stable/quantization-support.html)
 
 ---
 
-### Pitfall 11: PyTorch vs ONNX Runtime Calibration Format Mismatch
+### Pitfall 8: Accuracy Evaluation Takes Too Long for Interactive Use
 
-**What goes wrong:** Preparing calibration data in PyTorch format (NCHW tensors) but ONNX Runtime expects different format or data loader interface.
-
-**Why it happens:**
-- PyTorch uses NCHW (batch, channels, height, width)
-- ONNX Runtime quantization expects data reader that yields batches
-- Different APIs for calibration data preparation
-- Copy-paste from PyTorch example to ONNX without adaptation
-
-**Consequences:**
-- Runtime error: "Expected data reader, got tensor"
-- Shape mismatch errors during calibration
-- Wrong axis interpreted as channels/spatial dimensions
-- Calibration fails or uses wrong data
-
-**Prevention:**
-1. **Use appropriate calibration API for each framework**:
-   ```python
-   # PyTorch: Direct tensor calibration
-   for batch in calibration_loader:
-       model(batch)
-
-   # ONNX Runtime: DataReader class
-   class CalibrationDataReader:
-       def __init__(self, data):
-           self.data = data
-       def get_next(self):
-           # Return dict: {input_name: numpy_array}
-           return {'input': next_batch}
-   ```
-2. ONNX Runtime expects dict with input names as keys
-3. PyTorch calibration uses standard forward pass
-4. Verify data shapes match model input: ResNet8 expects (N, 32, 32, 3) or (N, 3, 32, 32)
-5. Check channel order: ONNX may use NHWC, PyTorch uses NCHW
-
-**Detection:**
-- Type error: "Expected DataReader, got Tensor"
-- Shape mismatch during calibration
-- Error: "Input name not found in model"
-
-**Phase to address:** Calibration Implementation phase — use framework-specific API
-
-**Warning signs:**
-- Reusing exact same calibration code for both frameworks
-- Not checking calibration API documentation
-
----
-
-### Pitfall 12: Missing QuantStub/DeQuantStub at Model Boundaries
-
-**What goes wrong:** PyTorch quantization fails to quantize inputs/outputs properly because QuantStub and DeQuantStub are missing.
+**What goes wrong:** Running full CIFAR-10 evaluation (10,000 images) after each parameter change makes the interactive experience unusable.
 
 **Why it happens:**
-- Tutorials don't always emphasize this requirement
-- Developers expect automatic input/output quantization
-- Model definition not modified for quantization
-- Copy-paste of float model without stub insertion
+- Full evaluation takes minutes on CPU
+- Users expect sub-second feedback from parameter changes
+- Natural temptation to show "real" accuracy after each modification
+- No built-in way to do incremental or approximate evaluation
+
+**This project's exposure:**
+
+From existing `evaluate.py`:
+- Full CIFAR-10 test set: 10,000 images
+- Current evaluation time: ~2-5 minutes on CPU
+- Would need to run after each parameter change for "real" accuracy
 
 **Consequences:**
-- No quantization statistics collected for inputs
-- Input remains float32, first Conv receives float instead of int8
-- Output dequantization missing, returning int8 instead of float
-- Runtime error: "Expected quantized tensor, got float"
+- Interactive workflow becomes batch workflow
+- Users lose context waiting for evaluation
+- May lead to skipping evaluation entirely
+- Frustration with tool usability
 
 **Prevention:**
-1. **Add stubs to model definition**:
-   ```python
-   class ResNet8(nn.Module):
-       def __init__(self):
-           super().__init__()
-           self.quant = torch.quantization.QuantStub()
-           self.dequant = torch.quantization.DeQuantStub()
-           # ... rest of model
 
-       def forward(self, x):
-           x = self.quant(x)  # Quantize input
-           # ... model computation
-           x = self.dequant(x)  # Dequantize output
-           return x
+1. **Use stratified mini-batch for interactive feedback:**
+   ```python
+   def quick_evaluate(model, num_samples=100):
+       """Fast evaluation on stratified sample (10 images per class)."""
+       indices = stratified_sample(cifar10_test, samples_per_class=10)
+       correct = 0
+       for idx in indices:
+           image, label = cifar10_test[idx]
+           pred = run_inference(model, image)
+           correct += (pred == label)
+       return correct / num_samples  # Approximate accuracy
+
+   # Use for interactive feedback (< 1 second)
+   quick_acc = quick_evaluate(modified_model)
+   mo.md(f"Quick accuracy (100 samples): {quick_acc:.1%}")
    ```
-2. QuantStub at model entry, DeQuantStub at model exit
-3. Required for eager mode quantization in PyTorch
-4. Not needed for ONNX Runtime (handles automatically)
+
+2. **Separate quick preview from full evaluation:**
+   ```python
+   # Cell A: Quick feedback (runs on slider change)
+   quick_acc = quick_evaluate(model, num_samples=50)
+
+   # Cell B: Full evaluation (requires explicit trigger)
+   full_eval_btn = mo.ui.run_button(label="Run Full Evaluation (2-5 min)")
+   mo.stop(not full_eval_btn.value)
+   full_acc = full_evaluate(model)  # All 10,000 images
+   ```
+
+3. **Pre-compute evaluation on parameter grid:**
+   ```python
+   @mo.persistent_cache
+   def precompute_accuracy_grid(model_path, scale_range, zp_range):
+       """Pre-compute accuracy for parameter combinations."""
+       results = {}
+       for scale in scale_range:
+           for zp in zp_range:
+               model = load_and_modify(model_path, scale, zp)
+               results[(scale, zp)] = full_evaluate(model)
+       return results
+
+   # Use cached grid for instant lookup
+   grid = precompute_accuracy_grid(...)
+   current_acc = grid[(scale_slider.value, zp_slider.value)]
+   ```
+
+4. **Show confidence interval for quick evaluation:**
+   ```python
+   def quick_evaluate_with_ci(model, num_samples=100, confidence=0.95):
+       """Quick evaluation with confidence interval."""
+       acc = quick_evaluate(model, num_samples)
+       # Binomial confidence interval
+       z = 1.96  # 95% CI
+       ci = z * np.sqrt(acc * (1 - acc) / num_samples)
+       return acc, ci
+
+   acc, ci = quick_evaluate_with_ci(model)
+   mo.md(f"Accuracy: {acc:.1%} +/- {ci:.1%} (n={num_samples})")
+   ```
 
 **Detection:**
-- Error: "Expected quantized input"
-- Input/output quantization missing in prepared model
-- First layer doesn't have quantization observer
 
-**Phase to address:** Model Architecture Modification phase — add stubs before quantization
+During design:
+- Estimate time for full evaluation
+- Calculate required samples for acceptable confidence
+- Test quick evaluation correlation with full evaluation
 
 **Warning signs:**
-- No QuantStub/DeQuantStub in model forward()
-- Model definition unchanged from float version
+- Users waiting more than 2 seconds for feedback
+- Evaluation cell dominates execution time
+- Users bypassing accuracy display
+
+**Phase to address:** Phase 4 (Comparison) - Implement tiered evaluation before building comparison features
+
+**Sources:**
+- [Marimo Expensive Notebooks](https://docs.marimo.io/guides/expensive_notebooks/)
+- Project context: 87.19% baseline accuracy on CIFAR-10
 
 ---
 
 ## Minor Pitfalls
 
-Mistakes that cause annoyance or confusion but are easily fixable.
+Mistakes that cause inconvenience but are easily fixable.
 
 ---
 
-### Pitfall 13: Quantized Model Saved Without State Dict
+### Pitfall 9: Closure Variable Capture in Lambda Functions
 
-**What goes wrong:** Saving quantized model using `torch.save(model, path)` instead of state dict, causing loading issues or non-portability.
+**What goes wrong:** Creating multiple UI elements in a loop causes all callbacks to reference the same (last) variable value.
 
 **Why it happens:**
-- Following float model saving pattern
-- Not understanding quantized model serialization requirements
-- Convenience of saving entire object
+- Python lambdas capture variables by reference, not value
+- By the time lambda executes, loop variable has final value
+- Common when creating sliders for multiple layers dynamically
 
-**Consequences:**
-- Model file includes Python code, not portable across versions
-- Loading requires exact same model definition and imports
-- Fails with "module not found" errors
-- Larger file size than necessary
+**This project's exposure:**
+```python
+# WRONG: All callbacks reference final layer_name
+sliders = {}
+for layer_name in layer_names:
+    sliders[layer_name] = mo.ui.slider(
+        0.001, 0.1,
+        on_change=lambda v: update_layer(layer_name, v)  # BUG!
+    )
+# All sliders update the LAST layer_name
+```
 
 **Prevention:**
-1. **Use torchscript for quantized models**:
+
+1. **Bind loop variable explicitly:**
    ```python
-   # For quantized models, use TorchScript
-   scripted = torch.jit.script(quantized_model)
-   scripted.save('resnet8_quantized.pt')
+   for layer_name in layer_names:
+       sliders[layer_name] = mo.ui.slider(
+           0.001, 0.1,
+           on_change=lambda v, name=layer_name: update_layer(name, v)
+       )
    ```
-2. Or save state dict with architecture separately
-3. Document loading requirements
-4. Test loading in fresh Python session
 
-**Detection:**
-- Import errors when loading model
-- Model fails to load in different environment
+2. **Use dict comprehension with factory function:**
+   ```python
+   def make_slider(name):
+       return mo.ui.slider(
+           0.001, 0.1,
+           on_change=lambda v: update_layer(name, v)
+       )
 
-**Phase to address:** Model Serialization phase — use correct save format
+   sliders = {name: make_slider(name) for name in layer_names}
+   ```
 
-**Warning signs:**
-- Using `torch.save(model, path)` for quantized model
-- No TorchScript conversion
+**Phase to address:** Phase 2 - Code review pattern for loop-created UI elements
+
+**Sources:**
+- [Marimo FAQ - Lambda Closure](https://docs.marimo.io/faq/)
+- [Python Closures in Loops](https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result)
 
 ---
 
-### Pitfall 14: Logging/Reporting Confusion Between uint8 and int8
+### Pitfall 10: Namespace Pollution with Intermediate Variables
 
-**What goes wrong:** Results documentation says "int8" but actual quantization used uint8, causing confusion during comparison.
+**What goes wrong:** Many intermediate variables in global scope cause name collisions and clutter the variables panel.
 
 **Why it happens:**
-- PyTorch fbgemm backend uses uint8 for activations by default
-- Developers assume int8 because "8-bit quantization"
-- Logging doesn't distinguish signed/unsigned
-- Different frameworks use different defaults
+- Marimo cells share global namespace
+- Data processing creates many intermediate variables
+- Variables panel becomes unusable
+- Easy to accidentally overwrite important variables
 
-**Consequences:**
-- Confusion when comparing frameworks (PyTorch uint8 vs ONNX Runtime int8)
-- Inaccurate documentation
-- Wrong expectations about quantization range
-- Difficult to reproduce results
+**This project's exposure:**
+```python
+# Cell 1
+df = load_data()
+filtered = df[df.value > 0]
+normalized = filtered / filtered.max()
+scaled = normalized * 255
+
+# Cell 2
+# Accidentally reuses 'filtered' for different purpose
+filtered = model.graph.node[0]  # Overwrites previous 'filtered'!
+```
 
 **Prevention:**
-1. **Log actual dtypes used**:
+
+1. **Use underscore prefix for local variables:**
    ```python
-   # Check and log quantization dtypes
-   qconfig = model.qconfig
-   print(f"Activation dtype: {qconfig.activation.dtype}")
-   print(f"Weight dtype: {qconfig.weight.dtype}")
+   # Cell 1
+   _df = load_data()
+   _filtered = _df[_df.value > 0]
+   _normalized = _filtered / _filtered.max()
+   processed_data = _normalized * 255  # Only export final result
    ```
-2. Document: "PyTorch fbgemm uses uint8 activations, int8 weights"
-3. ONNX Runtime: Check calibration table for data types
-4. Report both in results: "Quantized using uint8 (activations) and int8 (weights)"
 
-**Detection:**
-- Documentation claims int8 but model uses uint8
-- Comparisons don't match expected ranges
+2. **Encapsulate in functions:**
+   ```python
+   def process_data(raw_df):
+       filtered = raw_df[raw_df.value > 0]
+       normalized = filtered / filtered.max()
+       return normalized * 255
 
-**Phase to address:** Documentation phase — accurate reporting
+   processed_data = process_data(load_data())
+   ```
 
-**Warning signs:**
-- Generic "int8 quantization" without specifying activation/weight dtypes
-- No dtype verification in code
+3. **Delete intermediates explicitly:**
+   ```python
+   df = load_data()
+   filtered = df[df.value > 0]
+   result = filtered / filtered.max()
+   del df, filtered  # Clean up
+   ```
+
+**Phase to address:** Phase 1 - Establish naming conventions in notebook setup
+
+**Sources:**
+- [Marimo Best Practices - Variable Management](https://docs.marimo.io/guides/best_practices/)
 
 ---
 
-### Pitfall 15: Hardcoded Model Paths Break Cross-Platform Reproducibility
+### Pitfall 11: Missing Dependency Installation in Notebook Environment
 
-**What goes wrong:** Calibration or evaluation scripts hardcode paths like `/mnt/ext1/references/...`, breaking on other machines.
+**What goes wrong:** Notebook imports packages that aren't installed in the notebook's Python environment, causing ImportError.
 
 **Why it happens:**
-- Copy-paste from evaluate_pytorch.py with hardcoded defaults
-- Not using argparse for paths
-- Assuming single-machine development
+- Development machine has packages installed globally
+- Notebook doesn't specify dependencies
+- User runs notebook in fresh environment
+- Optional visualization packages (plotly, altair) not in core requirements
 
-**Consequences:**
-- Scripts fail on other machines
-- Collaborators cannot run quantization
-- CI/CD fails
+**This project's exposure:**
+
+Required packages for playground:
+- `marimo` (notebook framework)
+- `onnx` (model loading)
+- `onnxruntime` (inference)
+- `torch` (PyTorch model loading)
+- `numpy` (data manipulation)
+- `matplotlib` or `plotly` (visualization)
+
+```python
+# May fail if plotly not installed
+import plotly.express as px  # ImportError in fresh environment
+```
 
 **Prevention:**
-1. **Use argparse with defaults**:
+
+1. **Use Marimo's sandbox mode for dependency management:**
    ```python
-   parser.add_argument(
-       '--data-dir',
-       default='/mnt/ext1/references/tiny/.../cifar-10-batches-py',
-       help='Path to CIFAR-10 data'
-   )
+   # At top of notebook, specify requirements
+   # /// script
+   # dependencies = [
+   #   "onnx>=1.17.0",
+   #   "onnxruntime>=1.23.2",
+   #   "torch>=2.0.0",
+   #   "numpy",
+   #   "plotly",
+   # ]
+   # ///
    ```
-2. Support relative paths
-3. Document path requirements in README
-4. Check path exists, give helpful error
 
-**Detection:**
-- FileNotFoundError on other machines
-- Paths fail in CI
+2. **Add graceful fallbacks for optional packages:**
+   ```python
+   try:
+       import plotly.express as px
+       HAS_PLOTLY = True
+   except ImportError:
+       HAS_PLOTLY = False
+       import matplotlib.pyplot as plt
 
-**Phase to address:** All phases — use argparse from start
+   def plot_accuracy(data):
+       if HAS_PLOTLY:
+           return px.line(data)
+       else:
+           plt.plot(data)
+           return plt.gcf()
+   ```
 
-**Warning signs:**
-- Absolute paths hardcoded
-- No path validation
+3. **Update pyproject.toml with playground dependencies:**
+   ```toml
+   [project.optional-dependencies]
+   playground = [
+       "marimo>=0.10.0",
+       "plotly>=5.0.0",
+   ]
+   ```
+
+**Phase to address:** Phase 1 - Add dependencies before development starts
+
+**Sources:**
+- [Marimo Package Management](https://docs.marimo.io/guides/package_management/)
 
 ---
 
-## Phase-Specific Warnings
+## Phase-Specific Warning Matrix
 
 | Phase | Likely Pitfall | Priority | Mitigation |
 |-------|---------------|----------|------------|
-| **Calibration Data Preparation** | Random/insufficient calibration data | CRITICAL | Use 1000-3200 real CIFAR-10 images, 100+ batches |
-| **Calibration Data Preparation** | Preprocessing mismatch with evaluation | CRITICAL | Match evaluate_pytorch.py: raw pixels [0,255] |
-| **Model Architecture Modification** | Skip connections not quantization-aware | CRITICAL | Replace `+` with FloatFunctional.add |
-| **Model Architecture Modification** | Missing QuantStub/DeQuantStub | HIGH | Add stubs at model input/output |
-| **Model Preparation** | Module fusion not performed | CRITICAL | Fuse Conv-BN-ReLU before prepare() |
-| **Model Preparation** | Model not in eval mode | CRITICAL | Call model.eval() before prepare() |
-| **Quantization Configuration** | Observer/backend mismatch | CRITICAL | Use fbgemm (x86) or qnnpack (ARM) |
-| **ONNX Model Preparation** | No shape inference/optimization | HIGH | Run quant_pre_process before quantization |
-| **Quantization Validation** | Skipping quantization verification | HIGH | Check model size, operator types before evaluation |
-| **Evaluation** | No paired float baseline | MEDIUM | Run float and quantized in same session |
-| **Evaluation** | Batch size mismatch | MEDIUM | Use consistent batch size |
-| **Documentation** | uint8 vs int8 confusion | LOW | Log and report actual dtypes |
+| **1. Notebook Setup** | Model reloading (#1) | CRITICAL | Use mo.cache, isolate loading cells |
+| **1. Notebook Setup** | Namespace pollution (#10) | LOW | Establish naming conventions |
+| **1. Notebook Setup** | Missing dependencies (#11) | LOW | Specify in pyproject.toml |
+| **2. Parameter Inspection** | Intermediate capture (#4) | HIGH | Plan capture infrastructure first |
+| **2. Parameter Inspection** | Framework differences (#7) | MEDIUM | Design abstraction layer |
+| **2. Parameter Inspection** | Mutations not tracked (#2) | HIGH | Use immutable patterns |
+| **3. Interactive Modification** | UI values reset (#3) | HIGH | Isolate UI definition cells |
+| **3. Interactive Modification** | Weight modification (#5) | CRITICAL | Verify modification patterns |
+| **3. Interactive Modification** | Slider performance (#6) | MEDIUM | Add run buttons, use forms |
+| **3. Interactive Modification** | Lambda capture (#9) | LOW | Code review for loops |
+| **4. Comparison** | Evaluation speed (#8) | HIGH | Implement tiered evaluation |
 
 ---
 
-## Quantization Workflow Checklist
+## Testing Checklist for Marimo Notebooks
 
-Use this checklist to avoid pitfalls when adding PTQ:
+### Reactivity Testing
+- [ ] Model loading cell does NOT rerun when sliders change
+- [ ] Parameter modifications trigger downstream visualization updates
+- [ ] UI element values persist when unrelated cells rerun
+- [ ] Circular dependencies are not created (check with `marimo check`)
 
-### PyTorch Static Quantization
+### Performance Testing
+- [ ] Slider interactions respond in < 500ms
+- [ ] Quick evaluation completes in < 2 seconds
+- [ ] Memory usage is stable over extended interaction sessions
+- [ ] No "Loading model..." messages during parameter adjustment
 
-**Pre-Quantization:**
-- [ ] Model architecture modified: FloatFunctional for skip connections
-- [ ] QuantStub at model input, DeQuantStub at output
-- [ ] Calibration data prepared: 1000-3200 real CIFAR-10 images
-- [ ] Calibration preprocessing matches evaluate_pytorch.py (raw pixels 0-255)
-- [ ] QConfig selected for backend (fbgemm for x86 CPU)
+### Correctness Testing
+- [ ] Modified parameters actually affect inference output
+- [ ] Both ONNX and PyTorch models work with all features
+- [ ] Accuracy evaluation correlates with full test set
+- [ ] Parameter values displayed match values in model
 
-**Quantization:**
-- [ ] Model set to eval mode: `model.eval()`
-- [ ] Modules fused: `fuse_modules()` for Conv-BN-ReLU sequences
-- [ ] Model prepared: `torch.quantization.prepare(model)`
-- [ ] Calibration run with `torch.no_grad()` context
-- [ ] Model converted: `torch.quantization.convert(model)`
-
-**Validation:**
-- [ ] Quantized model inspected: operators show int8 types
-- [ ] Model size reduced by ~4× compared to float
-- [ ] Single-image test: output close to float (within 5%)
-- [ ] Quantization statistics logged (scale, zero_point)
-
-**Evaluation:**
-- [ ] Float baseline computed in same session
-- [ ] Quantized accuracy measured with same data/preprocessing
-- [ ] Accuracy delta reported (expected: 0-3pp drop for ResNet)
-- [ ] Per-class accuracy compared
-
-### ONNX Runtime Static Quantization
-
-**Pre-Quantization:**
-- [ ] ONNX model has shape information for all tensors
-- [ ] Symbolic shape inference run: `shape_inference.quant_pre_process()`
-- [ ] Model optimized: Conv-BN fused
-- [ ] Calibration data prepared: 1000-3200 real CIFAR-10 images
-- [ ] Calibration DataReader implemented
-
-**Quantization:**
-- [ ] CalibrationDataReader yields dict with correct input names
-- [ ] Calibration data in correct format (check NHWC vs NCHW)
-- [ ] QuantizationMode selected (IntegerOps or QLinearOps)
-- [ ] Activation type chosen (uint8 or int8)
-- [ ] Quantization performed: `quantize_static()`
-
-**Validation:**
-- [ ] Quantized ONNX model has QuantizeLinear/DequantizeLinear nodes
-- [ ] Model size reduced by ~4×
-- [ ] Netron visualization shows int8 operators
-- [ ] Calibration table saved and inspected
-
-**Evaluation:**
-- [ ] Float baseline computed with same ONNX Runtime session
-- [ ] Quantized accuracy measured with same preprocessing
-- [ ] Accuracy delta reported
-- [ ] Per-class accuracy compared
-
----
-
-## Expected Accuracy Ranges
-
-Based on ResNet8 CIFAR-10 baseline: 87.19%
-
-| Quantization Type | Expected Accuracy | Accuracy Drop | Concern Level |
-|-------------------|-------------------|---------------|---------------|
-| Float32 (baseline) | 87.19% | 0pp | — |
-| int8 (well-calibrated) | 85.5-87.0% | 0-1.7pp | ✓ Good |
-| int8 (decent calibration) | 83-85.5% | 1.7-4pp | ⚠ Acceptable |
-| int8 (poor calibration) | 70-83% | 4-17pp | ❌ Bad — check calibration |
-| int8 (broken quantization) | <70% | >17pp | ❌ Critical — quantization failed |
-
-**Debugging guide:**
-- **>85%**: Quantization successful
-- **80-85%**: Check calibration data size and preprocessing
-- **70-80%**: Calibration data likely wrong or insufficient
-- **50-70%**: Model not in eval mode, or observer mismatch
-- **<50%**: Preprocessing mismatch, or quantization completely failed
+### Usability Testing
+- [ ] Clear indication of which model is being inspected
+- [ ] Progress indicators for long-running operations
+- [ ] Undo/reset functionality for parameter changes
+- [ ] Help text for complex interactions
 
 ---
 
 ## Research Sources
 
-### Critical Pitfalls (HIGH confidence)
+### Marimo Documentation (HIGH confidence)
+- [Best Practices](https://docs.marimo.io/guides/best_practices/) - Official mutation and state management guidance
+- [Expensive Notebooks](https://docs.marimo.io/guides/expensive_notebooks/) - Caching and execution control
+- [Troubleshooting](https://docs.marimo.io/guides/troubleshooting/) - Common problems and solutions
+- [FAQ](https://docs.marimo.io/faq/) - UI element patterns and gotchas
 
-**Calibration Data:**
-- [Practical Quantization in PyTorch](https://pytorch.org/blog/quantization-in-practice/) — "About 100 mini-batches sufficient to calibrate observers"
-- [Master PyTorch Quantization: Tips, Tools, and Best Practices](https://medium.com/@noel.benji/beyond-the-basics-how-to-succeed-with-pytorch-quantization-e521ebb954cd) — "Using random data will result in bad quantization parameters"
-- [Static Quantization with Eager Mode in PyTorch](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html) — Official tutorial with calibration guidance
+### PyTorch Quantization (HIGH confidence)
+- [Changing Quantized Weights](https://discuss.pytorch.org/t/changing-quantized-weights/109060) - Weight modification patterns
+- [Quantization API Reference](https://pytorch.org/docs/stable/quantization-support.html) - Official API documentation
+- [Neural Network Quantization in PyTorch](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/) - Practical guide (2025)
 
-**Module Fusion:**
-- [fuse_modules — PyTorch 2.9 documentation](https://docs.pytorch.org/docs/stable/generated/torch.ao.quantization.fuse_modules.fuse_modules.html) — Official fusion API
-- [Practical Quantization in PyTorch](https://pytorch.org/blog/quantization-in-practice/) — Fusion patterns and requirements
+### ONNX Runtime (HIGH confidence)
+- [Quantization Documentation](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) - Official quantization guide
+- [Intermediate Results Investigation](https://onnx.ai/sklearn-onnx/auto_tutorial/plot_fbegin_investigate.html) - Capturing intermediate values
+- [ONNX Python API](https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html) - Model manipulation
 
-**Skip Connections:**
-- [PyTorch Static Quantization - Lei Mao's Log Book](https://leimao.github.io/blog/PyTorch-Static-Quantization/) — "Replace + with FloatFunctional.add"
-- [Static Quantization — torchao 0.15 documentation](https://docs.pytorch.org/ao/stable/static_quantization.html) — QuantStub/DeQuantStub requirements
-
-**Accuracy Degradation:**
-- [Accuracy drop after model quantization - PyTorch Forums](https://discuss.pytorch.org/t/accuracy-drop-after-model-quantization/190715) — Common accuracy issues
-- [Static Quantized model accuracy varies greatly with Calibration data](https://github.com/pytorch/pytorch/issues/45185) — Calibration impact on accuracy
-
-**Observer/Backend:**
-- [Default qconfig for onednn backend silently causes numeric saturation](https://github.com/pytorch/pytorch/issues/103646) — Backend compatibility issues
-- [Quantization API Reference — PyTorch 2.10 documentation](https://docs.pytorch.org/docs/stable/quantization-support.html) — QConfig and backend configuration
-
-**ONNX Runtime:**
-- [Quantize ONNX models | ONNX Runtime](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) — Official quantization guide
-- [ONNX Runtime quantization README](https://github.com/microsoft/onnxruntime/blob/main/onnxruntime/python/tools/quantization/README.md) — Calibration requirements
-
-### Moderate Pitfalls (MEDIUM confidence)
-
-- [Neural Network Quantization in PyTorch | Practical ML](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/) — Best practices
-- [Quantization — PyTorch master documentation](https://glaringlee.github.io/quantization.html) — Comprehensive quantization guide
-- [PyTorch to Quantized ONNX Model](https://medium.com/@hdpoorna/pytorch-to-quantized-onnx-model-18cf2384ec27) — Cross-framework considerations
-
-### Domain Knowledge (HIGH confidence)
-
-**CNN Quantization:**
-- [Quantization of Convolutional Neural Networks: Model Quantization](https://www.edge-ai-vision.com/2024/02/quantization-of-convolutional-neural-networks-model-quantization/) — CNN-specific guidance
-- [Post training 4-bit quantization of convolutional networks](https://openreview.net/pdf?id=Syel64HxLS) — Accuracy degradation analysis
-- [Model Quantization: Concepts, Methods, and Why It Matters | NVIDIA](https://developer.nvidia.com/blog/model-quantization-concepts-methods-and-why-it-matters/) — Quantization fundamentals
+### Memory and Performance (MEDIUM confidence)
+- [Memory-Efficient Model Loading](https://www.analyticsvidhya.com/blog/2024/10/memory-efficient-model-weight-loading-in-pytorch/) - PyTorch memory patterns
+- [GPU Memory Issues](https://discuss.pytorch.org/t/running-out-of-gpu-memory-when-loading-a-huggingface-model/217053) - Common memory problems
 
 ---
 
 **Confidence Assessment:** HIGH
-- Critical pitfalls verified with official documentation (PyTorch, ONNX Runtime)
-- Calibration requirements confirmed across multiple authoritative sources
-- Backend compatibility issues documented in PyTorch GitHub issues
-- CNN-specific quantization patterns validated with recent research (2024-2026)
+
+- Marimo pitfalls verified with official documentation
+- PyTorch quantization patterns from official forum discussions
+- ONNX intermediate capture from official tutorials
+- Integration pitfalls derived from project-specific codebase analysis
 
 **Research Gaps:**
-- ResNet8-specific quantization accuracy (only ResNet50 benchmarks widely available)
-- CIFAR-10 quantization accuracy expectations (most research uses ImageNet)
-- ONNX Runtime uint8 vs int8 trade-offs for small CNNs
 
-These gaps should be addressed during quantization experiments by measuring actual results.
+- No Marimo-specific examples for ML experimentation workflows (community is young)
+- Limited documentation on Marimo + ONNX Runtime integration
+- No benchmarks for reactive notebook performance with heavy ML workloads
+
+These gaps are acceptable because the core patterns (reactivity, mutations, caching) are well-documented, and the ML-specific considerations can be derived from general best practices.

@@ -1,272 +1,285 @@
-# Feature Landscape: PTQ Evaluation
+# Feature Landscape: Quantization Playground
 
-**Domain:** Post-Training Quantization (PTQ) for ResNet8 CIFAR-10
-**Researched:** 2026-01-28
-**Context:** Adding PTQ evaluation to existing full-precision evaluation codebase (87.19% baseline accuracy)
+**Domain:** Interactive quantization inspection/experimentation tool
+**Researched:** 2026-02-05
+**Milestone:** v1.4 Quantization Playground
+**Confidence:** MEDIUM (verified against existing tools and community patterns)
 
-## Table Stakes
+## Executive Summary
 
-Features users expect for PTQ evaluation. Missing = incomplete PTQ assessment.
+A quantization playground for ResNet8 serves users who want to "see every factor" in their quantized models. Based on research of existing tools (Netron, PyTorch Numeric Suite, NVIDIA Nsight, MATLAB Deep Network Quantizer) and the project's existing infrastructure (extract_operations.py, annotate_qdq_graph.py), the feature set falls into three categories: inspection (view parameters), capture (intermediate values), and experimentation (modify and compare).
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **ONNX Runtime static quantization** | Industry-standard quantization path for ONNX models | Medium | Uses `quantize_static()` API with calibration data |
-| **PyTorch static quantization** | Native PyTorch quantization for converted models | Medium | New PT2E export-based approach recommended (88% model coverage) |
-| **int8 quantization support** | Standard 8-bit signed quantization, most common format | Low | Symmetric for weights, asymmetric for activations |
-| **uint8 quantization support** | Unsigned 8-bit quantization, hardware-dependent benefits | Low | Alternative to int8, may suit ReLU activations better |
-| **Calibration data preparation** | Required for static PTQ to compute scale/zero-point | Low | Subset of training/validation data (100-512 samples typical) |
-| **MinMax calibration method** | Simplest calibration method, baseline approach | Low | Uses min/max values from calibration data |
-| **Quantized model accuracy evaluation** | Must measure accuracy impact of quantization | Low | Reuses existing CIFAR-10 evaluation infrastructure |
-| **Per-class accuracy breakdown** | Identify which classes suffer most from quantization | Low | Already implemented for full-precision models |
-| **Accuracy delta reporting** | Quantified accuracy loss vs 87.19% baseline | Low | Critical for assessing quantization viability |
-
-## Differentiators
-
-Features that provide deeper insight. Not expected, but valuable.
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Multiple calibration methods** | Compare MinMax vs Entropy vs Percentile | Medium | ONNX Runtime supports 3 methods, helps find optimal calibration |
-| **Per-channel weight quantization** | Can improve accuracy for models with large weight ranges | Medium | ONNX Runtime supports this, may need reduce_range on AVX2/AVX512 |
-| **Calibration set size sensitivity** | Test 100 vs 256 vs 512 samples impact on accuracy | Low | Understand minimum viable calibration data |
-| **Symmetric vs asymmetric quantization** | Compare different quantization schemes | Medium | PyTorch allows configuring per-layer quantization schemes |
-| **Observer comparison (PyTorch)** | MinMax vs MovingAverageMinMax observers | Medium | Different observers for weights vs activations recommended |
-| **Quantization format comparison** | QDQ vs QOperator (ONNX Runtime) | Medium | QDQ more portable, QOperator potentially faster |
-| **Per-layer quantization sensitivity** | Identify which layers degrade accuracy most | High | Requires instrumentation, useful for mixed-precision exploration |
-| **Confusion matrix comparison** | Full-precision vs quantized confusion matrices | Low | Visualize which class confusions increase post-quantization |
-
-## Anti-Features (Out of Scope)
-
-Features to explicitly NOT build. Would expand scope beyond PTQ evaluation.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Quantization-aware training (QAT)** | Different milestone, requires retraining pipeline | Focus on PTQ only, defer QAT to future work |
-| **Dynamic quantization** | Different quantization paradigm (weights-only) | Static quantization only per milestone scope |
-| **Performance benchmarking** | Milestone focuses on accuracy, not inference speed | Document accuracy only, defer latency/throughput measurement |
-| **Mixed-precision quantization** | Complex feature requiring per-layer sensitivity analysis | Uniform int8/uint8 only, defer mixed-precision |
-| **Custom quantization schemes** | Beyond standard int8/uint8 formats | Use built-in quantization formats only |
-| **Model architecture modification** | PTQ is post-training, no architecture changes | Use existing ResNet8 as-is |
-| **TFLite quantization** | Out of framework scope (ONNX RT + PyTorch only) | Stick to declared frameworks |
-| **Quantization for training** | Only evaluating inference quantization | Inference-only quantization |
-| **Advanced calibration algorithms** | Beyond standard MinMax/Entropy/Percentile | Use built-in calibration methods |
-
-## Expected Accuracy Impact
-
-### Typical PTQ Accuracy Loss for 8-bit INT8 on CNNs
-
-Based on research findings:
-
-**General expectation:**
-- INT8 PTQ on CNNs: **< 1% accuracy loss** on standard benchmarks (ImageNet)
-- ResNet architectures are relatively robust to quantization compared to efficient models like MobileNet
-- Smaller networks may experience slightly higher degradation than larger models
-
-**For ResNet8 on CIFAR-10 (87.19% baseline):**
-
-| Scenario | Expected Accuracy | Accuracy Loss | Confidence |
-|----------|------------------|---------------|------------|
-| **Best case** (optimal calibration) | 86.5-87.0% | 0.2-0.7% | MEDIUM |
-| **Typical case** (MinMax, 256 samples) | 85.5-86.5% | 0.7-1.7% | MEDIUM |
-| **Worst case** (poor calibration) | 83-85% | 2-4% | LOW |
-
-**Key factors affecting accuracy:**
-
-1. **Calibration quality**: Representative calibration data is critical
-   - 100-512 samples typical, must cover data distribution
-   - Random or non-representative data can cause severe degradation
-
-2. **Calibration method**: MinMax < Entropy ≈ Percentile
-   - MinMax is simplest but may be suboptimal
-   - Entropy/Percentile can improve accuracy by 0.5-1%
-
-3. **Quantization scheme**:
-   - Per-channel > Per-tensor (0.5-1% improvement possible)
-   - Symmetric for weights, asymmetric for activations (standard)
-
-4. **Model size**: Smaller models (like ResNet8) may lose more than larger ResNets
-   - ResNet8 is relatively small (8 layers)
-   - Expect upper end of 1-2% loss range
-
-### INT8 vs UINT8 Comparison
-
-| Aspect | INT8 (signed) | UINT8 (unsigned) |
-|--------|---------------|------------------|
-| **Range** | [-128, 127] | [0, 255] |
-| **Weight quantization** | Preferred (symmetric, centered at 0) | Not typical |
-| **Activation quantization** | Standard (asymmetric with zero-point) | Better for post-ReLU (always positive) |
-| **Hardware support** | Ubiquitous (INT8xINT8 acceleration) | Variable, some backends limited |
-| **Expected accuracy** | Baseline | Similar to INT8 for activations |
-| **Recommendation** | Default choice | Test as alternative for activations |
-
-**Practical guidance:**
-- Start with INT8 for both weights and activations (most compatible)
-- Test UINT8 for activations if INT8 accuracy is borderline
-- ResNet8 uses ReLU activations (always positive), so UINT8 may theoretically help
-- Hardware support varies: verify ONNX Runtime and PyTorch backends support UINT8
-
-## Feature Dependencies
-
-### Existing Features (Already Implemented)
-
-From milestone v1.0 and v1.1:
-- CIFAR-10 dataset loading and preprocessing
-- ONNX model loading and inference (ONNX Runtime)
-- PyTorch model loading and inference (converted via onnx2torch)
-- Per-class accuracy evaluation
-- 87.19% full-precision baseline established
-
-### New Feature Dependencies
-
-```
-Calibration Data Preparation
-  └─> MinMax Calibration (baseline)
-       ├─> ONNX Runtime Static Quantization (int8)
-       │    └─> Quantized ONNX Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       ├─> ONNX Runtime Static Quantization (uint8)
-       │    └─> Quantized ONNX Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       ├─> PyTorch Static Quantization (int8)
-       │    └─> Quantized PyTorch Model Accuracy Evaluation
-       │         └─> Accuracy Delta Analysis
-       └─> PyTorch Static Quantization (uint8)
-            └─> Quantized PyTorch Model Accuracy Evaluation
-                 └─> Accuracy Delta Analysis
-
-Optional (Differentiators):
-  Multiple Calibration Methods
-  Per-Channel Quantization
-  Calibration Set Size Sensitivity
-```
-
-## MVP Recommendation
-
-For milestone v1.2 PTQ evaluation, prioritize:
-
-### Phase 1: ONNX Runtime PTQ (Core)
-1. Calibration data preparation (256 CIFAR-10 samples)
-2. MinMax calibration method
-3. int8 quantization (weights + activations)
-4. Quantized model accuracy evaluation
-5. Accuracy delta reporting vs 87.19% baseline
-
-### Phase 2: PyTorch PTQ (Core)
-1. Reuse calibration data from Phase 1
-2. PT2E export-based quantization workflow
-3. int8 quantization (weights + activations)
-4. Quantized model accuracy evaluation
-5. Accuracy delta reporting vs 87.19% baseline
-
-### Phase 3: uint8 Exploration (Optional)
-1. ONNX Runtime uint8 quantization
-2. PyTorch uint8 quantization
-3. Compare int8 vs uint8 accuracy
-
-### Defer to Post-MVP
-- Multiple calibration methods (Entropy, Percentile)
-- Per-channel quantization
-- Calibration set size sensitivity
-- Observer comparison (PyTorch)
-- Quantization format comparison (QDQ vs QOperator)
-- Per-layer sensitivity analysis
-- Confusion matrix comparison
-
-**Rationale:**
-- Phase 1+2 provide complete PTQ evaluation for both frameworks (milestone goal)
-- int8 is industry standard, most compatible format
-- MinMax is simplest calibration, sufficient for initial assessment
-- Phase 3 adds uint8 as bonus if time permits (ResNet8 has ReLU, may benefit)
-- Differentiators deferred: nice-to-have but not critical for initial PTQ evaluation
-
-## Implementation Notes
-
-### ONNX Runtime Static Quantization
-
-**API:** `onnxruntime.quantization.quantize_static()`
-
-**Key parameters:**
-- `model_input`: Path to full-precision ONNX model
-- `model_output`: Path to save quantized model
-- `calibration_data_reader`: Custom class providing calibration samples
-- `quant_format`: QDQ (portable) vs QOperator (potentially faster)
-- `activation_type`: QuantType.QUInt8 or QuantType.QInt8
-- `weight_type`: QuantType.QInt8 (typical)
-- `calibrate_method`: MinMax, Entropy, or Percentile
-
-**Gotchas:**
-- Zero-point must represent FP32 zero exactly (critical for zero-padding in CNNs)
-- AVX2/AVX512 U8S8 format may have saturation issues (use reduce_range)
-- Per-channel quantization may need reduce_range on x86-64
-- Some quantized models run slower than FP32 if backend doesn't support ops
-
-### PyTorch Static Quantization
-
-**API:** New PT2E (PyTorch 2 Export) approach recommended
-
-**Workflow:**
-1. `torch.export.export()` - Capture model in graph mode
-2. `prepare_pt2e()` - Fold BatchNorm, insert observers
-3. Run calibration data through model
-4. `convert_pt2e()` - Produce quantized model
-
-**Key considerations:**
-- Calibration data quality critical (100 mini-batches typical)
-- Observer selection matters:
-  - Weights: Symmetric per-channel + MinMax observer
-  - Activations: Asymmetric per-tensor + MovingAverageMinMax observer
-- BatchNorm folding into Conv2d (automatic in prepare_pt2e)
-- Module naming must not overlap (causes erroneous calibration)
-
-**Gotchas:**
-- Random calibration data = bad quantization parameters (validate with real data)
-- Not all modules may be calibrated if model has dynamic control flow
-- Distribution drift may require re-calibration over time
-- Harder to debug than FP32 models (mismatched scale/zero-point issues)
-
-### Calibration Data Preparation
-
-**Size:** 100-512 samples (256 recommended starting point)
-
-**Sampling strategy:**
-- Random subset of training or validation set
-- Must be representative of inference distribution
-- Stratified sampling (equal samples per class) recommended for CIFAR-10
-
-**CIFAR-10 specific:**
-- 10 classes, 256 samples = ~25-26 samples per class
-- Use validation set (avoid test set for calibration)
-- Apply same preprocessing as full-precision model (raw pixel values 0-255)
-
-## Sources
-
-### High Confidence (Official Documentation)
-- [ONNX Runtime Quantization Documentation](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html)
-- [PyTorch 2 Export Post Training Quantization Tutorial](https://docs.pytorch.org/ao/stable/tutorials_source/pt2e_quant_ptq.html)
-- [PyTorch Static Quantization Documentation](https://docs.pytorch.org/ao/stable/static_quantization.html)
-- [PyTorch Quantization Overview](https://docs.pytorch.org/docs/stable/quantization.html)
-
-### Medium Confidence (Verified Sources)
-- [Post-training Quantization Google AI Edge](https://ai.google.dev/edge/litert/models/post_training_quantization)
-- [Practical Quantization in PyTorch Blog](https://pytorch.org/blog/quantization-in-practice/)
-- [Neural Network Quantization in PyTorch](https://arikpoz.github.io/posts/2025-04-16-neural-network-quantization-in-pytorch/)
-- [PyTorch Static Quantization Tutorial](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html)
-
-### Low Confidence (Research Papers and Forums)
-- [INT8 Quantization Fundamentals](https://apxml.com/courses/compiler-runtime-optimization-ml/chapter-8-quantization-low-precision-optimizations/quantization-fundamentals)
-- [Quantization Data Types Discussion](https://apxml.com/courses/practical-llm-quantization/chapter-1-foundations-model-quantization/integer-data-types)
-- [PyTorch Forums: Expected INT8 Accuracies](https://discuss.pytorch.org/t/expected-int8-accuracies-on-imagenet-1k-resnet-qat/187227)
-- [GitHub: Static Quantization Calibration Issues](https://github.com/pytorch/pytorch/issues/45185)
+The project already has strong foundations for parameter extraction. The playground adds interactivity and comparison capabilities via Marimo's reactive notebook environment.
 
 ---
 
-**Overall Confidence:** MEDIUM
+## Table Stakes
 
-- **HIGH** confidence on API workflows and official quantization methods (official docs verified)
-- **MEDIUM** confidence on expected accuracy impact (multiple sources agree on <1% for INT8, but ResNet8 is smaller than benchmarked models)
-- **LOW** confidence on specific ResNet8/CIFAR-10 accuracy expectations (extrapolated from larger models)
+Features users expect. Missing = tool feels incomplete.
 
-**Validation needed:**
-- Actual ResNet8 quantization accuracy (empirical testing required)
-- UINT8 hardware support in current ONNX Runtime/PyTorch versions
-- Optimal calibration method for this specific model (MinMax vs Entropy vs Percentile)
+| Feature | Why Expected | Complexity | Existing Foundation | Notes |
+|---------|--------------|------------|---------------------|-------|
+| **Load quantized models** | Entry point for any inspection | Low | `quantize_onnx.py`, `quantize_pytorch.py` | Both ONNX and PyTorch models already exist |
+| **Display model structure** | Users need graph overview | Low | `visualize_graph.py`, `annotate_qdq_graph.py` | Existing DOT/PNG generation can be embedded |
+| **List all layers with types** | Basic navigation requirement | Low | `extract_operations.py` | JSON extraction already implemented |
+| **Show scale/zero-point per layer** | Core quantization params | Low | `extract_operations.py` | Already extracts scales/zp from ONNX |
+| **Run inference on sample input** | Verify model works | Low | `evaluate.py`, `evaluate_pytorch.py` | Evaluation scripts exist |
+| **Display final accuracy** | Baseline metric users expect | Low | `evaluate.py` | Returns accuracy percentage |
+| **Select specific layer to inspect** | Navigate large graphs | Low | None (new UI) | Marimo dropdowns/selectors |
+| **Show tensor shapes at each layer** | Debug dimension mismatches | Low | ONNX shape inference | Standard ONNX API |
+
+**Table Stakes Summary:** Basic inspection of what's already extracted. The existing scripts provide 80% of the data; the playground surfaces it interactively.
+
+---
+
+## Differentiators
+
+Features that set product apart. Not expected, but add real value for understanding quantization.
+
+### Tier 1: High Value, Moderate Complexity
+
+| Feature | Value Proposition | Complexity | Dependencies | Notes |
+|---------|-------------------|------------|--------------|-------|
+| **Intermediate value capture** | See actual tensor values at any layer during inference | Medium | PyTorch hooks, ONNX intermediate outputs | Users want to "see every factor" |
+| **FP32 vs INT8 comparison** | Understand quantization impact per layer | Medium | Original + quantized models | Side-by-side value comparison |
+| **SQNR (Signal-to-Quantized-Noise Ratio)** | Quantify layer sensitivity | Medium | FP32 reference values | Industry-standard metric from PyTorch Numeric Suite |
+| **Activation histogram** | Visualize value distribution | Medium | Captured intermediate values | Shows if clipping is appropriate |
+| **Scale factor visualization** | Graph scale values across layers | Low | Existing extraction | Helps spot outliers |
+
+### Tier 2: Advanced Experimentation
+
+| Feature | Value Proposition | Complexity | Dependencies | Notes |
+|---------|-------------------|------------|--------------|-------|
+| **Modify scale interactively** | Experiment with different quantization parameters | Medium-High | Model graph manipulation | Marimo sliders drive re-quantization |
+| **Modify zero-point interactively** | Fine-tune asymmetric quantization | Medium-High | Model graph manipulation | Need to validate value ranges |
+| **Re-run inference after modification** | See impact of changes | Medium | Modified model creation | Marimo reactivity handles dependency |
+| **Compare original vs modified outputs** | A/B testing of parameters | Medium | Dual inference paths | Output diff visualization |
+| **Per-layer quantization toggle** | Enable/disable quantization per layer | High | Selective dequantization | Identify problematic layers |
+
+### Tier 3: Advanced Analysis
+
+| Feature | Value Proposition | Complexity | Dependencies | Notes |
+|---------|-------------------|------------|--------------|-------|
+| **Residual connection analysis** | ResNet-specific: scale mismatch at Add nodes | Medium | Graph traversal | STATE.md notes 2.65x-3.32x scale ratios |
+| **Weight distribution histogram** | See weight value spread per layer | Low | Weight tensor access | Standard visualization |
+| **Sensitivity ranking** | Sort layers by quantization impact | Medium | SQNR per layer | Guide optimization efforts |
+| **Export modified model** | Save experimental changes | Medium | ONNX model writing | For deployment testing |
+
+---
+
+## Anti-Features
+
+Features to explicitly NOT build. Common mistakes in this domain.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| **Full retraining interface** | Out of scope (PTQ only per PROJECT.md) | Link to external QAT resources |
+| **Real-time inference benchmarking** | Performance not in scope per PROJECT.md | Focus on accuracy, not speed |
+| **Custom dataset upload** | CIFAR-10 only per constraints | Pre-load CIFAR-10 samples |
+| **Automatic optimization suggestions** | Requires expertise to validate | Show data, let user decide |
+| **GPU inference support** | Adds complexity, CPU sufficient for ResNet8 | Stick with CPU inference |
+| **TFLite/other format support** | Out of scope per PROJECT.md | ONNX and PyTorch only |
+| **Multi-model comparison** | Scope creep | Single model focus per session |
+| **Cloud deployment** | Local notebook sufficient | Marimo runs locally |
+| **Real-time video/stream input** | CIFAR-10 is image classification | Single image inference |
+| **Undo/redo for modifications** | Notebook handles state via re-run | Reactive cells are the "undo" |
+
+---
+
+## Feature Dependencies
+
+```
+Load Model (table stakes)
+    |
+    +---> Display Structure (table stakes)
+    |         |
+    |         +---> Select Layer (table stakes)
+    |                   |
+    |                   +---> Show Parameters (table stakes)
+    |                   |
+    |                   +---> Intermediate Capture (differentiator)
+    |                             |
+    |                             +---> Activation Histogram (differentiator)
+    |                             |
+    |                             +---> FP32 Comparison (differentiator)
+    |                                       |
+    |                                       +---> SQNR Calculation (differentiator)
+    |
+    +---> Run Inference (table stakes)
+              |
+              +---> Display Accuracy (table stakes)
+              |
+              +---> Modify Parameters (differentiator)
+                        |
+                        +---> Re-run Inference (differentiator)
+                                  |
+                                  +---> Compare Outputs (differentiator)
+```
+
+**Critical Path:** Load Model -> Display Structure -> Select Layer -> Show Parameters
+**Experimentation Path:** Requires intermediate capture first, then comparison
+
+---
+
+## MVP Recommendation
+
+For MVP (first working version), prioritize:
+
+### Must Have (Phase 1)
+1. **Load ONNX quantized model** - Entry point
+2. **Display model structure** - Use existing annotate_qdq_graph output
+3. **List layers with scale/zero-point** - Use existing extract_operations output
+4. **Select layer and view details** - Marimo dropdown + reactive display
+5. **Run inference on CIFAR-10 sample** - Use existing evaluate.py logic
+6. **Display accuracy** - Single number baseline
+
+### Should Have (Phase 2)
+1. **Intermediate value capture** - Enables the "see every factor" goal
+2. **FP32 vs INT8 side-by-side** - Core comparison use case
+3. **Activation histogram per layer** - Visual understanding
+4. **SQNR calculation** - Quantitative comparison
+
+### Could Have (Phase 3)
+1. **Interactive scale modification** - Experimentation
+2. **Re-run inference after changes** - See impact
+3. **Output comparison visualization** - Diff display
+
+### Defer to Post-v1.4
+- **PyTorch model support** - Start with ONNX, add PyTorch later
+- **Per-layer quantization toggle** - Complex graph manipulation
+- **Export modified model** - Validation and format handling
+- **Residual connection analysis** - Advanced/specialized
+
+---
+
+## Marimo-Specific Considerations
+
+Marimo's reactive cell model affects feature implementation:
+
+| Marimo Feature | How It Helps | Feature It Enables |
+|----------------|--------------|-------------------|
+| **Reactive cells** | Change input, outputs update automatically | Interactive parameter modification |
+| **UI elements (sliders, dropdowns)** | Native interactive controls | Layer selection, parameter adjustment |
+| **Dataframe display** | Built-in table rendering | Layer listing with parameters |
+| **Matplotlib/Plotly support** | Visualization integration | Histograms, comparison charts |
+| **Pure Python storage** | Version control friendly | Can commit notebook to repo |
+| **Script execution mode** | Can run without UI | CI/validation of notebook |
+
+**Implication:** Marimo's reactivity means modifying a scale slider automatically triggers:
+1. Model update cell
+2. Inference cell
+3. Comparison cell
+4. Visualization cell
+
+This is the "interactive modification and re-evaluation" from PROJECT.md requirements.
+
+---
+
+## Complexity Assessment by Feature Category
+
+| Category | Total Features | Low | Medium | High |
+|----------|----------------|-----|--------|------|
+| Table Stakes | 8 | 8 | 0 | 0 |
+| Tier 1 Differentiators | 5 | 1 | 4 | 0 |
+| Tier 2 Differentiators | 5 | 0 | 3 | 2 |
+| Tier 3 Differentiators | 4 | 1 | 3 | 0 |
+
+**Observation:** Table stakes are all low complexity because existing scripts provide the data. Differentiators require new logic for capture, comparison, and modification.
+
+---
+
+## Existing Code Leverage
+
+| Existing Script | Features It Enables |
+|-----------------|---------------------|
+| `extract_operations.py` | Layer listing, scale/zero-point display, model structure |
+| `annotate_qdq_graph.py` | Visual graph display, QDQ architecture diagram |
+| `evaluate.py` | Inference execution, accuracy calculation |
+| `evaluate_pytorch.py` | PyTorch inference path (future) |
+| `calibration_utils.py` | CIFAR-10 sample loading |
+| `visualize_graph.py` | Model structure visualization |
+
+**Recommendation:** Build playground as orchestration layer over existing scripts, not replacement. Import functions from scripts into Marimo notebook cells.
+
+---
+
+## Implementation Approaches
+
+### Intermediate Value Capture
+
+**ONNX Approach:**
+```python
+# Use onnxruntime intermediate outputs
+# Set up session to output at desired nodes
+sess = onnxruntime.InferenceSession(model_path)
+output_names = [node.name for node in model.graph.node if filter_condition]
+results = sess.run(output_names, {input_name: input_data})
+```
+
+**PyTorch Approach:**
+```python
+# Use forward hooks to capture activations
+activations = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
+    return hook
+
+for name, layer in model.named_modules():
+    layer.register_forward_hook(get_activation(name))
+```
+
+### FP32 vs INT8 Comparison
+
+**Workflow:**
+1. Load both FP32 and INT8 models
+2. Run same input through both
+3. Capture intermediate activations at corresponding layers
+4. Compute SQNR: `10 * log10(signal_power / noise_power)`
+5. Display per-layer comparison table
+
+**PyTorch Numeric Suite Reference:**
+- Use `torch.ao.ns.fx.utils.compute_sqnr()` if available
+- Or compute manually: `SQNR = 10 * log10(sum(fp32^2) / sum((fp32 - quant)^2))`
+
+### Interactive Parameter Modification
+
+**ONNX Graph Manipulation:**
+```python
+# Modify scale/zero-point in initializers
+for init in model.graph.initializer:
+    if init.name == target_scale_name:
+        # Create new initializer with modified value
+        new_init = numpy_helper.from_array(new_scale_value, init.name)
+        # Replace in graph
+```
+
+**Marimo Integration:**
+```python
+@app.cell
+def scale_slider():
+    return mo.ui.slider(0.001, 0.1, value=0.01, label="Scale")
+
+@app.cell  # Reactive: re-runs when slider changes
+def modified_inference(scale_slider):
+    modified_model = modify_scale(model, scale_slider.value)
+    return run_inference(modified_model, input_data)
+```
+
+---
+
+## Sources
+
+- [PyTorch Numeric Suite Tutorial](https://docs.pytorch.org/tutorials/prototype/numeric_suite_tutorial.html) - SQNR and comparison methodology (HIGH confidence)
+- [ONNX Runtime Quantization](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) - Scale/zero-point parameter details (HIGH confidence)
+- [Netron GitHub](https://github.com/lutzroeder/netron) - Model visualization patterns (HIGH confidence)
+- [Marimo Documentation](https://docs.marimo.io/) - Reactive notebook capabilities (HIGH confidence)
+- [A Visual Guide to Quantization](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-quantization) - Histogram calibration methods (MEDIUM confidence)
+- [NVIDIA Nsight Deep Learning Designer](https://docs.nvidia.com/nsight-dl-designer/UserGuide/index.html) - Weight editor patterns (MEDIUM confidence)
+- [PyTorch Practical Quantization](https://pytorch.org/blog/quantization-in-practice/) - Debugging workflow (HIGH confidence)
+- [TorchLens Paper](https://www.nature.com/articles/s41598-023-40807-0) - Intermediate activation extraction (MEDIUM confidence)
+- [MATLAB Deep Network Quantizer](https://www.mathworks.com/help/deeplearning/ug/quantization-of-deep-neural-networks.html) - Quantization workflow visualization (MEDIUM confidence)
+
+---
+
+*Feature landscape research complete. Ready for requirements definition.*

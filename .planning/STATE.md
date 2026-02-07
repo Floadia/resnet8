@@ -2,128 +2,88 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-28)
+See: .planning/PROJECT.md (updated 2026-02-05)
 
-**Core value:** Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** v1.2 PTQ Evaluation COMPLETE
+**Core value:** Accurate model conversion across frameworks -- converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
+**Current focus:** v1.4 Quantization Playground - Phase 15 (Parameter Inspection)
 
 ## Current Position
 
-Phase: 8 of 8 (Comparison Analysis)
-Plan: 1 of 1 in current phase
-Status: Project complete
-Last activity: 2026-01-28 — Completed quick task 003: Add CI linting with ruff
+Phase: 15 of 17 (Parameter Inspection)
+Plan: Ready to plan
+Status: Ready for Phase 15
+Last activity: 2026-02-06 -- Phase 14 complete (verified)
 
-Progress: [██████████] 100% (8/8 phases complete)
+Progress: [===============.....] 17/20 plans (85% completion)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 4.25min (v1.2 tracking started)
-- Total execution time: 17min (v1.2 only)
+- Total plans completed: 17
+- Average duration: ~1h 42min
+- Total execution time: ~29 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Model Conversion | 1/1 | - | - |
-| 2. Accuracy Evaluation | 1/1 | - | - |
-| 3. PyTorch Conversion | 1/1 | - | - |
-| 4. PyTorch Evaluation | 1/1 | - | - |
-| 5. Calibration Infrastructure | 1/1 | 2min | 2min |
-| 6. ONNX Runtime Quantization | 1/1 | 6min | 6min |
-| 7. PyTorch Quantization | 1/1 | 6min | 6min |
-| 8. Comparison Analysis | 1/1 | 3min | 3min |
+| v1.0 (1-2) | 2 | ~1h | ~30min |
+| v1.1 (3-4) | 2 | ~1h | ~30min |
+| v1.2 (5-8) | 4 | ~2h | ~30min |
+| v1.3 (9-13) | 7 | ~3.5h | ~30min |
+| v1.4 (14+) | 2 | ~21.5h | ~10h 45min |
 
 **Recent Trend:**
-- Last plan: 08-01 (3min)
-- Analysis/documentation phases faster than implementation phases
+- Last 5 plans: 12-01, 12-02, 13-01, 14-01, 14-02
+- Trend: Phase 14-02 required debugging across sessions (path/import issues)
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-Recent decisions from PROJECT.md Key Decisions table:
-- ONNX as intermediate format: Standard interchange format (Good)
-- tf2onnx for Keras→ONNX: Standard tool, well-maintained (Good)
-- onnx2torch for ONNX→PyTorch: Leverage existing ONNX model (Good - works with FX mode)
-- Separate converter/eval scripts: Reusability and clarity (Good)
-- Raw pixel values (0-255): Match Keras training preprocessing (Good)
-
-From Phase 5 (Calibration Infrastructure):
-- 1000 calibration samples (100 per class): Exceeds roadmap minimum (200) for better quantization quality
-- Load from training batches: Prevents data leakage, maintains evaluation integrity
-- Preprocessing matches evaluate.py exactly: Critical to avoid 10-40% accuracy drops from mismatches
-
-From Phase 6 (ONNX Runtime Quantization):
-- QDQ format for CPU inference: Recommended by ONNX Runtime for better tool support
-- MinMax calibration method: Simpler and faster than Entropy/Percentile, good baseline
-- Uint8 outperforms Int8: 86.75% vs 85.58% accuracy (both above 85% threshold)
-- Per-channel quantization disabled: Start with per-tensor for initial validation
-- Fresh CalibrationDataReader per quantization: Iterator consumed after first use
-
-From Phase 7 (PyTorch Quantization):
-- FX graph mode for onnx2torch models: Eager mode doesn't support custom ONNX ops
-- JIT tracing for serialization: FX GraphModule has pickle issues, TorchScript works
-- fbgemm uint8 limitation: PyTorch requires qint8 weights, uint8-only not supported
-- PyTorch int8 matches ONNX Runtime int8: 85.68% vs 85.58% accuracy
-
-From Phase 8 (Comparison Analysis):
+From v1.2 (PTQ Evaluation):
 - ONNX Runtime uint8 recommended for best accuracy retention (86.75%, -0.44% drop)
 - All quantized models meet >85% accuracy and <5% drop requirements
 - PyTorch uint8 documented as not supported (fbgemm limitation)
+- Per-channel quantization disabled for initial validation (per-tensor used)
+
+From v1.3 (Documentation):
+- QDQ format operations process FP32 data, not INT8 (critical distinction: INT8 storage, FP32 computation)
+- ONNX Runtime fuses Q-DQ-Op patterns into INT8 kernels at inference time for performance
+- ResNet8 has 32 QuantizeLinear + 66 DequantizeLinear = 98 QDQ nodes (75% of graph)
+- Scale/zero-point parameters stored as initializers with systematic naming convention
+- Residual connections have significant scale mismatches (2.65x-3.32x ratios in ResNet8)
+
+From v1.4 (Quantization Playground):
+- Stack additions: marimo (>=0.19.7), plotly (>=6.5.0) only
+- Use mo.cache for model loading to prevent memory leaks on re-run
+- Avoid mutations -- return new objects for reactive updates
+- Wrapper pattern: Marimo notebook calls existing scripts/, not reimplementation
+- weights_only=False needed for PyTorch quantized models (full object deserialization)
+- Graceful missing file handling: return None instead of raising errors
+- Extract ONNX layers from both graph.node (operations) and graph.initializer (parameters)
+- Filter out PyTorch root module (empty name from named_modules) for clean layer lists
+- File selection mode (not directory mode) more reliable for Marimo file browser
+- PyTorch quantized models saved as dict {'model': ..., 'epoch': ...} - extract 'model' key
 
 ### Pending Todos
 
-None - project complete.
-
-### Quick Tasks Completed
-
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 001 | Use uv instead of old python management system | 2026-01-28 | 62cd2a0 | [001-use-uv-instead-of-old-python-management-](./quick/001-use-uv-instead-of-old-python-management-/) |
-| 002 | Add comprehensive README.md | 2026-01-28 | 8ca7d31 | [002-add-readme](./quick/002-add-readme/) |
-| 003 | Add CI that lint by ruff | 2026-01-28 | cc40f18 | [003-add-ci-that-lint-by-ruff](./quick/003-add-ci-that-lint-by-ruff/) |
+None
 
 ### Blockers/Concerns
 
-**All risks resolved:**
-- ✓ Calibration data quality: RESOLVED - Stratified sampling with 1000 samples (100 per class)
-- ✓ Preprocessing mismatches: RESOLVED - Verified identical to evaluate.py (float32, 0-255, NHWC)
-- ✓ ONNX Runtime quantization: RESOLVED - Both int8/uint8 achieve >85% accuracy (85.58%/86.75%)
-- ✓ PyTorch FX mode: RESOLVED - FX graph mode works with onnx2torch models
-- ✓ PyTorch serialization: RESOLVED - JIT tracing enables model serialization
-- ✓ PyTorch uint8: DOCUMENTED - fbgemm requires qint8 weights, uint8-only not possible
-- ✓ Comparison analysis: COMPLETE - Analysis document with recommendations
-
-## Final Results Summary
-
-**v1.2 PTQ Evaluation milestone complete.**
-
-| Model | Accuracy | Delta | Size | Reduction |
-|-------|----------|-------|------|-----------|
-| FP32 baseline | 87.19% | - | 315KB | - |
-| ONNX Runtime uint8 | 86.75% | -0.44% | 123KB | 61% |
-| ONNX Runtime int8 | 85.58% | -1.61% | 123KB | 61% |
-| PyTorch int8 | 85.68% | -1.51% | 165KB | 52% |
-| PyTorch uint8 | N/A | N/A | N/A | Not supported |
-
-**Recommendation:** ONNX Runtime uint8 for best accuracy-to-size ratio.
+None
 
 ## Session Continuity
 
-Last session: 2026-01-28
-Stopped at: Completed quick task 003 (Add CI linting with ruff)
+Last session: 2026-02-06
+Stopped at: Phase 14 complete (Notebook Foundation verified)
 Resume file: None
 
-**Project deliverables:**
-- README.md - Comprehensive project documentation with usage examples
-- docs/QUANTIZATION_ANALYSIS.md - Complete PTQ evaluation analysis
-- models/resnet8_int8.onnx - ONNX int8 quantized model
-- models/resnet8_uint8.onnx - ONNX uint8 quantized model
-- models/resnet8_int8.pt - PyTorch int8 quantized model
+**Next action:** Run `/gsd:discuss-phase 15` or `/gsd:plan-phase 15` for Parameter Inspection
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-01-28 after completing Phase 8 (v1.2 milestone complete)*
+*Last updated: 2026-02-06 with Phase 14 complete*

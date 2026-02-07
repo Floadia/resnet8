@@ -8,15 +8,16 @@ Multi-framework evaluation of ResNet8 for CIFAR-10, converted from the MLCommons
 
 Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
 
-## Current Milestone: v1.2 PTQ Evaluation
+## Current Milestone: v1.4 Quantization Playground
 
-**Goal:** Apply Post-Training Quantization (static) using both ONNX Runtime and PyTorch, evaluate int8 and uint8 model accuracy against full-precision baseline
+**Goal:** Interactive Marimo notebook environment to experiment with quantization and inspect all values
 
 **Target features:**
-- ONNX Runtime static quantization (int8/uint8)
-- PyTorch static quantization (int8/uint8)
-- Calibration using CIFAR-10 samples
-- Accuracy comparison: quantized vs full-precision (87.19%)
+- Load and visualize quantized model structure (ONNX and PyTorch)
+- Inspect all quantization parameters (scale, zero-point per layer)
+- Run inference and capture intermediate values at each layer
+- Modify parameters interactively and re-run experiments
+- Compare original vs modified outputs
 
 ## Requirements
 
@@ -32,14 +33,20 @@ Accurate model conversion across frameworks — converted models must produce eq
 - ✓ CIFAR-10 evaluation with PyTorch (87.19%) — v1.1
 - ✓ Per-class accuracy breakdown (PyTorch) — v1.1
 - ✓ Accuracy >85% on CIFAR-10 test set (PyTorch) — v1.1
+- ✓ ONNX Runtime static quantization (int8/uint8) — v1.2
+- ✓ PyTorch static quantization (int8) — v1.2
+- ✓ Calibration data preparation (CIFAR-10 subset) — v1.2
+- ✓ Quantized model accuracy evaluation — v1.2
+- ✓ Accuracy delta analysis (quantized vs 87.19% baseline) — v1.2
 
 ### Active
 
-- [ ] ONNX Runtime static quantization (int8/uint8)
-- [ ] PyTorch static quantization (int8/uint8)
-- [ ] Calibration data preparation (CIFAR-10 subset)
-- [ ] Quantized model accuracy evaluation
-- [ ] Accuracy delta analysis (quantized vs 87.19% baseline)
+- [ ] Marimo notebook setup for quantization experiments
+- [ ] Model loading utilities (ONNX and PyTorch quantized models)
+- [ ] Quantization parameter inspection (scale, zero-point per layer)
+- [ ] Intermediate value capture during inference
+- [ ] Interactive parameter modification and re-evaluation
+- [ ] Comparison visualization (original vs modified)
 
 ### Out of Scope
 
@@ -88,4 +95,4 @@ Accurate model conversion across frameworks — converted models must produce eq
 | onnx2torch for ONNX→PyTorch | Leverage existing ONNX model | — Pending |
 
 ---
-*Last updated: 2026-01-28 after v1.2 milestone start*
+*Last updated: 2026-02-05 after v1.4 milestone start*

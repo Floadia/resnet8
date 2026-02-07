@@ -1,872 +1,671 @@
-# Architecture Research: PTQ Integration
+# Architecture: Marimo Quantization Playground Integration
 
-**Project:** ResNet8 CIFAR-10 PTQ Evaluation
-**Domain:** Post-Training Quantization (Static)
-**Researched:** 2026-01-28
+**Project:** ResNet8 CIFAR-10 Quantization Playground
+**Milestone:** v1.4 - Interactive Quantization Playground
+**Researched:** 2026-02-05
 **Confidence:** HIGH
 
 ## Executive Summary
 
-PTQ integration follows a **quantize-then-evaluate pattern** that extends existing evaluation scripts with calibration and quantization steps. Both ONNX Runtime and PyTorch use similar workflows: (1) prepare calibration data, (2) quantize model with calibration, (3) evaluate quantized model using existing evaluation infrastructure. The architecture maintains clean separation between quantization (one-time conversion) and evaluation (repeated validation), mirroring the existing conversion/evaluation pattern from v1.0-v1.1.
+The Marimo quantization playground should integrate with existing ResNet8 scripts as a thin interactive layer, NOT by reimplementing functionality. The architecture follows a **wrapper pattern**: Marimo notebooks import and call existing utility functions from `scripts/`, display results interactively, and allow parameter modification through reactive UI elements.
 
-## Integration Points with Existing Components
+**Key architectural decision:** Refactor existing scripts into importable modules with clear entry points, then build Marimo notebooks that compose these modules with interactive controls.
 
-### ONNX Runtime Quantization Integration
+---
 
-| Existing Component | Integration Point | How PTQ Integrates |
-|-------------------|-------------------|-------------------|
-| `scripts/evaluate.py` | CIFAR-10 loading (`load_cifar10_test()`) | Reuse for calibration data preparation |
-| `scripts/evaluate.py` | Evaluation logic (`evaluate_model()`) | Identical interface - quantized .onnx works with same code |
-| `models/resnet8.onnx` | Input model | Source for quantization - produces `resnet8_int8.onnx`, `resnet8_uint8.onnx` |
-| CIFAR-10 test set | Test data | Subset (100-200 images) becomes calibration data |
+## Existing Component Inventory
 
-**Key insight:** ONNX Runtime quantization produces standard .onnx files that work with existing `onnxruntime.InferenceSession` - no changes to evaluation script needed.
+### Models (in `models/`)
 
-### PyTorch Quantization Integration
+| File | Format | Content | Access Pattern |
+|------|--------|---------|----------------|
+| `resnet8.pt` | PyTorch checkpoint | FP32 model (353 KB) | `torch.load()` with `weights_only=False` |
+| `resnet8_int8.pt` | TorchScript | INT8 quantized model (169 KB) | `torch.jit.load()` |
+| `resnet8_int8_operations.json` | JSON | Extracted QDQ operations with scales/zero-points | `json.load()` |
 
-| Existing Component | Integration Point | How PTQ Integrates |
-|-------------------|-------------------|-------------------|
-| `scripts/evaluate_pytorch.py` | CIFAR-10 loading (`load_cifar10_test()`) | Reuse for calibration data preparation |
-| `scripts/evaluate_pytorch.py` | Model loading (`load_pytorch_model()`) | Minor change - load quantized .pt differently |
-| `scripts/evaluate_pytorch.py` | Evaluation logic (`evaluate_model()`) | Identical interface - quantized model is still `torch.nn.Module` |
-| `models/resnet8.pt` | Input model | Source for quantization - produces `resnet8_int8.pt`, `resnet8_uint8.pt` |
-| CIFAR-10 test set | Test data | Subset (100-200 images) becomes calibration data |
+**Note:** ONNX models (`resnet8.onnx`, `resnet8_int8.onnx`) may be generated on-demand but are not committed to repo.
 
-**Key insight:** PyTorch quantized models are still `torch.nn.Module` instances, so existing evaluation code works with minor model loading changes.
+### Scripts (in `scripts/`)
 
-## Architecture Diagram
+| Script | Functions | Reuse Potential |
+|--------|-----------|-----------------|
+| `evaluate_pytorch.py` | `load_cifar10_test()`, `load_pytorch_model()`, `evaluate_model()`, `compute_accuracy()` | HIGH - direct import |
+| `quantize_pytorch.py` | `load_pytorch_model()`, `quantize_model_fx()`, `create_calibration_loader()` | MEDIUM - needs refactoring |
+| `calibration_utils.py` | `load_calibration_data()`, `verify_distribution()` | HIGH - already module-friendly |
+| `extract_operations.py` | `extract_qlinear_operations()` | HIGH - returns structured dict |
+| `visualize_graph.py` | Graph visualization utilities | HIGH - for model structure display |
+| `annotate_qdq_graph.py` | QDQ architecture diagrams | MEDIUM - generates static images |
+
+### Documentation (in `docs/quantization/`)
+
+| File | Content | Playground Use |
+|------|---------|----------------|
+| `01-boundary-operations.md` | QuantizeLinear/DequantizeLinear formulas | Reference in UI tooltips |
+| `02-qlinearconv.md` | QLinearConv operation details | Context for conv layer inspection |
+| `03-qlinearmatmul.md` | QLinearMatMul operation details | Context for dense layer inspection |
+| `04-architecture.md` | QDQ format architecture overview | High-level understanding |
+
+---
+
+## Proposed Architecture
+
+### Component Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     PTQ Evaluation Architecture                      │
-└─────────────────────────────────────────────────────────────────────┘
-
-EXISTING (v1.0-v1.1):
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│ FP32 Models  │      │ Evaluation   │      │  CIFAR-10    │
-│              │─────▶│  Scripts     │◄─────│  Test Data   │
-│ .onnx, .pt   │      │              │      │  (10K imgs)  │
-└──────────────┘      └──────────────┘      └──────────────┘
-                             │
-                             ▼
-                      Accuracy Reports
-
-
-NEW (v1.2 PTQ):
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│ FP32 Models  │      │ Calibration  │      │  CIFAR-10    │
-│              │      │     Data     │◄─────│  Subset      │
-│ .onnx, .pt   │      │  (100-200)   │      │ (from 10K)   │
-└──────────────┘      └──────────────┘      └──────────────┘
-       │                     │
-       │              ┌──────┘
-       │              │
-       ▼              ▼
-┌──────────────────────────────┐
-│  Quantization Scripts        │
-│  - quantize_onnx.py          │
-│  - quantize_pytorch.py       │
-└──────────────────────────────┘
-       │
-       │ Produces quantized models
-       ▼
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│ INT8 Models  │      │ Evaluation   │      │  CIFAR-10    │
-│              │─────▶│  Scripts     │◄─────│  Full Test   │
-│ *_int8.onnx  │      │  (REUSED)    │      │  (10K imgs)  │
-│ *_int8.pt    │      │              │      │              │
-└──────────────┘      └──────────────┘      └──────────────┘
-                             │
-                             ▼
-                   Quantized Accuracy Reports
++------------------------------------------------------------------+
+|                      Marimo Notebook Layer                        |
+|  +------------------+  +------------------+  +-----------------+  |
+|  | Model Inspector  |  | Parameter Editor |  | Comparison View |  |
+|  | (mo.ui.tree,     |  | (mo.ui.slider,   |  | (mo.ui.table,   |  |
+|  |  mo.ui.table)    |  |  mo.ui.number)   |  |  plots)         |  |
+|  +--------+---------+  +--------+---------+  +--------+--------+  |
+|           |                     |                     |           |
++-----------+---------------------+---------------------+-----------+
+            |                     |                     |
+            v                     v                     v
++------------------------------------------------------------------+
+|                    Playground Utilities Layer                     |
+|  playground/                                                      |
+|  +------------------+  +------------------+  +-----------------+  |
+|  | model_loader.py  |  | param_editor.py  |  | comparison.py   |  |
+|  | - load_model()   |  | - modify_scale() |  | - run_compare() |  |
+|  | - get_params()   |  | - modify_zp()    |  | - diff_output() |  |
+|  +--------+---------+  +--------+---------+  +--------+--------+  |
+|           |                     |                     |           |
++-----------+---------------------+---------------------+-----------+
+            |                     |                     |
+            v                     v                     v
++------------------------------------------------------------------+
+|                    Existing Scripts Layer                         |
+|  scripts/                                                         |
+|  +------------------+  +------------------+  +-----------------+  |
+|  | calibration_     |  | evaluate_        |  | extract_        |  |
+|  | utils.py         |  | pytorch.py       |  | operations.py   |  |
+|  +------------------+  +------------------+  +-----------------+  |
++------------------------------------------------------------------+
+            |                     |                     |
+            v                     v                     v
++------------------------------------------------------------------+
+|                         Data Layer                                |
+|  models/                           External Data                  |
+|  +------------------+             +------------------+            |
+|  | resnet8.pt       |             | CIFAR-10 dataset |            |
+|  | resnet8_int8.pt  |             | (calibration/    |            |
+|  | *_operations.json|             |  test batches)   |            |
+|  +------------------+             +------------------+            |
++------------------------------------------------------------------+
 ```
 
-## New Components Needed
+### Integration Points
 
-### 1. Calibration Data Utility (`scripts/calibration_utils.py`)
+#### 1. Model Loading Integration
 
-**Purpose:** Prepare representative calibration dataset from CIFAR-10.
+**Existing code:** `scripts/evaluate_pytorch.py::load_pytorch_model()`
 
-**Functionality:**
-- Load CIFAR-10 test batch (reuse existing loading logic)
-- Sample 100-200 images (stratified sampling across classes)
-- Return calibration subset as numpy arrays
-- Configurable sample size and random seed for reproducibility
-
-**Why separate:** Both ONNX Runtime and PyTorch quantization scripts need calibration data - avoid duplication.
-
-**Interface:**
 ```python
-def get_calibration_data(
-    data_dir: str,
-    num_samples: int = 200,
-    random_seed: int = 42
-) -> tuple[np.ndarray, np.ndarray]:
-    """Returns (images, labels) subset for calibration."""
-    pass
+# Current implementation handles both formats:
+def load_pytorch_model(model_path: str) -> torch.nn.Module:
+    try:
+        model = torch.jit.load(model_path, map_location="cpu")
+        model.eval()
+        return model
+    except RuntimeError:
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
+        model = checkpoint["model"]
+        model.eval()
+        return model
 ```
 
-### 2. ONNX Runtime Quantization Script (`scripts/quantize_onnx.py`)
+**Marimo integration:**
 
-**Purpose:** Apply static quantization to ONNX model.
+```python
+# playground/model_loader.py
+import sys
+sys.path.insert(0, "scripts")
+from evaluate_pytorch import load_pytorch_model
 
-**Workflow:**
-1. Load FP32 ONNX model (`models/resnet8.onnx`)
-2. Create `CalibrationDataReader` using calibration data
-3. Call `quantize_static()` with int8 or uint8 configuration
-4. Save quantized model (`models/resnet8_int8.onnx`)
-5. Repeat for uint8 variant
-
-**Key operations:**
-- Pre-processing with `shape_inference.quant_pre_process()` (optional but recommended)
-- Quantization with `quantize_static(model_path, output_path, calibration_data_reader, ...)`
-- Configuration: `QuantType.QInt8` or `QuantType.QUInt8` for activations/weights
-
-**Dependencies:**
-- `onnxruntime.quantization` module
-- Calibration utils for data preparation
-- Original ONNX model
-
-### 3. PyTorch Quantization Script (`scripts/quantize_pytorch.py`)
-
-**Purpose:** Apply static quantization to PyTorch model.
-
-**Workflow:**
-1. Load FP32 PyTorch model (`models/resnet8.pt`)
-2. Prepare calibration data loader
-3. Set quantization configuration (qconfig)
-4. Prepare model for quantization (`prepare()` or `prepare_pt2e()`)
-5. Run calibration (forward pass with calibration data)
-6. Convert to quantized model (`convert()` or `convert_pt2e()`)
-7. Save quantized model (`models/resnet8_int8.pt`)
-8. Repeat for uint8 variant
-
-**Key operations:**
-- Model export: `torch.export.export()` (PT2E path, recommended)
-- Preparation: `prepare_pt2e()` inserts observers
-- Calibration: Forward pass with representative data
-- Conversion: `convert_pt2e()` produces quantized model
-
-**Dependencies:**
-- `torch.ao.quantization` or `torchao` module
-- Calibration utils for data preparation
-- Original PyTorch model
-
-### 4. Quantized Model Evaluation (Reuse Existing)
-
-**No new component needed** - existing evaluation scripts work with quantized models.
-
-**ONNX Runtime:**
-- `scripts/evaluate.py --model models/resnet8_int8.onnx` works unchanged
-- `onnxruntime.InferenceSession` loads quantized .onnx transparently
-
-**PyTorch:**
-- `scripts/evaluate_pytorch.py --model models/resnet8_int8.pt` works with minor changes
-- Quantized model is still `torch.nn.Module`, just with quantized operations
-
-**Modification needed (PyTorch only):**
-- Update `load_pytorch_model()` to handle quantized models if serialization format differs
-- Likely minimal - quantized models can be saved as standard checkpoints
-
-## Data Flow
-
-### ONNX Runtime Quantization Flow
-
-```
-1. Load FP32 Model
-   ├─ Input: models/resnet8.onnx
-   └─ Action: Pre-process with quant_pre_process() (optional)
-
-2. Prepare Calibration Data
-   ├─ Input: CIFAR-10 test batch (10,000 images)
-   ├─ Action: Sample 200 images (20 per class, stratified)
-   └─ Output: (200, 32, 32, 3) float32 array, range [0, 255]
-
-3. Create CalibrationDataReader
-   ├─ Input: Calibration images
-   ├─ Action: Wrap in CalibrationDataReader class
-   └─ Output: Iterator yielding {input_name: batch_data}
-
-4. Quantize Model (INT8)
-   ├─ Input: Pre-processed .onnx, CalibrationDataReader
-   ├─ Action: quantize_static(..., weight_type=QInt8, activation_type=QInt8)
-   ├─ Calibration: Run inference to collect activation statistics
-   └─ Output: models/resnet8_int8.onnx
-
-5. Quantize Model (UINT8)
-   ├─ Input: Pre-processed .onnx, CalibrationDataReader
-   ├─ Action: quantize_static(..., weight_type=QUInt8, activation_type=QUInt8)
-   └─ Output: models/resnet8_uint8.onnx
-
-6. Evaluate Quantized Models
-   ├─ Input: resnet8_int8.onnx, resnet8_uint8.onnx, full test set (10K)
-   ├─ Action: scripts/evaluate.py --model models/resnet8_int8.onnx
-   └─ Output: Accuracy reports (compare to 87.19% baseline)
+def load_with_metadata(model_path: str) -> dict:
+    """Load model and extract metadata for UI display."""
+    model = load_pytorch_model(model_path)
+    return {
+        "model": model,
+        "path": model_path,
+        "type": "TorchScript" if hasattr(model, "graph") else "Checkpoint",
+        "is_quantized": "int8" in model_path.lower(),
+    }
 ```
 
-### PyTorch Quantization Flow
+#### 2. Parameter Extraction Integration
 
-```
-1. Load FP32 Model
-   ├─ Input: models/resnet8.pt
-   ├─ Action: torch.load(), set to eval mode
-   └─ Output: Model ready for quantization
+**Existing code:** `scripts/extract_operations.py::extract_qlinear_operations()`
 
-2. Prepare Calibration Data
-   ├─ Input: CIFAR-10 test batch (10,000 images)
-   ├─ Action: Sample 200 images, convert to torch.Tensor
-   └─ Output: DataLoader with (200, 32, 32, 3) tensors
-
-3. Export Model (PT2E)
-   ├─ Input: FP32 model
-   ├─ Action: torch.export.export(model, example_inputs)
-   └─ Output: Exported GraphModule
-
-4. Prepare for Quantization
-   ├─ Input: Exported model, quantizer configuration
-   ├─ Action: prepare_pt2e(model, quantizer)
-   ├─ Effect: Inserts observers after activations
-   └─ Output: Model with observers
-
-5. Calibrate (INT8)
-   ├─ Input: Prepared model, calibration DataLoader
-   ├─ Action: Forward pass through calibration data
-   ├─ Effect: Observers collect activation statistics
-   └─ Output: Calibrated model
-
-6. Convert to Quantized (INT8)
-   ├─ Input: Calibrated model
-   ├─ Action: convert_pt2e(model)
-   └─ Output: models/resnet8_int8.pt
-
-7. Repeat for UINT8
-   ├─ Configure: Use quint8 dtypes if supported
-   └─ Output: models/resnet8_uint8.pt
-
-8. Evaluate Quantized Models
-   ├─ Input: resnet8_int8.pt, resnet8_uint8.pt, full test set (10K)
-   ├─ Action: scripts/evaluate_pytorch.py --model models/resnet8_int8.pt
-   └─ Output: Accuracy reports (compare to 87.19% baseline)
+```python
+# Returns structured dict with scales and zero-points per operation
+{
+    "model_path": "...",
+    "opset_version": 15,
+    "operations": [
+        {
+            "name": "...",
+            "op_type": "DequantizeLinear",
+            "scales": {"...": 0.026842},
+            "zero_points": {"...": -79}
+        },
+        ...
+    ],
+    "summary": {"total_nodes": 130, "qlinear_nodes": 98}
+}
 ```
 
-## Suggested Build Order
+**Marimo integration:**
 
-### Phase 1: Calibration Infrastructure (Foundation)
+```python
+# playground/param_inspector.py
+import json
 
-**Why first:** Both ONNX Runtime and PyTorch quantization need calibration data. Building this first enables parallel development of quantization scripts.
+def load_operations(json_path: str) -> dict:
+    """Load pre-extracted operations for interactive inspection."""
+    with open(json_path) as f:
+        return json.load(f)
 
-**Deliverables:**
-- `scripts/calibration_utils.py` with `get_calibration_data()` function
-- Unit test: Verify stratified sampling produces balanced class distribution
-- Verify: 200 samples, shape (200, 32, 32, 3), raw pixel values [0, 255]
+def get_layer_params(operations: dict, layer_name: str) -> dict:
+    """Extract scale/zero-point for specific layer."""
+    for op in operations["operations"]:
+        if layer_name in op["name"]:
+            return {
+                "name": op["name"],
+                "op_type": op["op_type"],
+                "scales": op.get("scales", {}),
+                "zero_points": op.get("zero_points", {})
+            }
+    return None
+```
 
-**Dependencies:** CIFAR-10 test batch (already available)
+#### 3. Inference Integration
 
-**Effort:** Low (reuse existing loading logic from evaluate.py)
+**Existing code:** `scripts/evaluate_pytorch.py::evaluate_model()`
+
+**New capability needed:** Capture intermediate layer outputs.
+
+```python
+# playground/inference.py
+import torch
+
+def run_inference_with_hooks(model, images, capture_layers=None):
+    """Run inference and capture intermediate activations."""
+    activations = {}
+    hooks = []
+
+    def make_hook(name):
+        def hook(module, input, output):
+            activations[name] = output.detach().clone()
+        return hook
+
+    # Register hooks for named modules
+    for name, module in model.named_modules():
+        if capture_layers is None or name in capture_layers:
+            hooks.append(module.register_forward_hook(make_hook(name)))
+
+    # Run inference
+    images_tensor = torch.from_numpy(images)
+    with torch.no_grad():
+        outputs = model(images_tensor)
+
+    # Remove hooks
+    for hook in hooks:
+        hook.remove()
+
+    return outputs, activations
+```
+
+#### 4. Calibration Data Integration
+
+**Existing code:** `scripts/calibration_utils.py::load_calibration_data()`
+
+**Marimo integration:** Direct import, no changes needed.
+
+```python
+# In Marimo notebook
+import sys
+sys.path.insert(0, "scripts")
+from calibration_utils import load_calibration_data
+
+# Load subset for quick experiments
+images, labels, class_names = load_calibration_data(
+    data_dir="/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py",
+    samples_per_class=10  # Small subset for interactive use
+)
+```
 
 ---
 
-### Phase 2: ONNX Runtime Quantization (Simpler Path)
+## Data Flow Architecture
 
-**Why second:** ONNX Runtime quantization is simpler - no model export step, quantized models use same evaluation script unchanged.
+### Flow 1: Model Inspection
 
-**Deliverables:**
-- `scripts/quantize_onnx.py` script
-- Quantized models: `models/resnet8_int8.onnx`, `models/resnet8_uint8.onnx`
-- Evaluation results for both quantized models
+```
+User selects model file (mo.ui.dropdown)
+    |
+    v
+load_with_metadata(path) --> Model object + metadata dict
+    |
+    v
+Extract state_dict or graph structure
+    |
+    v
+Display in mo.ui.tree (hierarchical layer view)
+    |
+    v
+User clicks layer --> Show layer details (shape, dtype, params)
+```
 
-**Key tasks:**
-1. Implement `CalibrationDataReader` class
-2. Add pre-processing step with `quant_pre_process()`
-3. Call `quantize_static()` with INT8 configuration
-4. Verify quantized model loads with `onnxruntime.InferenceSession`
-5. Run evaluation with existing `scripts/evaluate.py`
-6. Repeat for UINT8
+### Flow 2: Parameter Inspection (ONNX-based)
 
-**Dependencies:**
-- Phase 1 (calibration data)
-- `onnxruntime.quantization` module
-- Original `models/resnet8.onnx`
+```
+Load pre-extracted operations.json
+    |
+    v
+Display operations in mo.ui.table (sortable, filterable)
+    |
+    v
+User selects operation --> Show scale/zero-point values
+    |
+    v
+Display quantization range visualization (mo.ui.plotly or altair)
+    |
+    v
+User modifies slider --> Re-quantize and show effect
+```
 
-**Effort:** Medium (CalibrationDataReader implementation, quantization configuration)
+### Flow 3: Inference Comparison
+
+```
+Select original model (FP32) and quantized model (INT8)
+    |
+    v
+Load sample images from calibration data
+    |
+    v
+Run inference on both models with hooks
+    |
+    v
+Capture intermediate activations
+    |
+    v
+Display side-by-side comparison:
+- Per-layer output differences
+- Final prediction differences
+- Accuracy metrics
+```
+
+### Flow 4: Parameter Modification Experiment
+
+```
+Load quantized PyTorch model
+    |
+    v
+Display editable scale/zero-point parameters
+    |
+    v
+User modifies parameter via slider/input
+    |
+    +---> [Temporary modification in memory]
+    |
+    v
+Re-run inference with modified parameters
+    |
+    v
+Compare to original quantized output:
+- Output tensor diff
+- Accuracy impact
+- Per-class accuracy changes
+```
 
 ---
 
-### Phase 3: PyTorch Quantization (Complex Path)
+## New Components to Build
 
-**Why third:** PyTorch quantization requires model export (PT2E), more complex API, potential model loading changes.
+### 1. `playground/` Package
 
-**Deliverables:**
-- `scripts/quantize_pytorch.py` script
-- Quantized models: `models/resnet8_int8.pt`, `models/resnet8_uint8.pt`
-- Updated `scripts/evaluate_pytorch.py` if needed for loading quantized models
-- Evaluation results for both quantized models
+New directory for Marimo-specific utilities.
 
-**Key tasks:**
-1. Export model with `torch.export.export()`
-2. Configure quantizer (decide on backend: x86, qnnpack, etc.)
-3. Prepare model with `prepare_pt2e()`
-4. Run calibration (forward pass with calibration data)
-5. Convert to quantized with `convert_pt2e()`
-6. Test serialization/deserialization of quantized model
-7. Update evaluation script if model loading differs
-8. Run evaluation
-9. Repeat for UINT8 (if supported)
+```
+playground/
+├── __init__.py           # Package exports
+├── model_loader.py       # Unified model loading
+├── param_inspector.py    # Parameter extraction and display
+├── inference.py          # Inference with activation capture
+├── comparison.py         # Model comparison utilities
+└── visualization.py      # Plotting helpers for Marimo
+```
 
-**Dependencies:**
-- Phase 1 (calibration data)
-- `torch.ao.quantization` or `torchao` module
-- Original `models/resnet8.pt`
+### 2. Marimo Notebooks
 
-**Effort:** High (PT2E export, quantizer configuration, potential evaluation script changes)
+```
+notebooks/
+├── 01_model_inspector.py      # Browse model structure
+├── 02_parameter_viewer.py     # View quantization params
+├── 03_inference_comparison.py # Compare FP32 vs INT8
+├── 04_parameter_editor.py     # Modify params interactively
+└── 05_full_playground.py      # Combined experience
+```
 
-**Risk factors:**
-- PyTorch quantization API changed significantly in 2.x (PT2E vs eager mode)
-- UINT8 support may be limited (PyTorch traditionally uses INT8 on CPU)
-- Quantized model serialization format may differ from FP32
+### 3. Script Refactoring (Minimal)
+
+**Goal:** Make existing scripts importable without running `main()`.
+
+**Current issue:** Some scripts have side effects at import time (e.g., adding to sys.path).
+
+**Fix pattern:**
+
+```python
+# Before
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from calibration_utils import load_calibration_data
+
+# After (move to function)
+def get_calibration_loader(...):
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from calibration_utils import load_calibration_data
+    # ...
+```
 
 ---
-
-### Phase 4: Comparison and Documentation
-
-**Why last:** Requires all quantized models evaluated to produce comparison matrix.
-
-**Deliverables:**
-- Accuracy comparison table: FP32 vs INT8 vs UINT8 for both frameworks
-- Model size comparison
-- Documentation of accuracy deltas
-- Analysis of which quantization method performs best
-
-**Key tasks:**
-1. Collect all evaluation results
-2. Calculate accuracy deltas (quantized - baseline 87.19%)
-3. Compare model file sizes
-4. Document findings
-5. Identify best-performing quantization approach
-
-**Dependencies:**
-- Phase 2 (ONNX quantized models evaluated)
-- Phase 3 (PyTorch quantized models evaluated)
-
-**Effort:** Low (data collection and reporting)
 
 ## Build Order Rationale
 
-**Sequential dependency chain:**
-```
-Phase 1 (Calibration Utils)
-   ├──▶ Phase 2 (ONNX Quantization)  ─┐
-   │                                  │
-   └──▶ Phase 3 (PyTorch Quantization)├──▶ Phase 4 (Comparison)
-                                      │
-                                      ┘
-```
+### Phase 1: Model Inspection (Foundation)
 
-**Why this ordering:**
+**Components:**
+- `playground/model_loader.py`
+- `notebooks/01_model_inspector.py`
 
-1. **Calibration first** - Shared dependency, enables parallel work on phases 2-3
-2. **ONNX before PyTorch** - De-risk with simpler path, validate calibration data works
-3. **PyTorch third** - More complex, benefit from lessons learned in ONNX quantization
-4. **Comparison last** - Natural conclusion, requires all prior results
+**Why first:**
+- Simplest integration (just loading and displaying)
+- Validates Marimo + PyTorch interop
+- No parameter modification complexity
+- Users can immediately explore model structure
 
-**Alternative considered:** Parallel phases 2-3 after phase 1
-- **Rejected because:** PyTorch quantization can learn from ONNX quantization experience (calibration data size tuning, accuracy expectations)
+**Dependencies:** None (uses existing `evaluate_pytorch.py`)
 
-## Framework-Specific Quantization Details
+### Phase 2: Parameter Viewing (Read-Only)
 
-### ONNX Runtime
+**Components:**
+- `playground/param_inspector.py`
+- `notebooks/02_parameter_viewer.py`
 
-**API Location:** `onnxruntime.quantization.quantize`
+**Why second:**
+- Builds on model loading
+- Still read-only (no modifications)
+- Validates JSON data flow
+- Foundation for parameter editing
 
-**Key Functions:**
-- `quant_pre_process(input_model_path, output_model_path)` - Pre-process model
-- `quantize_static(model_input, model_output, calibration_data_reader, **kwargs)` - Main quantization
+**Dependencies:** Phase 1, existing `operations.json`
 
-**Quantization Types:**
-- `QuantType.QInt8` - Signed 8-bit integer
-- `QuantType.QUInt8` - Unsigned 8-bit integer
+### Phase 3: Inference with Hooks
 
-**Calibration Methods:**
-- MinMax (default) - Uses min/max values from calibration data
-- Entropy (KL divergence) - Minimizes information loss
-- Percentile - Clips outliers based on percentile
+**Components:**
+- `playground/inference.py`
+- `notebooks/03_inference_comparison.py`
 
-**CalibrationDataReader Interface:**
-```python
-class CalibrationDataReader:
-    def get_next(self) -> dict[str, np.ndarray] | None:
-        """Return next batch as {input_name: data} or None when done."""
-        pass
-```
+**Why third:**
+- Needs activation capture (new capability)
+- More complex than viewing
+- Foundation for comparison features
 
-**Output Format:** Standard ONNX file with QuantizeLinear/DequantizeLinear ops
+**Dependencies:** Phase 1, calibration data access
 
-**Confidence:** HIGH - Official ONNX Runtime documentation and examples
+### Phase 4: Parameter Modification
 
-### PyTorch
+**Components:**
+- `playground/param_editor.py`
+- `notebooks/04_parameter_editor.py`
 
-**API Location:** `torch.ao.quantization` (legacy) or `torchao` (recommended)
+**Why fourth:**
+- Most complex (modifying model state)
+- Needs inference to validate changes
+- Experimental feature
 
-**Key Functions (PT2E Path):**
-- `torch.export.export(model, args)` - Export to graph representation
-- `prepare_pt2e(model, quantizer)` - Insert observers
-- `convert_pt2e(model)` - Convert to quantized representation
+**Dependencies:** Phases 1-3
 
-**Quantization Types:**
-- `torch.qint8` - Signed 8-bit integer (standard on CPU)
-- `torch.quint8` - Unsigned 8-bit integer (may have limited support)
+### Phase 5: Integrated Playground
 
-**Backends:**
-- `x86` - Default for x86 CPUs (replaced FBGEMM in PyTorch 2.x)
-- `qnnpack` - Optimized for ARM/mobile
+**Components:**
+- `playground/comparison.py`
+- `notebooks/05_full_playground.py`
 
-**Observer Types:**
-- `MinMaxObserver` - Tracks min/max activation values
-- `MovingAverageMinMaxObserver` - Smoothed min/max for stability
-- `HistogramObserver` - Entropy-based calibration
+**Why last:**
+- Combines all features
+- Needs all components working
+- Polish and UX refinement
 
-**Output Format:** PyTorch checkpoint (.pt) with quantized nn.Module
-
-**Confidence:** MEDIUM-HIGH - Official PyTorch/torchao documentation, but PT2E is newer API
-
-**Uncertainty:** UINT8 support on x86 backend unclear - may default to INT8
-
-## Integration Pattern: Quantize-Then-Evaluate
-
-Both frameworks follow the same high-level pattern:
-
-```
-┌─────────────────────────────────────────┐
-│  Quantization Script (One-time)         │
-│  --------------------------------       │
-│  1. Load FP32 model                     │
-│  2. Prepare calibration data            │
-│  3. Configure quantization              │
-│  4. Calibrate (collect statistics)      │
-│  5. Convert to quantized                │
-│  6. Save quantized model                │
-└─────────────────────────────────────────┘
-                  │
-                  │ Produces quantized artifacts
-                  ▼
-┌─────────────────────────────────────────┐
-│  Evaluation Script (Reusable)           │
-│  --------------------------------       │
-│  1. Load quantized model                │
-│  2. Load test data                      │
-│  3. Run inference                       │
-│  4. Calculate accuracy                  │
-│  5. Report results                      │
-└─────────────────────────────────────────┘
-```
-
-**Benefits of this pattern:**
-- **Separation of concerns** - Quantization logic isolated from evaluation
-- **Reusability** - Evaluation script works for FP32 and quantized models
-- **Testability** - Each script independently testable
-- **Consistency** - Mirrors existing convert.py → evaluate.py pattern
-
-## Patterns to Follow
-
-### Pattern 1: Stratified Calibration Sampling
-
-**What:** Sample calibration data with equal representation from each class.
-
-**Why:** Prevents quantization bias toward majority classes, ensures all classes contribute to activation statistics.
-
-**Implementation:**
-```python
-def get_calibration_data(data_dir: str, num_samples: int = 200):
-    images, labels, _ = load_cifar10_test(data_dir)
-
-    # Sample 20 images per class (200 total for 10 classes)
-    samples_per_class = num_samples // 10
-    calibration_indices = []
-
-    for class_idx in range(10):
-        class_mask = labels == class_idx
-        class_indices = np.where(class_mask)[0]
-        # Random sample without replacement
-        sampled = np.random.choice(class_indices, samples_per_class, replace=False)
-        calibration_indices.extend(sampled)
-
-    return images[calibration_indices], labels[calibration_indices]
-```
-
-**Source:** Best practice from calibration research (128-200 samples typical)
-
-**Confidence:** HIGH
+**Dependencies:** Phases 1-4
 
 ---
 
-### Pattern 2: Pre-Processing Before Quantization (ONNX)
+## Technical Decisions
 
-**What:** Run `quant_pre_process()` before `quantize_static()`.
+### Decision 1: PyTorch Primary, ONNX Secondary
 
-**Why:** Performs symbolic shape inference and model optimization (operator fusion) that preserve computation graph structure, making debugging easier.
+**Recommendation:** Focus on PyTorch model inspection.
 
-**Implementation:**
+**Rationale:**
+- PyTorch TorchScript models are already in `models/`
+- PyTorch allows hook-based activation capture
+- Parameter modification is more straightforward
+- ONNX inspection via `operations.json` (pre-extracted)
+
+**ONNX access:** Use pre-extracted JSON for parameter viewing rather than loading ONNX models directly. This avoids ONNX Runtime dependency complexity in Marimo.
+
+### Decision 2: Reactive Parameter Modification
+
+**Recommendation:** Use Marimo's reactive execution for instant feedback.
+
+**Pattern:**
+
 ```python
-from onnxruntime.quantization import shape_inference
+import marimo as mo
 
-# Pre-process
-preprocessed_model = "models/resnet8_preprocessed.onnx"
-shape_inference.quant_pre_process(
-    input_model_path="models/resnet8.onnx",
-    output_model_path=preprocessed_model
-)
+# Slider bound to variable
+scale_slider = mo.ui.slider(0.001, 0.1, value=0.03, step=0.001)
 
-# Then quantize
-quantize_static(preprocessed_model, output_model, calibration_reader, ...)
+# Cell that depends on slider
+@mo.reactive
+def modified_inference():
+    modified_scale = scale_slider.value
+    # Modify model parameter
+    # Run inference
+    # Return results
+    return results
 ```
 
-**Source:** ONNX Runtime documentation recommendation
+**Rationale:** Marimo's reactive model eliminates callback boilerplate and ensures consistent state.
 
-**Confidence:** HIGH
+### Decision 3: Project Notebook Pattern
 
----
+**Recommendation:** Use Marimo as project notebook (not sandbox).
 
-### Pattern 3: Separate Scripts Per Quantization Type
+**Configuration in `pyproject.toml`:**
 
-**What:** Create separate `quantize_onnx.py` and `quantize_pytorch.py` rather than unified script.
-
-**Why:**
-- APIs differ significantly between frameworks
-- Configuration options framework-specific
-- Easier to maintain and debug
-- Mirrors existing conversion pattern (convert.py vs convert_pytorch.py)
-
-**Confidence:** HIGH
-
----
-
-### Pattern 4: Preserve Preprocessing Consistency
-
-**What:** Use identical preprocessing in calibration and evaluation (raw pixel values [0, 255]).
-
-**Why:** Model trained on raw pixels - normalization would invalidate calibration and cause accuracy loss.
-
-**Critical:** Already established in v1.0 that model expects raw [0, 255] values, NOT [0, 1] normalized.
-
-**Implementation:**
-```python
-# DON'T normalize for ResNet8 CIFAR-10
-images = images.astype(np.float32)  # Keep [0, 255] range
-
-# This would break quantization:
-# images = images.astype(np.float32) / 255.0  # WRONG for this model
+```toml
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+    "marimo>=0.10.0",  # Add marimo as dev dependency
+]
 ```
 
-**Confidence:** HIGH (learned from v1.0 debugging)
+**Rationale:**
+- Shares dependencies with project (torch, onnx, etc.)
+- Can import from `scripts/` directly
+- No inline dependency management needed
 
-## Anti-Patterns to Avoid
+### Decision 4: Minimal Script Modification
 
-### Anti-Pattern 1: Using Full Test Set for Calibration
+**Recommendation:** Prefer wrapping over modifying existing scripts.
 
-**What:** Using all 10,000 CIFAR-10 test images for calibration.
+**Pattern:**
 
-**Why bad:**
-- Unnecessary computation time (calibration runs full inference)
-- Minimal accuracy improvement beyond 100-200 samples
-- Risk of overfitting quantization parameters to test set
-
-**Consequences:**
-- Slow quantization process (minutes instead of seconds)
-- Potential data leakage if calibration set == test set
-
-**Instead:** Use 100-200 stratified samples from test set (separate from final evaluation) or ideally from validation set.
-
-**Source:** Research shows 128-200 samples sufficient, diminishing returns beyond
-
-**Confidence:** HIGH
-
----
-
-### Anti-Pattern 2: Ignoring Calibration Method Selection
-
-**What:** Using default calibration method (MinMax) without testing alternatives.
-
-**Why bad:**
-- MinMax sensitive to outliers, may choose poor quantization range
-- Entropy and Percentile methods often produce better accuracy
-- CNN models (like ResNet8) typically benefit from Entropy calibration
-
-**Consequences:**
-- Unnecessary accuracy loss from suboptimal quantization ranges
-
-**Instead:**
 ```python
-# ONNX Runtime - try Entropy first for CNNs
-quantize_static(
-    ...,
-    calibrate_method=CalibrationMethod.Entropy  # Not just MinMax
-)
+# playground/model_loader.py
+def load_model_for_playground(path):
+    """Wrapper that handles playground-specific concerns."""
+    import sys
+    import os
 
-# PyTorch - use HistogramObserver for entropy-based calibration
-from torch.ao.quantization import HistogramObserver
-qconfig = QConfig(
-    activation=HistogramObserver.with_args(...),
-    weight=PerChannelMinMaxObserver.with_args(...)
-)
+    # Temporarily modify path
+    scripts_dir = os.path.join(os.path.dirname(__file__), "..", "scripts")
+    sys.path.insert(0, scripts_dir)
+
+    try:
+        from evaluate_pytorch import load_pytorch_model
+        return load_pytorch_model(path)
+    finally:
+        sys.path.remove(scripts_dir)
 ```
 
-**Confidence:** MEDIUM-HIGH (common recommendation, but MinMax often works well enough)
+**Rationale:**
+- Existing scripts continue working standalone
+- Playground has its own import handling
+- Easier to maintain both use cases
 
 ---
 
-### Anti-Pattern 3: Modifying Evaluation Scripts Unnecessarily
+## Marimo UI Component Mapping
 
-**What:** Rewriting evaluation logic for quantized models when existing code works.
-
-**Why bad:**
-- Code duplication
-- Maintenance burden (two evaluation paths)
-- Risk of introducing bugs
-
-**Consequences:**
-- Harder to compare FP32 vs quantized (different evaluation code)
-- Technical debt
-
-**Instead:**
-- ONNX: Use `scripts/evaluate.py` unchanged - quantized .onnx works identically
-- PyTorch: Minimal changes to model loading only, reuse evaluation logic
-
-**Confidence:** HIGH
+| Feature | Marimo Component | Usage |
+|---------|-----------------|-------|
+| Model selection | `mo.ui.dropdown` | Select from available models |
+| Layer tree | `mo.ui.tree` | Hierarchical model structure |
+| Parameter table | `mo.ui.table` | Scale/zero-point display |
+| Scale editor | `mo.ui.slider` + `mo.ui.number` | Modify scale values |
+| Image viewer | `mo.image` | Show sample images |
+| Activation heatmap | plotly/altair + `mo.ui.plotly` | Visualize activations |
+| Comparison view | `mo.hstack`/`mo.vstack` | Side-by-side layouts |
+| Metrics display | `mo.stat` | Accuracy/loss numbers |
+| Layer selection | `mo.ui.multiselect` | Choose layers to inspect |
 
 ---
 
-### Anti-Pattern 4: Quantizing Before Export (PyTorch)
+## File Structure After Implementation
 
-**What:** Trying to quantize PyTorch model before `torch.export.export()` in PT2E path.
-
-**Why bad:**
-- PT2E requires exported graph representation for quantization
-- Eager mode quantization (older API) has limitations and less active development
-- PT2E is recommended path in PyTorch 2.x
-
-**Consequences:**
-- Incompatible with recommended quantization workflow
-- May fail or produce suboptimal results
-
-**Instead:**
-```python
-# CORRECT - Export first, then quantize
-exported = torch.export.export(model, (example_input,))
-prepared = prepare_pt2e(exported, quantizer)
-# ... calibration ...
-quantized = convert_pt2e(prepared)
-
-# WRONG - Trying to quantize non-exported model
-quantized = torch.quantization.quantize_static(model, ...)  # Legacy eager mode
+```
+resnet8/
+├── models/
+│   ├── resnet8.pt
+│   ├── resnet8_int8.pt
+│   └── resnet8_int8_operations.json
+├── scripts/
+│   ├── calibration_utils.py      # Unchanged
+│   ├── evaluate_pytorch.py       # Unchanged
+│   ├── extract_operations.py     # Unchanged
+│   └── ...
+├── playground/                    # NEW
+│   ├── __init__.py
+│   ├── model_loader.py
+│   ├── param_inspector.py
+│   ├── inference.py
+│   ├── comparison.py
+│   └── visualization.py
+├── notebooks/                     # NEW
+│   ├── 01_model_inspector.py
+│   ├── 02_parameter_viewer.py
+│   ├── 03_inference_comparison.py
+│   ├── 04_parameter_editor.py
+│   └── 05_full_playground.py
+├── pyproject.toml                 # Add marimo to dev deps
+└── ...
 ```
 
-**Source:** PyTorch 2.x documentation recommends PT2E over eager mode
-
-**Confidence:** HIGH
-
 ---
 
-### Anti-Pattern 5: Per-Tensor Quantization Only
+## Risk Mitigation
 
-**What:** Using per-tensor quantization when per-channel is available.
+### Risk 1: TorchScript Quantized Model Modification
 
-**Why bad:**
-- Per-tensor uses single scale/zero-point for entire weight tensor
-- Per-channel uses separate scale/zero-point per output channel
-- Per-channel typically produces better accuracy (especially for Conv layers)
-- Minimal inference overhead
-
-**Consequences:**
-- Unnecessary accuracy loss from coarse quantization granularity
-
-**Instead:**
-```python
-# ONNX Runtime
-quantize_static(..., per_channel=True)  # Enable per-channel quantization
-
-# PyTorch
-from torch.ao.quantization import PerChannelMinMaxObserver
-qconfig = QConfig(
-    activation=MinMaxObserver,
-    weight=PerChannelMinMaxObserver  # Per-channel for weights
-)
-```
-
-**Confidence:** HIGH (standard best practice)
-
-## Verification Strategy
-
-### Quantization Script Verification
-
-**After quantization, verify:**
-1. **Model file created** - Check file exists at expected path
-2. **Model loads** - `onnxruntime.InferenceSession()` or `torch.load()` succeeds
-3. **Model runs** - Forward pass with test input produces output
-4. **Output shape correct** - (batch, 10) for CIFAR-10 classification
-5. **Accuracy reasonable** - Run evaluation on subset (1000 images) for quick check
-
-### Calibration Data Verification
-
-**Before quantization, verify:**
-1. **Sample count** - 200 images (or configured amount)
-2. **Class distribution** - 20 images per class (stratified)
-3. **Shape correct** - (N, 32, 32, 3)
-4. **Value range** - [0, 255] for raw pixels (not normalized)
-5. **No duplicates** - Each image appears once in calibration set
-
-### Evaluation Verification
-
-**After quantization, verify:**
-1. **Baseline accuracy** - FP32 models still achieve 87.19% (sanity check)
-2. **Quantized accuracy** - Within reasonable delta (typically -1% to -3% for 8-bit)
-3. **Model size reduction** - INT8/UINT8 models ~4x smaller than FP32
-4. **No degraded classes** - Per-class accuracy doesn't collapse for any class
-
-## Risk Factors and Mitigations
-
-### Risk 1: PyTorch UINT8 Limited Support
-
-**Risk:** PyTorch x86 backend may not support UINT8 quantization (traditionally INT8-focused).
-
-**Impact:** Cannot produce `resnet8_uint8.pt`, scope reduction.
-
-**Likelihood:** Medium - UINT8 support unclear in documentation.
+**Challenge:** TorchScript models are frozen; parameters may not be easily modifiable.
 
 **Mitigation:**
-1. Attempt UINT8 quantization with `torch.quint8` dtype
-2. If unsupported, document limitation and proceed with INT8 only
-3. ONNX Runtime UINT8 still available for comparison
+1. For viewing: Extract parameters without modification (works)
+2. For editing: May need to re-quantize from FP32 with modified parameters
+3. Alternative: Load checkpoint format instead of TorchScript where possible
 
-**Detection:** PyTorch will raise error if UINT8 unsupported during `prepare_pt2e()`.
+### Risk 2: Hook Compatibility with Quantized Models
 
----
-
-### Risk 2: Quantization Accuracy Loss > 5%
-
-**Risk:** Quantized models lose >5% accuracy (e.g., 87.19% → <82%), making results unusable.
-
-**Impact:** Quantized models not production-viable, investigation needed.
-
-**Likelihood:** Low - 8-bit quantization typically loses 1-3% accuracy with proper calibration.
+**Challenge:** PyTorch hooks may not capture quantized tensor internals correctly.
 
 **Mitigation:**
-1. Use entropy-based calibration (not just MinMax)
-2. Increase calibration samples to 500 if accuracy poor
-3. Try per-channel quantization
-4. Debug with per-layer accuracy analysis
+1. Test hooks on both FP32 and INT8 models early
+2. Use TorchScript graph inspection as fallback
+3. Document which layers support hook-based inspection
 
-**Detection:** Evaluation script reports accuracy after quantization.
+### Risk 3: Large Model/Data in Interactive Environment
 
----
-
-### Risk 3: Calibration Data Selection Bias
-
-**Risk:** Using test set for calibration creates data leakage, overfitting quantization parameters.
-
-**Impact:** Accuracy appears good on test set but doesn't generalize.
-
-**Likelihood:** Low if using small subset (200/10000 = 2% overlap).
+**Challenge:** Full CIFAR-10 (10K images) too slow for interactive feedback.
 
 **Mitigation:**
-1. Use separate validation set if available
-2. Document test set usage for calibration
-3. Keep calibration set small (200 images) to minimize overlap
-
-**Detection:** Cannot detect directly (would need separate validation set).
+1. Use calibration subset (100-1000 images) for experiments
+2. Cache inference results where possible
+3. Provide progress indicators for longer operations
 
 ---
-
-### Risk 4: PT2E Export Fails for Model
-
-**Risk:** `torch.export.export()` fails due to dynamic control flow or unsupported operations.
-
-**Impact:** Cannot use PT2E quantization path, must fall back to eager mode.
-
-**Likelihood:** Low - ResNet8 is simple CNN with standard operations.
-
-**Mitigation:**
-1. Test export early (Phase 3, Task 1)
-2. If export fails, document issue and use eager mode quantization
-3. Eager mode: `torch.quantization.quantize_static()` instead of PT2E
-
-**Detection:** `torch.export.export()` will raise error if model not exportable.
-
-## Confidence Assessment
-
-| Aspect | Confidence | Rationale |
-|--------|-----------|-----------|
-| **ONNX Runtime workflow** | HIGH | Official documentation, clear examples, standard API |
-| **PyTorch PT2E workflow** | MEDIUM-HIGH | Official documentation, but newer API (2.x), less battle-tested |
-| **Calibration data requirements** | HIGH | Multiple sources agree on 100-200 samples, stratified sampling |
-| **Integration points** | HIGH | Analyzed existing code, quantized models use same interfaces |
-| **Build order** | HIGH | Sequential dependencies clear, de-risks with ONNX first |
-| **PyTorch UINT8 support** | LOW | Documentation unclear on x86 backend UINT8 support |
-| **Accuracy expectations** | MEDIUM | Typical 8-bit PTQ loses 1-3%, but model-specific |
-
-## Open Questions for Phase Planning
-
-1. **Calibration method comparison:** Should we try multiple calibration methods (MinMax, Entropy, Percentile) or default to Entropy?
-   - **Recommendation:** Start with MinMax (simpler), add Entropy if accuracy poor
-
-2. **Calibration sample size:** Use 200 samples (default) or more?
-   - **Recommendation:** Start with 200, increase to 500 only if accuracy < 84%
-
-3. **PyTorch backend selection:** x86 (default) or qnnpack?
-   - **Recommendation:** x86 (CPU target), qnnpack only if targeting mobile/ARM
-
-4. **Validation vs test set for calibration:** Use test set subset or separate validation?
-   - **Recommendation:** Test set subset (200/10000) acceptable for research, document limitation
-
-5. **UINT8 handling if PyTorch doesn't support:** Skip or investigate workaround?
-   - **Recommendation:** Attempt first, skip if unsupported (ONNX UINT8 still available)
 
 ## Sources
 
-### High Confidence (Official Documentation)
+### Marimo Documentation (HIGH confidence)
+- [Marimo Official Docs](https://docs.marimo.io/) - API reference and guides
+- [Marimo Best Practices](https://docs.marimo.io/guides/best_practices/) - Notebook organization
+- [Notebooks in Projects](https://docs.marimo.io/guides/package_management/notebooks_in_projects/) - Integration patterns
 
-- [Quantize ONNX models | ONNX Runtime](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html) - ONNX Runtime quantization overview
-- [ONNX Runtime Image Classification Quantization Example](https://github.com/microsoft/onnxruntime-inference-examples/blob/main/quantization/image_classification/cpu/ReadMe.md) - Complete workflow example
-- [PyTorch 2 Export Post Training Quantization](https://docs.pytorch.org/ao/stable/tutorials_source/pt2e_quant_ptq.html) - PT2E quantization tutorial
-- [Static Quantization Tutorial - PyTorch](https://docs.pytorch.org/tutorials/advanced/static_quantization_tutorial.html) - Static quantization guide
-- [INT8 Quantization for x86 CPU in PyTorch](https://pytorch.org/blog/int8-quantization/) - x86 backend details
+### PyTorch Documentation (HIGH confidence)
+- [PyTorch Hooks Tutorial](https://pytorch.org/tutorials/beginner/former_torchies/nnft_tutorial.html#forward-and-backward-function-hooks) - Activation capture
+- [TorchScript Reference](https://pytorch.org/docs/stable/jit.html) - Scripted model inspection
 
-### Medium Confidence (Research and Community)
+### Project-Specific (HIGH confidence)
+- Existing scripts in `scripts/` directory - Direct code review
+- `models/resnet8_int8_operations.json` - Pre-extracted quantization parameters
+- `docs/quantization/04-architecture.md` - QDQ format understanding
 
-- [Calibration Data for LLM Quantization](https://apxml.com/courses/quantized-llm-deployment/chapter-1-advanced-llm-quantization-fundamentals/calibration-data-selection) - Calibration data best practices (128-200 samples)
-- [Accurate Post Training Quantization With Small Calibration Sets](http://proceedings.mlr.press/v139/hubara21a/hubara21a.pdf) - Research on calibration set size
-- [Model Quantization Concepts - NVIDIA](https://developer.nvidia.com/blog/model-quantization-concepts-methods-and-why-it-matters/) - Quantization overview
-- [Quantization Overview - HuggingFace](https://huggingface.co/docs/optimum/en/concept_guides/quantization) - General quantization concepts
+---
 
-### Low Confidence (WebSearch, Verification Needed)
+## Confidence Assessment
 
-- PyTorch UINT8 support on x86 backend - Documentation unclear, needs experimental verification
-- Optimal calibration method for ResNet8 CIFAR-10 - Model-specific, requires experimentation
-- PT2E export compatibility with onnx2torch-converted models - May have edge cases
+| Component | Confidence | Rationale |
+|-----------|------------|-----------|
+| Model loading integration | HIGH | Existing code works, wrapper is straightforward |
+| Parameter extraction | HIGH | JSON format already defined and working |
+| Marimo reactive UI | HIGH | Well-documented, standard patterns |
+| Hook-based activation capture | MEDIUM | PyTorch hooks work but quantized model behavior needs testing |
+| Parameter modification | MEDIUM | TorchScript limitations may require workarounds |
+| Full integration | MEDIUM | Complex composition, needs iterative refinement |
 
-## Notes for Roadmap Creation
+---
 
-**Phase structure recommendation:**
+## Implications for Roadmap
 
-1. **Phase 1: Calibration Infrastructure** - Foundational, enables parallel work
-2. **Phase 2: ONNX Runtime Quantization** - Lower complexity, de-risk early
-3. **Phase 3: PyTorch Quantization** - Higher complexity, benefits from Phase 2 learnings
-4. **Phase 4: Comparison and Analysis** - Synthesize results
+Based on this architecture research:
+
+1. **Phase 1 (Foundation):** Model loading + basic inspection UI
+   - Low risk, validates core integration
+   - Deliverable: Working Marimo notebook that loads and displays model structure
+
+2. **Phase 2 (Parameters):** Parameter viewing from JSON
+   - Low risk, read-only operations
+   - Deliverable: Interactive table of scale/zero-point values
+
+3. **Phase 3 (Inference):** Hook-based activation capture
+   - Medium risk, needs validation on quantized models
+   - Deliverable: Side-by-side FP32 vs INT8 comparison
+
+4. **Phase 4 (Editing):** Parameter modification experiments
+   - Higher risk, TorchScript limitations
+   - Deliverable: Interactive scale/zero-point modification with re-inference
+
+5. **Phase 5 (Polish):** Integrated playground
+   - Integration risk, but all components proven
+   - Deliverable: Complete playground notebook
 
 **Research flags:**
-- **Phase 1:** Low research risk - straightforward data sampling
-- **Phase 2:** Low research risk - well-documented ONNX Runtime API
-- **Phase 3:** Medium research risk - PT2E is newer, UINT8 support unclear
-- **Phase 4:** No research risk - data collection only
-
-**Critical path dependencies:**
-- Phase 2 and 3 both depend on Phase 1 (calibration data)
-- Phase 4 depends on Phase 2 and 3 (all evaluations complete)
-- No circular dependencies
-
-**Estimated effort:**
-- Phase 1: 1-2 hours (simple data sampling)
-- Phase 2: 3-4 hours (CalibrationDataReader, quantization, evaluation)
-- Phase 3: 4-6 hours (PT2E export, quantization, potential evaluation changes, UINT8 investigation)
-- Phase 4: 1-2 hours (comparison table, documentation)
-
-**Total estimated effort:** 9-14 hours for complete PTQ evaluation milestone.
+- Phase 3 may need deeper research on quantized model hooks
+- Phase 4 may need research on TorchScript modification limitations
