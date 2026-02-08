@@ -1,0 +1,10 @@
+{
+  "name": "resnet8-cifar10",
+  "version": "1.2.0",
+  "tasks": {
+    "doc": "deno doc --html --name='ResNet8 CIFAR-10' --output=docs/api/_site docs/api/mod.ts"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}
