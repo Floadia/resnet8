@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 Phase: 15 of 17 (Parameter Inspection)
 Plan: Ready to plan
 Status: Ready for Phase 15
-Last activity: 2026-02-06 -- Phase 14 complete (verified)
+Last activity: 2026-02-08 -- Completed quick task 004: Support deno doc
 
 Progress: [===============.....] 17/20 plans (85% completion)
 
@@ -76,12 +76,11 @@ None
 
 None
 
-## Quick Tasks
+### Quick Tasks Completed
 
-Quick tasks are standalone improvements tracked separately from planned phases.
-
-**Completed:**
-- Quick 004 (2026-02-08): Deno documentation support - TypeScript type definitions documenting 33 Python functions across 14 modules for browsable HTML docs via deno doc
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 004 | Support deno doc | 2026-02-08 | 8e7ad3c | [004-support-deno-doc](./quick/004-support-deno-doc/) |
 
 ## Session Continuity
 
