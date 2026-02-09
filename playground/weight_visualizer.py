@@ -6,7 +6,7 @@ Usage:
 
 import marimo
 
-__generated_with = "0.19.7"
+__generated_with = "0.19.9"
 app = marimo.App()
 
 
@@ -25,7 +25,6 @@ def _():
         sys.path.insert(0, str(project_root))
 
     MODELS_DIR = project_root / "models"
-
     return MODELS_DIR, go, mo, np
 
 
@@ -61,7 +60,7 @@ def _(mo, model_files):
 
 
 @app.cell
-def _(model_selector, mo, np):
+def _(mo, model_selector, np):
     """Load selected model and extract layer/tensor info."""
     import torch
 
@@ -275,7 +274,7 @@ def _(model_selector, mo, np):
 
     model_data = _model_data
     load_error = _load_error
-    return load_error, model_data, torch
+    return load_error, model_data
 
 
 @app.cell
@@ -332,7 +331,6 @@ def _(layer_selector, model_data, tensor_selector):
         _td = model_data.get("tensor_data", {})
         _layer_td = _td.get(layer_selector.value, {})
         tensor_entry = _layer_td.get(tensor_selector.value)
-
     return (tensor_entry,)
 
 
@@ -347,7 +345,7 @@ def _(mo, tensor_entry):
     )
     mo.md(f"""**Quantization View**
 
-{quant_view}""").callout(kind="neutral") if _is_quant else None
+    {quant_view}""").callout(kind="neutral") if _is_quant else None
     return (quant_view,)
 
 
@@ -400,7 +398,7 @@ def _(bins_slider, go, mo, quant_view, tensor_entry):
 
     histogram_fig = _fig
     mo.ui.plotly(histogram_fig) if histogram_fig else None
-    return (histogram_fig,)
+    return
 
 
 @app.cell
@@ -509,9 +507,9 @@ def _(
 
             _range_md = f"""**Selected Range:** [{_r_min:.6f}, {_r_max:.6f}]
 
-**Count in range:** {_count_in} / {_total}
+    **Count in range:** {_count_in} / {_total}
 
-**Percentage:** {_pct:.2f}%"""
+    **Percentage:** {_pct:.2f}%"""
 
             _range_display = mo.vstack(
                 [
