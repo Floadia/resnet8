@@ -38,19 +38,17 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 
 - `models/` ディレクトリ内の `.onnx` および `.pt` ファイルを自動検出
 - ドロップダウンで選択
-- **実装**: `mo.ui.dropdown(options=model_files, allow_select_none=True, label="Model")`
 
 ### 2.2 レイヤー選択
 
 - 選択されたモデルからレイヤー一覧を動的に取得
 - ドロップダウンで選択
-- **実装**: `mo.ui.dropdown(options=_layer_options, allow_select_none=True, label="Layer")`
 
 ### 2.3 テンソル選択
 
 - レイヤー選択後、`weight` / `bias` をドロップダウンで切り替え可能
 - デフォルトは `weight`
-- **実装**: レイヤー・テンソルは `mo.hstack([layer_selector, tensor_selector])` で横並び表示
+- レイヤーとテンソルは横並びで表示
 
 ### 2.4 量子化モデル対応
 
@@ -58,26 +56,23 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
   - **int8 raw values**: 量子化された整数値のヒストグラム
   - **dequantized (FP32)**: `scale × (value - zero_point)` でFP32相当に復元した値のヒストグラム
 - FP32 モデルでは切り替えUIは非表示
-- **実装**: `mo.ui.radio(options={"int8 raw values": "int", "dequantized (FP32)": "fp32"}, value="dequantized (FP32)")` を `mo.md().callout(kind="neutral")` で表示
 
 ### 2.5 ヒストグラム表示
 
 - Plotly によるインタラクティブなヒストグラム
 - ビン数はスライダーで調整可能 (10〜200, step=5, デフォルト=50)
 - ホバーで各ビンの詳細値を表示
-- パーセンテージラベル付き (`histnorm="percent"`)
-- **実装**: `go.Histogram(x=data, nbinsx=bins, histnorm="percent")` + `mo.ui.plotly(fig)`
+- Y軸はパーセンテージ表示
 
 ### 2.6 値範囲分析
 
 - ユーザが min / max を入力して [Apply Range] で適用
 - デフォルト値は `mean ± std` を自動計算
-- 指定範囲をヒストグラム上でハイライト表示（オレンジ色、範囲外はグレー）
+- 指定範囲をヒストグラム上でハイライト表示（範囲内: オレンジ、範囲外: グレー）
 - 統計パネルに以下を表示:
   - 選択範囲
   - 範囲内のパラメータ数
   - 全体に占める割合 (%)
-- **実装**: `mo.ui.text` × 2 + `mo.ui.run_button` → `barmode="overlay"` で2色ヒストグラム
 
 ### 2.7 統計情報表示
 
@@ -85,7 +80,6 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 - Shape (テンソル形状)
 - Total params (パラメータ数)
 - 量子化テンソルの場合: Scale, Zero Point も表示
-- **実装**: `mo.md().callout(kind="neutral")`
 
 ---
 
@@ -114,35 +108,27 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 | 技術 | 用途 | バージョン |
 | --- | --- | --- |
 | Python | 言語 | 3.12+ |
-| Marimo | UIフレームワーク / notebook | 0.19.9 |
-| Plotly | ヒストグラム描画 | 5.0.0+ |
-| PyTorch | PyTorchモデル読み込み | 2.0.0+ |
-| NumPy | 数値計算 | 1.26.4+ |
-| ONNX | ONNXモデル読み込み (optional) | 1.17.0+ |
+| Marimo | UIフレームワーク / notebook | >= 0.19 |
+| Plotly | ヒストグラム描画 | >= 5.0 |
+| PyTorch | PyTorchモデル読み込み | >= 2.0 |
+| NumPy | 数値計算 | >= 1.26 |
+| ONNX | ONNXモデル読み込み (optional) | >= 1.17 |
 
 ### 4.2 アーキテクチャ
 
-**ファイル**: `playground/weight_visualizer.py` (約560行)
+**ファイル**: `playground/weight_visualizer.py`
 
-セル構成 (15 cells):
+各セルの責務は docstring に記載。大まかな構成:
 
-| # | 責務 | 出力変数 |
-|---|------|----------|
-| 1 | インポート・定数定義 | `MODELS_DIR`, `go`, `mo`, `np` |
-| 2 | タイトル表示 | - |
-| 3 | モデルファイル検出 | `model_files` |
-| 4 | モデル選択UI | `model_selector` |
-| 5 | モデル読み込み・テンソル抽出 | `model_data`, `load_error` |
-| 6 | エラー表示 | - |
-| 7 | レイヤー選択UI | `layer_selector` |
-| 8 | テンソル選択UI + レイヤー/テンソル横並び | `tensor_selector` |
-| 9 | テンソルデータ参照 | `tensor_entry` |
-| 10 | 量子化ビュー切替 | `quant_view` |
-| 11 | ビンスライダー | `bins_slider` |
-| 12 | ヒストグラム表示 | `histogram_fig` |
-| 13 | 値範囲入力UI | `range_min_input`, `range_max_input`, `apply_button` |
-| 14 | 値範囲ハイライト表示 | - |
-| 15 | 統計情報パネル | - |
+1. インポート・定数定義
+2. タイトル表示
+3. モデルファイル検出 → モデル選択UI
+4. モデル読み込み・テンソル一括抽出
+5. レイヤー選択UI → テンソル選択UI
+6. 量子化ビュー切替 / ビンスライダー
+7. ヒストグラム表示
+8. 値範囲分析UI + ハイライト表示
+9. 統計情報パネル
 
 ### 4.3 モデル読み込み方式
 
@@ -162,15 +148,6 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 **ONNX** (対応済みだが現在モデルファイルなし):
 - `onnx.load()` → `model.graph.initializer` からテンソル取得
 - scale/zero_point initializer を参照して量子化パラメータ取得
-
-### 4.4 Marimo 設計上の注意点
-
-- ヘルパー関数 (`_load_onnx_model`, `_load_pytorch_model`) はモデル読み込みセル**内部**で定義
-  - Marimo では `def _xxx()` (アンダースコアプレフィックス) はセルプライベート、他セルから呼び出し不可
-- セルローカル変数は全て `_` プレフィックス (例: `_data`, `_is_q`, `_x_title`)
-  - プレフィックスなしの変数はセル間エクスポートされ、重複定義がエラーになるため
-- `mo.ui.radio` の `value` パラメータはオプションの**キー（ラベル）**を指定 (値ではない)
-  - 正: `value="dequantized (FP32)"` / 誤: `value="fp32"`
 
 ---
 
@@ -232,48 +209,56 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 
 ## 7. 実際のモデルデータ (実行結果)
 
-以下は `resnet8.pt` (FP32) および `resnet8_int8.pt` (INT8 TorchScript) から実際に抽出したデータである。
+モデルから抽出した重み統計データは [`spec/captures/model_data.json`](captures/model_data.json) に格納されている。
 
-### 7.1 FP32 モデル (`resnet8.pt`) レイヤー一覧
+再生成コマンド:
 
-| レイヤー | テンソル | Shape | Params | Min | Max | Mean | Std |
-|---------|---------|-------|--------|-----|-----|------|-----|
-| conv2d_1/BiasAdd | weight | (16, 3, 3, 3) | 432 | -0.7645 | 0.9083 | -0.0021 | 0.2687 |
-| conv2d_1/BiasAdd | bias | (16,) | 16 | -0.0056 | 0.0009 | -0.0007 | 0.0016 |
-| conv2d_1_2/BiasAdd | weight | (16, 16, 3, 3) | 2,304 | -0.6771 | 0.5802 | -0.0041 | 0.1295 |
-| conv2d_1_2/BiasAdd | bias | (16,) | 16 | -0.0599 | 0.1370 | 0.0101 | 0.0469 |
-| conv2d_2_1/BiasAdd | weight | (16, 16, 3, 3) | 2,304 | -0.5411 | 0.5084 | -0.0005 | 0.1172 |
-| conv2d_3_1/BiasAdd.1 | weight | (32, 16, 3, 3) | 4,608 | -0.4830 | 0.3758 | -0.0060 | 0.0998 |
-| conv2d_4_1/BiasAdd | weight | (32, 32, 3, 3) | 9,216 | -0.4152 | 0.3844 | -0.0041 | 0.0865 |
-| conv2d_5_1/BiasAdd | weight | (32, 16, 1, 1) | 512 | -0.4724 | 0.5948 | 0.0139 | 0.1338 |
-| conv2d_6_1/BiasAdd.1 | weight | (64, 32, 3, 3) | 18,432 | -0.2789 | 0.3226 | -0.0047 | 0.0693 |
-| conv2d_7_1/BiasAdd | weight | (64, 64, 3, 3) | 36,864 | -0.2503 | 0.2733 | -0.0021 | 0.0581 |
-| conv2d_8_1/BiasAdd | weight | (64, 32, 1, 1) | 2,048 | -0.6925 | 0.5840 | -0.0271 | 0.1356 |
+```bash
+uv run python -c "
+import torch, numpy as np, json
 
-**合計パラメータ数 (weight のみ)**: 76,732
+# FP32
+fp32 = torch.load('models/resnet8.pt', weights_only=False, map_location='cpu')
+model = fp32['model']; model.eval()
+fp32_layers = {}
+for name, param in model.state_dict().items():
+    parts = name.rsplit('.', 1)
+    if len(parts) == 2 and parts[1] in ('weight', 'bias'):
+        arr = param.cpu().numpy()
+        fp32_layers.setdefault(parts[0], {})[parts[1]] = dict(
+            shape=list(arr.shape), min=float(np.min(arr)), max=float(np.max(arr)),
+            mean=float(np.mean(arr)), std=float(np.std(arr)), total_params=int(np.prod(arr.shape)))
 
-### 7.2 INT8 量子化モデル (`resnet8_int8.pt`) レイヤー一覧
+# INT8
+int8_model = torch.jit.load('models/resnet8_int8.pt', map_location='cpu'); int8_model.eval()
+int8_layers = {}
+for name, mod in int8_model.named_modules():
+    if not name: continue
+    try:
+        if not mod._c.hasattr('_packed_params'): continue
+        packed = mod._c.__getattr__('_packed_params')
+        for fn in [torch.ops.quantized.conv2d_unpack, torch.ops.quantized.linear_unpack]:
+            try: w, b = fn(packed); break
+            except: continue
+        else: continue
+        int_arr, deq_arr = w.int_repr().cpu().numpy(), w.dequantize().cpu().numpy()
+        entry = dict(
+            weight_int=dict(shape=list(int_arr.shape), min=int(np.min(int_arr)), max=int(np.max(int_arr)), mean=float(np.mean(int_arr))),
+            weight_fp32=dict(shape=list(deq_arr.shape), min=float(np.min(deq_arr)), max=float(np.max(deq_arr)),
+                mean=float(np.mean(deq_arr)), std=float(np.std(deq_arr)), total_params=int(np.prod(deq_arr.shape))),
+            scale=float(w.q_per_channel_scales().mean()), zero_point=float(w.q_per_channel_zero_points().float().mean()))
+        if b is not None:
+            b_arr = b.detach().cpu().numpy()
+            entry['bias'] = dict(shape=list(b_arr.shape), min=float(np.min(b_arr)), max=float(np.max(b_arr)),
+                mean=float(np.mean(b_arr)), std=float(np.std(b_arr)), total_params=int(np.prod(b_arr.shape)))
+        int8_layers[name] = entry
+    except: pass
 
-| レイヤー | Shape | Scale | ZP | INT8 Range | FP32 Range | FP32 Mean | FP32 Std |
-|---------|-------|-------|-----|-----------|-----------|----------|---------|
-| conv2d_1/BiasAdd | (16, 3, 3, 3) | 0.004477 | 0.0 | [-128, 127] | [-0.7642, 0.9048] | -0.0023 | 0.2686 |
-| conv2d_1_2/BiasAdd | (16, 16, 3, 3) | 0.003202 | 0.0 | [-128, 127] | [-0.6797, 0.5788] | -0.0042 | 0.1295 |
-| conv2d_2_1/BiasAdd | (16, 16, 3, 3) | 0.003032 | 0.0 | [-128, 127] | [-0.5432, 0.5065] | -0.0005 | 0.1173 |
-| conv2d_3_1/BiasAdd.1 | (32, 16, 3, 3) | 0.002398 | 0.0 | [-128, 127] | [-0.4849, 0.3750] | -0.0060 | 0.0998 |
-| conv2d_4_1/BiasAdd | (32, 32, 3, 3) | 0.002169 | 0.0 | [-128, 127] | [-0.4168, 0.3842] | -0.0041 | 0.0865 |
-| conv2d_5_1/BiasAdd | (32, 16, 1, 1) | 0.002277 | 0.0 | [-128, 127] | [-0.4742, 0.5925] | 0.0138 | 0.1337 |
-| conv2d_6_1/BiasAdd.1 | (64, 32, 3, 3) | 0.001749 | 0.0 | [-128, 127] | [-0.2800, 0.3214] | -0.0047 | 0.0693 |
-| conv2d_7_1/BiasAdd | (64, 64, 3, 3) | 0.001554 | 0.0 | [-128, 127] | [-0.2513, 0.2722] | -0.0021 | 0.0581 |
-| conv2d_8_1/BiasAdd | (64, 32, 1, 1) | 0.002705 | 0.0 | [-128, 127] | [-0.6952, 0.5866] | -0.0271 | 0.1357 |
-
-### 7.3 量子化精度の観察
-
-全レイヤーで per-channel symmetric quantization (zero_point = 0.0) が適用されている。
-
-FP32 → INT8 の値変化:
-- **conv2d_1**: FP32 range [-0.7645, 0.9083] → INT8 dequantized [-0.7642, 0.9048] (誤差 < 0.004)
-- **conv2d_7_1**: FP32 range [-0.2503, 0.2733] → INT8 dequantized [-0.2513, 0.2722] (誤差 < 0.002)
-- 全レイヤーで scale 値は 0.001〜0.005 の範囲に収まっており、量子化精度は良好
+with open('spec/captures/model_data.json', 'w') as f:
+    json.dump(dict(fp32_layers=fp32_layers, int8_layers=int8_layers), f, indent=2)
+print('Written to spec/captures/model_data.json')
+"
+```
 
 ---
 
