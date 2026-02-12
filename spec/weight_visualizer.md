@@ -216,14 +216,3 @@ marimo edit playground/weight_visualizer.py
 # または読み取り専用モード
 marimo run playground/weight_visualizer.py
 ```
-
-## 8. 依存関係
-
-`pyproject.toml` に以下が追加済み:
-- `marimo>=0.15.5`
-- `plotly>=5.0.0`
-
-既存の依存関係:
-- `torch`
-- `numpy`
-- `onnx` (ONNX モデル使用時)
