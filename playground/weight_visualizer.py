@@ -352,9 +352,7 @@ def _(mo, tensor_entry):
 @app.cell
 def _(mo, tensor_entry):
     """Bins slider for histogram."""
-    bins_slider = mo.ui.slider(
-        start=10, stop=200, step=5, value=50, label="Bins"
-    )
+    bins_slider = mo.ui.slider(start=10, stop=200, step=5, value=50, label="Bins")
     bins_slider if tensor_entry is not None else None
     return (bins_slider,)
 
@@ -447,9 +445,7 @@ def _(
             _r_min = float(range_min_input.value)
             _r_max = float(range_max_input.value)
         except (ValueError, TypeError):
-            _range_display = mo.md("**Invalid min/max values.**").callout(
-                kind="danger"
-            )
+            _range_display = mo.md("**Invalid min/max values.**").callout(kind="danger")
         else:
             _is_q = tensor_entry.get("is_quantized", False)
             if _is_q and quant_view.value == "int":
@@ -466,9 +462,7 @@ def _(
 
             _nbins = bins_slider.value
             _counts_all, _bin_edges = np.histogram(_data, bins=_nbins)
-            _counts_in, _ = np.histogram(
-                _data[_in_range], bins=_bin_edges
-            )
+            _counts_in, _ = np.histogram(_data[_in_range], bins=_bin_edges)
             _counts_out = _counts_all - _counts_in
             _pct_in = _counts_in / _total * 100
             _pct_out = _counts_out / _total * 100
@@ -484,9 +478,7 @@ def _(
                     marker_color="lightgray",
                     opacity=0.7,
                     name="outside range",
-                    hovertemplate=(
-                        "Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"
-                    ),
+                    hovertemplate=("Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"),
                 )
             )
             _fig.add_trace(
@@ -497,9 +489,7 @@ def _(
                     marker_color="orange",
                     opacity=0.85,
                     name="in range",
-                    hovertemplate=(
-                        "Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"
-                    ),
+                    hovertemplate=("Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"),
                 )
             )
             _fig.update_layout(
