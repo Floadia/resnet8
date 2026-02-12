@@ -464,32 +464,39 @@ def _(
             _total = len(_data)
             _pct = _count_in / _total * 100 if _total > 0 else 0.0
 
-            _data_in = _data[_in_range]
-            _data_out = _data[~_in_range]
             _nbins = bins_slider.value
+            _counts_all, _bin_edges = np.histogram(_data, bins=_nbins)
+            _counts_in, _ = np.histogram(
+                _data[_in_range], bins=_bin_edges
+            )
+            _counts_out = _counts_all - _counts_in
+            _pct_in = _counts_in / _total * 100
+            _pct_out = _counts_out / _total * 100
+            _bin_centers = (_bin_edges[:-1] + _bin_edges[1:]) / 2
+            _bin_width = _bin_edges[1] - _bin_edges[0]
 
             _fig = go.Figure()
             _fig.add_trace(
-                go.Histogram(
-                    x=_data_out,
-                    nbinsx=_nbins,
+                go.Bar(
+                    x=_bin_centers,
+                    y=_pct_out,
+                    width=_bin_width * 0.95,
                     marker_color="lightgray",
                     opacity=0.7,
                     name="outside range",
-                    histnorm="percent",
                     hovertemplate=(
                         "Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"
                     ),
                 )
             )
             _fig.add_trace(
-                go.Histogram(
-                    x=_data_in,
-                    nbinsx=_nbins,
+                go.Bar(
+                    x=_bin_centers,
+                    y=_pct_in,
+                    width=_bin_width * 0.95,
                     marker_color="orange",
                     opacity=0.85,
                     name="in range",
-                    histnorm="percent",
                     hovertemplate=(
                         "Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"
                     ),
@@ -499,7 +506,7 @@ def _(
                 title="Weight Distribution (Range Highlighted)",
                 xaxis_title=_x_title,
                 yaxis_title="Percentage (%)",
-                barmode="overlay",
+                barmode="stack",
                 bargap=0.05,
                 height=450,
                 template="plotly_white",
