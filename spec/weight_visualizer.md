@@ -207,62 +207,7 @@ ResNet8 モデルの各レイヤーの重み分布をインタラクティブに
 
 ---
 
-## 7. 実際のモデルデータ (実行結果)
-
-モデルから抽出した重み統計データは [`spec/captures/model_data.json`](captures/model_data.json) に格納されている。
-
-再生成コマンド:
-
-```bash
-uv run python -c "
-import torch, numpy as np, json
-
-# FP32
-fp32 = torch.load('models/resnet8.pt', weights_only=False, map_location='cpu')
-model = fp32['model']; model.eval()
-fp32_layers = {}
-for name, param in model.state_dict().items():
-    parts = name.rsplit('.', 1)
-    if len(parts) == 2 and parts[1] in ('weight', 'bias'):
-        arr = param.cpu().numpy()
-        fp32_layers.setdefault(parts[0], {})[parts[1]] = dict(
-            shape=list(arr.shape), min=float(np.min(arr)), max=float(np.max(arr)),
-            mean=float(np.mean(arr)), std=float(np.std(arr)), total_params=int(np.prod(arr.shape)))
-
-# INT8
-int8_model = torch.jit.load('models/resnet8_int8.pt', map_location='cpu'); int8_model.eval()
-int8_layers = {}
-for name, mod in int8_model.named_modules():
-    if not name: continue
-    try:
-        if not mod._c.hasattr('_packed_params'): continue
-        packed = mod._c.__getattr__('_packed_params')
-        for fn in [torch.ops.quantized.conv2d_unpack, torch.ops.quantized.linear_unpack]:
-            try: w, b = fn(packed); break
-            except: continue
-        else: continue
-        int_arr, deq_arr = w.int_repr().cpu().numpy(), w.dequantize().cpu().numpy()
-        entry = dict(
-            weight_int=dict(shape=list(int_arr.shape), min=int(np.min(int_arr)), max=int(np.max(int_arr)), mean=float(np.mean(int_arr))),
-            weight_fp32=dict(shape=list(deq_arr.shape), min=float(np.min(deq_arr)), max=float(np.max(deq_arr)),
-                mean=float(np.mean(deq_arr)), std=float(np.std(deq_arr)), total_params=int(np.prod(deq_arr.shape))),
-            scale=float(w.q_per_channel_scales().mean()), zero_point=float(w.q_per_channel_zero_points().float().mean()))
-        if b is not None:
-            b_arr = b.detach().cpu().numpy()
-            entry['bias'] = dict(shape=list(b_arr.shape), min=float(np.min(b_arr)), max=float(np.max(b_arr)),
-                mean=float(np.mean(b_arr)), std=float(np.std(b_arr)), total_params=int(np.prod(b_arr.shape)))
-        int8_layers[name] = entry
-    except: pass
-
-with open('spec/captures/model_data.json', 'w') as f:
-    json.dump(dict(fp32_layers=fp32_layers, int8_layers=int8_layers), f, indent=2)
-print('Written to spec/captures/model_data.json')
-"
-```
-
----
-
-## 8. 実行方法
+## 7. 実行方法
 
 ```bash
 # 起動
@@ -272,7 +217,7 @@ marimo edit playground/weight_visualizer.py
 marimo run playground/weight_visualizer.py
 ```
 
-## 9. 依存関係
+## 8. 依存関係
 
 `pyproject.toml` に以下が追加済み:
 - `marimo>=0.15.5`
