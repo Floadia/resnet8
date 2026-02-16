@@ -266,10 +266,10 @@ Plans:
   3. User can select a layer and view activation histogram with statistics (shape, min, max, mean, std) in the same style as weight histograms
   4. User can toggle between weight view and intermediate activation view for the same layer using radio buttons
   5. Activation visualization reuses existing histogram components from weight_visualizer.py (consistent UI/UX)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 15-01-PLAN.md — Add input source selection, activation capture via forward hooks, view toggle, and activation histogram/stats
 
 ## Progress
 
