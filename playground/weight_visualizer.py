@@ -277,7 +277,10 @@ def _(is_script_mode, mo, model_files, model_selector, np):
         elif _path and _path.endswith(".pt"):
             model_data = _load_pytorch_model(_path)
         else:
-            model_data = {"format": "none", "layers": {}, "is_quantized": False, "tensor_data": {}}
+            model_data = {
+                "format": "none", "layers": {},
+                "is_quantized": False, "tensor_data": {},
+            }
     return (model_data,)
 
 
