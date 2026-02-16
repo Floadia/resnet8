@@ -278,8 +278,10 @@ def _(is_script_mode, mo, model_files, model_selector, np):
             model_data = _load_pytorch_model(_path)
         else:
             model_data = {
-                "format": "none", "layers": {},
-                "is_quantized": False, "tensor_data": {},
+                "format": "none",
+                "layers": {},
+                "is_quantized": False,
+                "tensor_data": {},
             }
     return (model_data,)
 
@@ -400,9 +402,7 @@ def _(mo, np, quant_view, tensor_entry):
     range_min_input = mo.ui.text(value=_default_min, label="Min")
     range_max_input = mo.ui.text(value=_default_max, label="Max")
     apply_button = mo.ui.run_button(label="Apply Range")
-    mo.hstack(
-        [range_min_input, range_max_input, apply_button], justify="start", gap=1
-    )
+    mo.hstack([range_min_input, range_max_input, apply_button], justify="start", gap=1)
     return apply_button, range_max_input, range_min_input
 
 

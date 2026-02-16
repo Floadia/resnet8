@@ -71,8 +71,13 @@ def _(mo, project_root):
 
 @app.cell
 def _(
-    Path, folder_picker, get_model_summary,
-    is_script_mode, load_model_variants, mo, project_root,
+    Path,
+    folder_picker,
+    get_model_summary,
+    is_script_mode,
+    load_model_variants,
+    mo,
+    project_root,
 ):
     """Load models from selected folder."""
     if is_script_mode:
@@ -106,9 +111,7 @@ def _(mo, models_summary, selected_folder):
     **PyTorch variants:** {pytorch_list}
     """
     has_models = models_summary["total_loaded"] > 0
-    mo.md(summary_text).callout(
-        kind="success"
-    ) if has_models else mo.md(
+    mo.md(summary_text).callout(kind="success") if has_models else mo.md(
         f"**No models found in:** `{selected_folder}`"
     ).callout(kind="warn")
     return
