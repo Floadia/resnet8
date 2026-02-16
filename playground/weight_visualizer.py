@@ -24,8 +24,32 @@ def _():
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
+    scripts_dir = project_root / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    from get_resnet8_intermediate import (
+        load_cifar10_test_sample,
+        normalize_input,
+        run_with_hook,
+        collect_named_tensors,
+        get_model_layers,
+        load_model as load_intermediate_model,
+    )
+
     MODELS_DIR = project_root / "models"
-    return MODELS_DIR, go, mo, np
+    return (
+        MODELS_DIR,
+        collect_named_tensors,
+        get_model_layers,
+        go,
+        load_cifar10_test_sample,
+        load_intermediate_model,
+        mo,
+        normalize_input,
+        np,
+        run_with_hook,
+    )
 
 
 @app.cell
@@ -284,6 +308,113 @@ def _(is_script_mode, mo, model_files, model_selector, np):
                 "tensor_data": {},
             }
     return (model_data,)
+
+
+@app.cell
+def _(mo, model_data):
+    """Input source selection for activation capture (PyTorch only)."""
+    _is_pytorch = model_data.get("format") == "pytorch"
+
+    input_source = mo.ui.radio(
+        options={"CIFAR-10 sample": "cifar10", "Random input": "random"},
+        value="CIFAR-10 sample",
+        label="Input Source",
+    )
+    sample_index = mo.ui.number(
+        start=0, stop=9999, step=1, value=0, label="Sample Index"
+    )
+    run_button = mo.ui.run_button(label="Run Inference")
+
+    if _is_pytorch:
+        mo.vstack([
+            mo.md("### Intermediate Activations"),
+            mo.hstack([input_source, sample_index, run_button], justify="start", gap=1),
+        ])
+    else:
+        mo.md("_Activation capture requires a PyTorch model (.pt)_").callout(kind="neutral") if model_data.get("format") != "none" else None
+
+    return input_source, run_button, sample_index
+
+
+@app.cell
+def _(
+    collect_named_tensors,
+    get_model_layers,
+    input_source,
+    is_script_mode,
+    load_cifar10_test_sample,
+    load_intermediate_model,
+    model_data,
+    model_selector,
+    mo,
+    normalize_input,
+    np,
+    run_button,
+    run_with_hook,
+    sample_index,
+):
+    """Capture intermediate activations via forward hooks (PyTorch only)."""
+    import torch as _torch
+
+    # ALWAYS define defaults so downstream cells can reference activation_data
+    activation_data = {}
+    activation_status = ""
+    _output = mo.md("")
+
+    _is_pytorch = model_data.get("format") == "pytorch"
+    if _is_pytorch and run_button.value:
+        _path = model_selector.value
+        _device = _torch.device("cpu")
+        _data_dir = "/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py"
+
+        with mo.status.spinner(title="Capturing activations..."):
+            try:
+                _model = load_intermediate_model(_path, _device)
+                _model.eval()
+
+                _sample = None
+                if input_source.value == "random":
+                    _sample = np.random.random((1, 32, 32, 3)).astype(np.float32)
+                    activation_status = "Input: random (1, 32, 32, 3)"
+                else:
+                    try:
+                        _sample, _label = load_cifar10_test_sample(
+                            _data_dir, int(sample_index.value)
+                        )
+                        activation_status = f"Input: CIFAR-10 test[{int(sample_index.value)}] (label={_label})"
+                    except FileNotFoundError:
+                        _output = mo.md(
+                            "**CIFAR-10 data not found.** Use 'Random input' instead, "
+                            f"or ensure data exists at `{_data_dir}`."
+                        ).callout(kind="danger")
+
+                if _sample is not None:
+                    _x = normalize_input(_sample, _device)
+                    _layers = get_model_layers(_model)
+
+                    for _ln in _layers:
+                        try:
+                            _value = run_with_hook(_model, _ln, _x)
+                            _named = list(collect_named_tensors(_value, _ln))
+                            for _tn, _arr in _named:
+                                activation_data[_tn] = {
+                                    "values": _arr.flatten().astype(np.float64),
+                                    "shape": _arr.shape,
+                                }
+                        except Exception:
+                            pass  # Skip layers where hooks fail
+
+                    _output = mo.md(
+                        f"**Activations captured:** {len(activation_data)} tensors | {activation_status}"
+                    ).callout(kind="success")
+
+            except Exception as _e:
+                _output = mo.md(
+                    f"**Activation capture failed:** {_e}"
+                ).callout(kind="danger")
+
+    _output
+    return activation_data, activation_status
 
 
 @app.cell
