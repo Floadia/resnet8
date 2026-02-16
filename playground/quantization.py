@@ -18,15 +18,9 @@ def _():
 @app.cell
 def _():
     """Import dependencies."""
-    import sys
     from pathlib import Path
 
     import marimo as mo
-
-    # Add project root to path for imports
-    project_root = Path(__file__).parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
 
     from playground.utils import (
         get_all_layer_names,
@@ -34,7 +28,9 @@ def _():
         get_model_summary,
         load_model_variants,
     )
+    from playground.utils.notebook import ensure_project_root
 
+    project_root = ensure_project_root(__file__)
     return (
         Path,
         get_all_layer_names,

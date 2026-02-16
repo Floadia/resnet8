@@ -13,19 +13,27 @@ app = marimo.App()
 @app.cell
 def _():
     """Import dependencies."""
-    import sys
-    from pathlib import Path
-
     import marimo as mo
     import numpy as np
     import plotly.graph_objects as go
 
-    project_root = Path(__file__).parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    from playground.utils.notebook import ensure_project_root
+    from playground.utils.weight_visualizer_data import (
+        collect_model_files,
+        load_model_data,
+    )
+
+    project_root = ensure_project_root(__file__)
 
     MODELS_DIR = project_root / "models"
-    return MODELS_DIR, go, mo, np
+    return (
+        MODELS_DIR,
+        collect_model_files,
+        go,
+        load_model_data,
+        mo,
+        np,
+    )
 
 
 @app.cell
@@ -60,220 +68,25 @@ def _(mo, model_files):
 
 
 @app.cell
-def _(mo, model_selector, np):
+def _(collect_model_files, MODELS_DIR):
+    """Detect model files in models/ directory."""
+    model_files = collect_model_files(MODELS_DIR)
+    return (model_files,)
+
+
+@app.cell
+def _(load_model_data, mo, model_selector):
     """Load selected model and extract layer/tensor info."""
-    import torch
-
-    def _load_onnx_model(path):
-        """Load ONNX model and extract tensor metadata."""
-        import onnx
-        from onnx import numpy_helper as nh
-
-        model = onnx.load(str(path))
-        initializers = {}
-        for init in model.graph.initializer:
-            if init.name:
-                initializers[init.name] = init
-
-        node_op_types = {n.op_type for n in model.graph.node}
-        is_quantized = bool(
-            node_op_types & {"QLinearConv", "QLinearMatMul", "QuantizeLinear"}
-        )
-
-        layers = {}
-        for name in initializers:
-            if name.endswith("_scale") or name.endswith("_zero_point"):
-                continue
-            if name.endswith("_quantized"):
-                base = name.rsplit("_quantized", 1)[0]
-            else:
-                base = name
-
-            if "bias" in name.lower() or name.endswith(".bias"):
-                tensor_type = "bias"
-                layer_name = base.replace(".bias", "").replace("/bias", "")
-            elif "weight" in name.lower() or name.endswith(".weight"):
-                tensor_type = "weight"
-                layer_name = base.replace(".weight", "").replace("/weight", "")
-            else:
-                tensor_type = "weight"
-                layer_name = base
-
-            if layer_name not in layers:
-                layers[layer_name] = {}
-            layers[layer_name][tensor_type] = name
-
-        tensor_data = {}
-        for ln, tensors in layers.items():
-            tensor_data[ln] = {}
-            for tt, init_name in tensors.items():
-                init = initializers[init_name]
-                arr = nh.to_array(init)
-                entry = {
-                    "values": arr.flatten().astype(np.float64),
-                    "shape": arr.shape,
-                }
-
-                if arr.dtype in (np.int8, np.uint8) and is_quantized:
-                    entry["is_quantized"] = True
-                    entry["int_values"] = arr.flatten().astype(np.float64)
-
-                    scale_name = init_name + "_scale"
-                    zp_name = init_name + "_zero_point"
-                    if scale_name not in initializers:
-                        base_name = init_name.replace("_quantized", "")
-                        scale_name = base_name + "_scale"
-                        zp_name = base_name + "_zero_point"
-
-                    scale = None
-                    zp = 0.0
-                    if scale_name in initializers:
-                        scale = float(nh.to_array(initializers[scale_name]).flat[0])
-                    if zp_name in initializers:
-                        zp = float(nh.to_array(initializers[zp_name]).flat[0])
-
-                    entry["scale"] = scale
-                    entry["zero_point"] = zp
-                    if scale is not None:
-                        entry["values"] = scale * (entry["int_values"] - zp)
-                else:
-                    entry["is_quantized"] = False
-
-                tensor_data[ln][tt] = entry
-
-        return {
-            "format": "onnx",
-            "layers": layers,
-            "is_quantized": is_quantized,
-            "tensor_data": tensor_data,
-        }
-
-    def _load_pytorch_model(path):
-        """Load PyTorch model and extract tensor metadata."""
-        loaded = torch.load(str(path), weights_only=False, map_location="cpu")
-        if isinstance(loaded, dict) and "model" in loaded:
-            model = loaded["model"]
-        else:
-            model = loaded
-        model.eval()
-
-        is_quantized = False
-        layers = {}
-        tensor_data = {}
-
-        # Detect TorchScript quantized modules with packed params
-        packed_modules = {}
-        for name, mod in model.named_modules():
-            if not name:
-                continue
-            try:
-                if mod._c.hasattr("_packed_params"):
-                    packed_modules[name] = mod
-            except (AttributeError, RuntimeError):
-                pass
-
-        if packed_modules:
-            is_quantized = True
-            for name, mod in packed_modules.items():
-                packed = mod._c.__getattr__("_packed_params")
-                w, b = None, None
-
-                for unpack_fn in [
-                    torch.ops.quantized.conv2d_unpack,
-                    torch.ops.quantized.linear_unpack,
-                ]:
-                    try:
-                        w, b = unpack_fn(packed)
-                        break
-                    except (RuntimeError, TypeError):
-                        continue
-
-                if w is None:
-                    continue
-
-                layers[name] = {"weight": name + ".weight"}
-                tensor_data[name] = {}
-
-                if hasattr(w, "int_repr"):
-                    int_arr = w.int_repr().cpu().numpy()
-                    deq_arr = w.dequantize().cpu().numpy()
-                    entry = {
-                        "values": deq_arr.flatten().astype(np.float64),
-                        "shape": tuple(int_arr.shape),
-                        "is_quantized": True,
-                        "int_values": int_arr.flatten().astype(np.float64),
-                        "scale": float(w.q_per_channel_scales().mean()),
-                        "zero_point": float(
-                            w.q_per_channel_zero_points().float().mean()
-                        ),
-                    }
-                else:
-                    arr = w.detach().cpu().numpy()
-                    entry = {
-                        "values": arr.flatten().astype(np.float64),
-                        "shape": arr.shape,
-                        "is_quantized": False,
-                    }
-                tensor_data[name]["weight"] = entry
-
-                if b is not None:
-                    layers[name]["bias"] = name + ".bias"
-                    arr = b.detach().cpu().numpy()
-                    tensor_data[name]["bias"] = {
-                        "values": arr.flatten().astype(np.float64),
-                        "shape": arr.shape,
-                        "is_quantized": False,
-                    }
-
-        # Also include FP32 params from state_dict
-        state_dict = model.state_dict()
-        for pname, tensor in state_dict.items():
-            parts = pname.rsplit(".", 1)
-            if len(parts) != 2:
-                continue
-            layer_name, tensor_type = parts
-            if tensor_type not in ("weight", "bias"):
-                continue
-            if layer_name in tensor_data and tensor_type in tensor_data[layer_name]:
-                continue
-
-            if layer_name not in layers:
-                layers[layer_name] = {}
-            layers[layer_name][tensor_type] = pname
-
-            if layer_name not in tensor_data:
-                tensor_data[layer_name] = {}
-
-            arr = tensor.cpu().numpy()
-            tensor_data[layer_name][tensor_type] = {
-                "values": arr.flatten().astype(np.float64),
-                "shape": arr.shape,
-                "is_quantized": False,
-            }
-
-        return {
-            "format": "pytorch",
-            "layers": layers,
-            "is_quantized": is_quantized,
-            "tensor_data": tensor_data,
-        }
-
-    _model_data = None
-    _load_error = None
+    model_data = None
+    load_error = None
 
     if model_selector.value:
-        _path = model_selector.value
         try:
             with mo.status.spinner(title="Loading model..."):
-                if _path.endswith(".onnx"):
-                    _model_data = _load_onnx_model(_path)
-                elif _path.endswith(".pt"):
-                    _model_data = _load_pytorch_model(_path)
+                model_data = load_model_data(model_selector.value)
         except Exception as e:
-            _load_error = str(e)
+            load_error = str(e)
 
-    model_data = _model_data
-    load_error = _load_error
     return load_error, model_data
 
 
