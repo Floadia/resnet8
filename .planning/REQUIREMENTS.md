@@ -209,27 +209,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HW-01 | Phase 13 | Complete |
 | HW-02 | Phase 13 | Complete |
 | HW-03 | Phase 13 | Complete |
-| NB-01 | Phase 14 | Pending |
-| NB-02 | Phase 14 | Pending |
-| NB-03 | Phase 14 | Pending |
-| NB-04 | Phase 14 | Pending |
-| INSP-01 | Phase 15 | Pending |
-| INSP-02 | Phase 15 | Pending |
-| INSP-03 | Phase 15 | Pending |
-| INSP-04 | Phase 15 | Pending |
-| INSP-05 | Phase 15 | Pending |
-| CAP-01 | Phase 16 | Pending |
-| CAP-02 | Phase 16 | Pending |
-| CAP-03 | Phase 16 | Pending |
-| CAP-04 | Phase 16 | Pending |
-| MOD-01 | Phase 17 | Pending |
-| MOD-02 | Phase 17 | Pending |
-| MOD-03 | Phase 17 | Pending |
-
-| INTM-01 | TBD | Pending |
-| INTM-02 | TBD | Pending |
-| INTM-03 | TBD | Pending |
-| INTM-04 | TBD | Pending |
+| NB-01 | Phase 14 | Paused |
+| NB-02 | Phase 14 | Paused |
+| NB-03 | Phase 14 | Paused |
+| NB-04 | Phase 14 | Paused |
+| INSP-01 | Phase 15 | Paused |
+| INSP-02 | Phase 15 | Paused |
+| INSP-03 | Phase 15 | Paused |
+| INSP-04 | Phase 15 | Paused |
+| INSP-05 | Phase 15 | Paused |
+| CAP-01 | Phase 16 | Paused |
+| CAP-02 | Phase 16 | Paused |
+| CAP-03 | Phase 16 | Paused |
+| CAP-04 | Phase 16 | Paused |
+| MOD-01 | Phase 17 | Paused |
+| MOD-02 | Phase 17 | Paused |
+| MOD-03 | Phase 17 | Paused |
+| INTM-01 | Phase 18 | Pending |
+| INTM-02 | Phase 18 | Pending |
+| INTM-03 | Phase 18 | Pending |
+| INTM-04 | Phase 18 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
@@ -238,8 +237,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 - v1.3 requirements: 14 total (Complete)
 - v1.4 requirements: 16 total (Paused)
 - v1.5 requirements: 4 total (Pending)
-- Mapped to phases: 53/57 (v1.5 TBD)
+- Mapped to phases: 57/57 (100% coverage)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-16 with v1.5 requirements*
+*Last updated: 2026-02-16 with v1.5 Phase 18 traceability*

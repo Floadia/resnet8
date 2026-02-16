@@ -9,10 +9,13 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-16 — Milestone v1.5 started
+**Current Milestone:** v1.5 Intermediate Value Visualizer
+**Phase:** 18 - Intermediate Activation Capture
+**Plan:** —
+**Status:** Ready for planning
+**Progress:** ▱▱▱▱▱▱▱▱▱▱ 0% (0/1 phases)
+
+Last activity: 2026-02-16 — Roadmap created for v1.5
 
 ## Performance Metrics
 
@@ -21,15 +24,16 @@ Last activity: 2026-02-16 — Milestone v1.5 started
 - Average duration: ~1h 42min
 - Total execution time: ~29 hours
 
-**By Phase:**
+**By Milestone:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| v1.0 (1-2) | 2 | ~1h | ~30min |
-| v1.1 (3-4) | 2 | ~1h | ~30min |
-| v1.2 (5-8) | 4 | ~2h | ~30min |
-| v1.3 (9-13) | 7 | ~3.5h | ~30min |
-| v1.4 (14+) | 2 | ~21.5h | ~10h 45min |
+| Milestone | Phases | Plans | Total Time | Avg/Plan |
+|-----------|--------|-------|------------|----------|
+| v1.0 | 1-2 | 2 | ~1h | ~30min |
+| v1.1 | 3-4 | 2 | ~1h | ~30min |
+| v1.2 | 5-8 | 4 | ~2h | ~30min |
+| v1.3 | 9-13 | 7 | ~3.5h | ~30min |
+| v1.4 | 14-17 | 2 | ~21.5h | ~10h 45min |
+| v1.5 | 18 | 0 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: 12-01, 12-02, 13-01, 14-01, 14-02
@@ -66,6 +70,13 @@ From v1.4 (Quantization Playground):
 - File selection mode (not directory mode) more reliable for Marimo file browser
 - PyTorch quantized models saved as dict {'model': ..., 'epoch': ...} - extract 'model' key
 
+From v1.5 (Intermediate Value Visualizer):
+- Reference implementation exists in scripts/get_resnet8_intermediate.py
+- Forward hooks pattern: register on target module, capture output in closure, remove after inference
+- Input normalization: torch.from_numpy(sample).to(device) -- raw pixels (0-255), no preprocessing
+- Layer discovery: model.named_modules() filters empty names (root module)
+- Activation capture supports complex outputs (tuples/dicts) via recursive flattening
+
 ### Pending Todos
 
 None
@@ -77,11 +88,11 @@ None
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Milestone v1.5 initialized
+Stopped at: Roadmap created for v1.5
 Resume file: None
 
-**Next action:** Define requirements for v1.5
+**Next action:** `/gsd:plan-phase 18`
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-16 with v1.5 milestone start*
+*Last updated: 2026-02-16 with v1.5 roadmap*

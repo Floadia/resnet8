@@ -6,7 +6,8 @@
 - ✅ **v1.1 PyTorch Evaluation** - Phases 3-4 (shipped 2026-01-27)
 - ✅ **v1.2 PTQ Evaluation** - Phases 5-8 (shipped 2026-01-28)
 - ✅ **v1.3 Quantized Operations Documentation** - Phases 9-13 (shipped 2026-02-05)
-- 🚧 **v1.4 Quantization Playground** - Phases 14-17 (in progress)
+- 🚧 **v1.4 Quantization Playground** - Phases 14-17 (paused)
+- 🎯 **v1.5 Intermediate Value Visualizer** - Phase 18 (current)
 
 ## Phases
 
@@ -225,7 +226,8 @@ Plans:
 
 </details>
 
-### 🚧 v1.4 Quantization Playground (In Progress)
+<details>
+<summary>⏸️ v1.4 Quantization Playground (Phases 14-17) - PAUSED</summary>
 
 **Milestone Goal:** Interactive Marimo notebook for inspecting and experimenting with quantization parameters, enabling users to understand how scale/zero-point choices affect model accuracy.
 
@@ -286,10 +288,33 @@ Plans:
 Plans:
 - [ ] TBD
 
+</details>
+
+### 🎯 v1.5 Intermediate Value Visualizer (Current Milestone)
+
+**Milestone Goal:** Add intermediate activation capture and visualization to playground/weight_visualizer.py, enabling users to inspect activation distributions across layers during inference.
+
+- [ ] **Phase 18: Intermediate Activation Capture** - Add inference and layer activation visualization to weight_visualizer notebook
+
+### Phase 18: Intermediate Activation Capture
+**Goal**: Users can run inference and visualize intermediate activations alongside weights in the weight_visualizer notebook
+**Depends on**: Phase 14 (needs PyTorch model loading infrastructure from weight_visualizer.py)
+**Requirements**: INTM-01, INTM-02, INTM-03, INTM-04
+**Success Criteria** (what must be TRUE):
+  1. User can select input source via radio button (CIFAR-10 sample by index or random input) in the notebook
+  2. User can trigger inference through the loaded PyTorch model and capture intermediate activations at all layers using forward hooks
+  3. User can select a layer and view activation histogram with statistics (shape, min, max, mean, std) in the same style as weight histograms
+  4. User can toggle between weight view and intermediate activation view for the same layer using radio buttons
+  5. Activation visualization reuses existing histogram components from weight_visualizer.py (consistent UI/UX)
+**Plans**: TBD
+
+Plans:
+- [ ] TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -307,10 +332,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 1/1 | Complete | 2026-02-05 |
 | 14. Notebook Foundation | v1.4 | 2/2 | Complete | 2026-02-06 |
-| 15. Parameter Inspection | v1.4 | 0/TBD | Not started | - |
-| 16. Inference and Value Capture | v1.4 | 0/TBD | Not started | - |
-| 17. Interactive Modification | v1.4 | 0/TBD | Not started | - |
+| 15. Parameter Inspection | v1.4 | 0/TBD | Paused | - |
+| 16. Inference and Value Capture | v1.4 | 0/TBD | Paused | - |
+| 17. Interactive Modification | v1.4 | 0/TBD | Paused | - |
+| 18. Intermediate Activation Capture | v1.5 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-06 with Phase 14 complete*
+*Last updated: 2026-02-16 with v1.5 Phase 18*
