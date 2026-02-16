@@ -254,7 +254,7 @@ Plans:
 
 **Milestone Goal:** Add intermediate activation capture and visualization to playground/weight_visualizer.py, enabling users to inspect activation distributions across layers during inference.
 
-- [ ] **Phase 15: Intermediate Activation Capture** - Add inference and layer activation visualization to weight_visualizer notebook
+- [x] **Phase 15: Intermediate Activation Capture** - Add inference and layer activation visualization to weight_visualizer notebook (completed 2026-02-16)
 
 ### Phase 15: Intermediate Activation Capture
 **Goal**: Users can run inference and visualize intermediate activations alongside weights in the weight_visualizer notebook
@@ -292,7 +292,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 1/1 | Complete | 2026-02-05 |
 | 14. Notebook Foundation | v1.4 | 2/2 | Complete | 2026-02-06 |
-| 15. Intermediate Activation Capture | v1.5 | 0/TBD | Not started | - |
+| 15. Intermediate Activation Capture | v1.5 | Complete    | 2026-02-16 | - |
 
 ---
 *Roadmap created: 2026-01-27*

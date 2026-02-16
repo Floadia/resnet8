@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 **Current Milestone:** v1.5 Intermediate Value Visualizer
 **Phase:** 15 - Intermediate Activation Capture
 **Plan:** Complete
-**Status:** Phase complete
+**Status:** Milestone complete
 **Progress:** ██████████ 100% (1/1 phases)
 
 Last activity: 2026-02-16 — Completed Phase 15 Plan 01
