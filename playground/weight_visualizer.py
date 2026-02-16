@@ -24,8 +24,32 @@ def _():
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
+    scripts_dir = project_root / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    from get_resnet8_intermediate import (
+        load_cifar10_test_sample,
+        normalize_input,
+        run_with_hook,
+        collect_named_tensors,
+        get_model_layers,
+        load_model as load_intermediate_model,
+    )
+
     MODELS_DIR = project_root / "models"
-    return MODELS_DIR, go, mo, np
+    return (
+        MODELS_DIR,
+        collect_named_tensors,
+        get_model_layers,
+        go,
+        load_cifar10_test_sample,
+        load_intermediate_model,
+        mo,
+        normalize_input,
+        np,
+        run_with_hook,
+    )
 
 
 @app.cell
@@ -288,6 +312,113 @@ def _(is_script_mode, mo, model_files, model_selector, np):
 
 @app.cell
 def _(mo, model_data):
+    """Input source selection for activation capture (PyTorch only)."""
+    _is_pytorch = model_data.get("format") == "pytorch"
+
+    input_source = mo.ui.radio(
+        options={"CIFAR-10 sample": "cifar10", "Random input": "random"},
+        value="CIFAR-10 sample",
+        label="Input Source",
+    )
+    sample_index = mo.ui.number(
+        start=0, stop=9999, step=1, value=0, label="Sample Index"
+    )
+    run_button = mo.ui.run_button(label="Run Inference")
+
+    if _is_pytorch:
+        mo.vstack([
+            mo.md("### Intermediate Activations"),
+            mo.hstack([input_source, sample_index, run_button], justify="start", gap=1),
+        ])
+    else:
+        mo.md("_Activation capture requires a PyTorch model (.pt)_").callout(kind="neutral") if model_data.get("format") != "none" else None
+
+    return input_source, run_button, sample_index
+
+
+@app.cell
+def _(
+    collect_named_tensors,
+    get_model_layers,
+    input_source,
+    is_script_mode,
+    load_cifar10_test_sample,
+    load_intermediate_model,
+    model_data,
+    model_selector,
+    mo,
+    normalize_input,
+    np,
+    run_button,
+    run_with_hook,
+    sample_index,
+):
+    """Capture intermediate activations via forward hooks (PyTorch only)."""
+    import torch as _torch
+
+    # ALWAYS define defaults so downstream cells can reference activation_data
+    activation_data = {}
+    activation_status = ""
+    _output = mo.md("")
+
+    _is_pytorch = model_data.get("format") == "pytorch"
+    if _is_pytorch and run_button.value:
+        _path = model_selector.value
+        _device = _torch.device("cpu")
+        _data_dir = "/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py"
+
+        with mo.status.spinner(title="Capturing activations..."):
+            try:
+                _model = load_intermediate_model(_path, _device)
+                _model.eval()
+
+                _sample = None
+                if input_source.value == "random":
+                    _sample = np.random.random((1, 32, 32, 3)).astype(np.float32)
+                    activation_status = "Input: random (1, 32, 32, 3)"
+                else:
+                    try:
+                        _sample, _label = load_cifar10_test_sample(
+                            _data_dir, int(sample_index.value)
+                        )
+                        activation_status = f"Input: CIFAR-10 test[{int(sample_index.value)}] (label={_label})"
+                    except FileNotFoundError:
+                        _output = mo.md(
+                            "**CIFAR-10 data not found.** Use 'Random input' instead, "
+                            f"or ensure data exists at `{_data_dir}`."
+                        ).callout(kind="danger")
+
+                if _sample is not None:
+                    _x = normalize_input(_sample, _device)
+                    _layers = get_model_layers(_model)
+
+                    for _ln in _layers:
+                        try:
+                            _value = run_with_hook(_model, _ln, _x)
+                            _named = list(collect_named_tensors(_value, _ln))
+                            for _tn, _arr in _named:
+                                activation_data[_tn] = {
+                                    "values": _arr.flatten().astype(np.float64),
+                                    "shape": _arr.shape,
+                                }
+                        except Exception:
+                            pass  # Skip layers where hooks fail
+
+                    _output = mo.md(
+                        f"**Activations captured:** {len(activation_data)} tensors | {activation_status}"
+                    ).callout(kind="success")
+
+            except Exception as _e:
+                _output = mo.md(
+                    f"**Activation capture failed:** {_e}"
+                ).callout(kind="danger")
+
+    _output
+    return activation_data, activation_status
+
+
+@app.cell
+def _(mo, model_data):
     """Layer selection dropdown."""
     _layer_options = {name: name for name in sorted(model_data["layers"].keys())}
 
@@ -326,9 +457,56 @@ def _(layer_selector, model_data, tensor_selector):
 
 
 @app.cell
-def _(mo, tensor_entry):
-    """Quantization view toggle (only shown for quantized tensors)."""
-    _is_quant = tensor_entry is not None and tensor_entry.get("is_quantized", False)
+def _(activation_data, mo, model_data):
+    """Toggle between weight and activation views."""
+    _has_activations = bool(activation_data) if 'activation_data' in dir() else False
+    _is_pytorch = model_data.get("format") == "pytorch"
+
+    view_toggle = mo.ui.radio(
+        options={"Weights": "weights", "Activations": "activations"},
+        value="Weights",
+        label="View",
+    )
+    view_toggle if _is_pytorch and _has_activations else None
+    return (view_toggle,)
+
+
+@app.cell
+def _(activation_data, layer_selector, mo, model_data, tensor_entry, view_toggle):
+    """Resolve which data to display based on view toggle."""
+    activation_mismatch_msg = None
+    if view_toggle.value == "activations" and activation_data:
+        # Look for activation matching current layer
+        _layer = layer_selector.value
+        _act = activation_data.get(_layer)
+        if _act is None:
+            # Try prefix match (activation keys may have suffixes from collect_named_tensors)
+            for _k, _v in activation_data.items():
+                if _k.startswith(_layer + "_") or _k == _layer:
+                    _act = _v
+                    break
+        if _act is None:
+            activation_mismatch_msg = mo.md(
+                f"**No activation captured for layer '{_layer}'.** "
+                "Weight layer names and activation layer names may not align. "
+                "Showing weight view instead."
+            ).callout(kind="warn")
+        display_entry = _act if _act is not None else tensor_entry
+        display_mode = "activations" if _act is not None else "weights"
+    else:
+        display_entry = tensor_entry
+        display_mode = "weights"
+    activation_mismatch_msg
+    return activation_mismatch_msg, display_entry, display_mode
+
+
+@app.cell
+def _(display_entry, display_mode, mo):
+    """Quantization view toggle (only shown for quantized weights)."""
+    _is_weight_mode = display_mode == "weights" if 'display_mode' in dir() else True
+    _is_quant = (display_entry is not None and
+                 display_entry.get("is_quantized", False) and
+                 _is_weight_mode)
     quant_view = mo.ui.radio(
         options={"int8 raw values": "int", "dequantized (FP32)": "fp32"},
         value="dequantized (FP32)",
@@ -341,32 +519,41 @@ def _(mo, tensor_entry):
 
 
 @app.cell
-def _(mo, tensor_entry):
+def _(display_entry, mo):
     """Bins slider for histogram."""
     bins_slider = mo.ui.slider(start=10, stop=200, step=5, value=50, label="Bins")
-    bins_slider if tensor_entry is not None else None
+    bins_slider if display_entry is not None else None
     return (bins_slider,)
 
 
 @app.cell
-def _(bins_slider, go, mo, quant_view, tensor_entry):
-    """Plotly histogram of weight distribution."""
-    _is_q = tensor_entry.get("is_quantized", False)
-    if _is_q and quant_view.value == "int":
-        _data = tensor_entry["int_values"]
-        _x_title = "Value (int8/uint8)"
-        _title = "Weight Distribution (Quantized Integer Values)"
-    else:
-        _data = tensor_entry["values"]
+def _(bins_slider, display_entry, display_mode, go, mo, quant_view):
+    """Plotly histogram of weight or activation distribution."""
+    mo.stop(display_entry is None)
+
+    if display_mode == "activations":
+        _data = display_entry["values"]
         _x_title = "Value"
-        _title = "Weight Distribution"
+        _title = "Activation Distribution"
+        _color = "darkorange"
+    else:
+        _is_q = display_entry.get("is_quantized", False)
+        if _is_q and quant_view.value == "int":
+            _data = display_entry["int_values"]
+            _x_title = "Value (int8/uint8)"
+            _title = "Weight Distribution (Quantized Integer Values)"
+        else:
+            _data = display_entry["values"]
+            _x_title = "Value"
+            _title = "Weight Distribution"
+        _color = "steelblue"
 
     _fig = go.Figure()
     _fig.add_trace(
         go.Histogram(
             x=_data,
             nbinsx=bins_slider.value,
-            marker_color="steelblue",
+            marker_color=_color,
             opacity=0.85,
             name="all",
             histnorm="percent",
@@ -387,22 +574,22 @@ def _(bins_slider, go, mo, quant_view, tensor_entry):
 
 
 @app.cell
-def _(mo, np, quant_view, tensor_entry):
+def _(display_entry, mo, np, quant_view):
     """Value range analysis inputs."""
-    _is_q = tensor_entry.get("is_quantized", False)
+    _is_q = display_entry.get("is_quantized", False) if display_entry is not None else False
     if _is_q and quant_view.value == "int":
-        _data = tensor_entry["int_values"]
+        _data = display_entry["int_values"]
     else:
-        _data = tensor_entry["values"]
-    _std = float(np.std(_data))
-    _mean = float(np.mean(_data))
+        _data = display_entry["values"] if display_entry is not None else np.array([])
+    _std = float(np.std(_data)) if len(_data) > 0 else 0.0
+    _mean = float(np.mean(_data)) if len(_data) > 0 else 0.0
     _default_min = f"{_mean - _std:.6f}"
     _default_max = f"{_mean + _std:.6f}"
 
     range_min_input = mo.ui.text(value=_default_min, label="Min")
     range_max_input = mo.ui.text(value=_default_max, label="Max")
     apply_button = mo.ui.run_button(label="Apply Range")
-    mo.hstack([range_min_input, range_max_input, apply_button], justify="start", gap=1)
+    mo.hstack([range_min_input, range_max_input, apply_button], justify="start", gap=1) if display_entry is not None else None
     return apply_button, range_max_input, range_min_input
 
 
@@ -410,13 +597,13 @@ def _(mo, np, quant_view, tensor_entry):
 def _(
     apply_button,
     bins_slider,
+    display_entry,
     go,
     mo,
     np,
     quant_view,
     range_max_input,
     range_min_input,
-    tensor_entry,
 ):
     """Value range analysis results and highlighted histogram."""
     mo.stop(not apply_button.value)
@@ -424,12 +611,12 @@ def _(
     _r_min = float(range_min_input.value)
     _r_max = float(range_max_input.value)
 
-    _is_q = tensor_entry.get("is_quantized", False)
+    _is_q = display_entry.get("is_quantized", False) if display_entry is not None else False
     if _is_q and quant_view.value == "int":
-        _data = tensor_entry["int_values"]
+        _data = display_entry["int_values"]
         _x_title = "Value (int8/uint8)"
     else:
-        _data = tensor_entry["values"]
+        _data = display_entry["values"]
         _x_title = "Value"
 
     _in_range = (_data >= _r_min) & (_data <= _r_max)
@@ -495,24 +682,29 @@ def _(
 
 
 @app.cell
-def _(mo, np, tensor_entry):
+def _(display_entry, display_mode, mo, np):
     """Statistics panel."""
-    _vals = tensor_entry["values"]
-    _shape = tensor_entry["shape"]
+    mo.stop(display_entry is None)
+
+    _vals = display_entry["values"]
+    _shape = display_entry["shape"]
     _min = float(np.min(_vals))
     _max = float(np.max(_vals))
     _mean = float(np.mean(_vals))
     _std = float(np.std(_vals))
     _total = int(np.prod(_shape))
 
+    _mode_label = "Activation" if display_mode == "activations" else "Weight"
     _stats_lines = [
+        f"**{_mode_label} Statistics**",
         f"**Min:** {_min:.6f} &nbsp;&nbsp; **Max:** {_max:.6f}",
         f"**Mean:** {_mean:.6f} &nbsp;&nbsp; **Std:** {_std:.6f}",
-        f"**Shape:** {_shape} &nbsp;&nbsp; **Total params:** {_total:,}",
+        f"**Shape:** {_shape} &nbsp;&nbsp; **Total elements:** {_total:,}",
     ]
-    if tensor_entry.get("is_quantized", False):
-        _scale = tensor_entry.get("scale")
-        _zp = tensor_entry.get("zero_point")
+
+    if display_mode == "weights" and display_entry.get("is_quantized", False):
+        _scale = display_entry.get("scale")
+        _zp = display_entry.get("zero_point")
         _scale_str = f"{_scale:.6f}" if _scale is not None else "N/A"
         _zp_str = f"{_zp:.1f}" if _zp is not None else "N/A"
         _stats_lines.append(

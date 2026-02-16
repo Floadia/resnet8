@@ -2,40 +2,42 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-05)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Accurate model conversion across frameworks -- converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10)
-**Current focus:** v1.4 Quantization Playground - Phase 15 (Parameter Inspection)
+**Current focus:** v1.5 Intermediate Value Visualizer
 
 ## Current Position
 
-Phase: 15 of 17 (Parameter Inspection)
-Plan: Ready to plan
-Status: Ready for Phase 15
-Last activity: 2026-02-06 -- Phase 14 complete (verified)
+**Current Milestone:** v1.5 Intermediate Value Visualizer
+**Phase:** 15 - Intermediate Activation Capture
+**Plan:** Complete
+**Status:** Milestone complete
+**Progress:** ██████████ 100% (1/1 phases)
 
-Progress: [===============.....] 17/20 plans (85% completion)
+Last activity: 2026-02-16 — Completed Phase 15 Plan 01
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: ~1h 42min
-- Total execution time: ~29 hours
+- Total plans completed: 18
+- Average duration: ~1h 36min
+- Total execution time: ~29h 6min
 
-**By Phase:**
+**By Milestone:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| v1.0 (1-2) | 2 | ~1h | ~30min |
-| v1.1 (3-4) | 2 | ~1h | ~30min |
-| v1.2 (5-8) | 4 | ~2h | ~30min |
-| v1.3 (9-13) | 7 | ~3.5h | ~30min |
-| v1.4 (14+) | 2 | ~21.5h | ~10h 45min |
+| Milestone | Phases | Plans | Total Time | Avg/Plan |
+|-----------|--------|-------|------------|----------|
+| v1.0 | 1-2 | 2 | ~1h | ~30min |
+| v1.1 | 3-4 | 2 | ~1h | ~30min |
+| v1.2 | 5-8 | 4 | ~2h | ~30min |
+| v1.3 | 9-13 | 7 | ~3.5h | ~30min |
+| v1.4 | 14-17 | 2 | ~21.5h | ~10h 45min |
+| v1.5 | 15 | 1 | ~6min | ~6min |
 
 **Recent Trend:**
-- Last 5 plans: 12-01, 12-02, 13-01, 14-01, 14-02
-- Trend: Phase 14-02 required debugging across sessions (path/import issues)
+- Last 5 plans: 12-02, 13-01, 14-01, 14-02, 15-01
+- Trend: Phase 15-01 completed quickly (6min) - straightforward implementation
 
 *Updated after each plan completion*
 
@@ -68,6 +70,16 @@ From v1.4 (Quantization Playground):
 - File selection mode (not directory mode) more reliable for Marimo file browser
 - PyTorch quantized models saved as dict {'model': ..., 'epoch': ...} - extract 'model' key
 
+From v1.5 (Intermediate Value Visualizer):
+- Reference implementation exists in scripts/get_resnet8_intermediate.py
+- Forward hooks pattern: register on target module, capture output in closure, remove after inference
+- Input normalization: torch.from_numpy(sample).to(device) -- raw pixels (0-255), no preprocessing
+- Layer discovery: model.named_modules() filters empty names (root module)
+- Activation capture supports complex outputs (tuples/dicts) via recursive flattening
+- Always-defined pattern for Marimo cells: use if/else with default values instead of mo.stop() when return variables must exist for downstream cells
+- Data routing pattern: display_entry resolver cell centralizes view mode logic for multiple consumer cells
+- Color coding: orange for activations, blue for weights (visual distinction in histograms)
+
 ### Pending Todos
 
 None
@@ -78,12 +90,12 @@ None
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Phase 14 complete (Notebook Foundation verified)
-Resume file: None
+Last session: 2026-02-16
+Stopped at: Completed Phase 15-01 (Intermediate Activation Capture)
+Resume file: .planning/phases/15-intermediate-activation-capture/15-01-SUMMARY.md
 
-**Next action:** Run `/gsd:discuss-phase 15` or `/gsd:plan-phase 15` for Parameter Inspection
+**Next action:** v1.5 milestone complete - see ROADMAP.md for next milestone
 
 ---
 *State initialized: 2026-01-27*
-*Last updated: 2026-02-06 with Phase 14 complete*
+*Last updated: 2026-02-16 with Phase 15-01 completion*

@@ -87,35 +87,44 @@
 - [x] **HW-02**: Hardware pseudocode (C-style) with exact bit-widths for each operation
 - [x] **HW-03**: Verification test vectors from ResNet8 for hardware validation
 
-## v1.4 Requirements (Current Milestone)
+## v1.4 Requirements (Phase 14 shipped, Phases 15-17 cancelled)
 
-### Notebook Foundation
+### Notebook Foundation (Complete)
 
-- [ ] **NB-01**: User can launch Marimo notebook for quantization experiments
-- [ ] **NB-02**: User can load ONNX quantized model with caching (no memory leak on re-run)
-- [ ] **NB-03**: User can load PyTorch quantized model with caching
-- [ ] **NB-04**: User can select layer/operation from model structure
+- [x] **NB-01**: User can launch Marimo notebook for quantization experiments
+- [x] **NB-02**: User can load ONNX quantized model with caching (no memory leak on re-run)
+- [x] **NB-03**: User can load PyTorch quantized model with caching
+- [x] **NB-04**: User can select layer/operation from model structure
 
-### Parameter Inspection
+### Parameter Inspection (Cancelled)
 
-- [ ] **INSP-01**: User can view scale and zero-point for each layer
-- [ ] **INSP-02**: User can view weight tensor shapes and dtypes
-- [ ] **INSP-03**: User can navigate model structure (tree/list view)
-- [ ] **INSP-04**: User can compare FP32 vs quantized values side-by-side
-- [ ] **INSP-05**: User can view activation histograms per layer
+- ~~**INSP-01**: User can view scale and zero-point for each layer~~
+- ~~**INSP-02**: User can view weight tensor shapes and dtypes~~
+- ~~**INSP-03**: User can navigate model structure (tree/list view)~~
+- ~~**INSP-04**: User can compare FP32 vs quantized values side-by-side~~
+- ~~**INSP-05**: User can view activation histograms per layer~~
 
-### Value Capture
+### Value Capture (Cancelled)
 
-- [ ] **CAP-01**: User can run inference on sample CIFAR-10 images
-- [ ] **CAP-02**: User can capture intermediate activations at each layer
-- [ ] **CAP-03**: User can see SQNR (Signal-to-Quantization-Noise Ratio) per layer
-- [ ] **CAP-04**: User can see per-layer accuracy contribution analysis
+- ~~**CAP-01**: User can run inference on sample CIFAR-10 images~~
+- ~~**CAP-02**: User can capture intermediate activations at each layer~~
+- ~~**CAP-03**: User can see SQNR (Signal-to-Quantization-Noise Ratio) per layer~~
+- ~~**CAP-04**: User can see per-layer accuracy contribution analysis~~
 
-### Interactive Modification
+### Interactive Modification (Cancelled)
 
-- [ ] **MOD-01**: User can modify scale/zero-point values via UI
-- [ ] **MOD-02**: User can re-run inference with modified parameters
-- [ ] **MOD-03**: User can compare original vs modified outputs
+- ~~**MOD-01**: User can modify scale/zero-point values via UI~~
+- ~~**MOD-02**: User can re-run inference with modified parameters~~
+- ~~**MOD-03**: User can compare original vs modified outputs~~
+
+## v1.5 Requirements (Current Milestone)
+
+### Intermediate Values
+
+- [ ] **INTM-01**: User can select an input source (CIFAR-10 sample by index or random input) for inference
+- [ ] **INTM-02**: User can run inference through a loaded PyTorch model and capture intermediate activations at each layer using forward hooks
+- [ ] **INTM-03**: User can select a layer and view intermediate activation histogram and statistics (shape, min, max, mean, std)
+- [ ] **INTM-04**: User can toggle between weight view and intermediate activation view for the same layer
 
 ## Future Requirements
 
@@ -200,31 +209,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HW-01 | Phase 13 | Complete |
 | HW-02 | Phase 13 | Complete |
 | HW-03 | Phase 13 | Complete |
-| NB-01 | Phase 14 | Pending |
-| NB-02 | Phase 14 | Pending |
-| NB-03 | Phase 14 | Pending |
-| NB-04 | Phase 14 | Pending |
-| INSP-01 | Phase 15 | Pending |
-| INSP-02 | Phase 15 | Pending |
-| INSP-03 | Phase 15 | Pending |
-| INSP-04 | Phase 15 | Pending |
-| INSP-05 | Phase 15 | Pending |
-| CAP-01 | Phase 16 | Pending |
-| CAP-02 | Phase 16 | Pending |
-| CAP-03 | Phase 16 | Pending |
-| CAP-04 | Phase 16 | Pending |
-| MOD-01 | Phase 17 | Pending |
-| MOD-02 | Phase 17 | Pending |
-| MOD-03 | Phase 17 | Pending |
+| NB-01 | Phase 14 | Complete |
+| NB-02 | Phase 14 | Complete |
+| NB-03 | Phase 14 | Complete |
+| NB-04 | Phase 14 | Complete |
+| INSP-01–05 | — | Cancelled |
+| CAP-01–04 | — | Cancelled |
+| MOD-01–03 | — | Cancelled |
+| INTM-01 | Phase 15 | Pending |
+| INTM-02 | Phase 15 | Pending |
+| INTM-03 | Phase 15 | Pending |
+| INTM-04 | Phase 15 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
 - v1.2 requirements: 12 total (Complete)
 - v1.3 requirements: 14 total (Complete)
-- v1.4 requirements: 16 total (Pending)
-- Mapped to phases: 53/53 (100% coverage)
+- v1.4 requirements: 4 complete, 12 cancelled
+- v1.5 requirements: 4 total (Pending)
+- Active requirements mapped to phases: 45/45 (100% coverage)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-05 with v1.4 phase mappings*
+*Last updated: 2026-02-16 — v1.4 Phases 15-17 cancelled, v1.5 renumbered to Phase 15*
