@@ -30,6 +30,13 @@ def _():
 
 @app.cell
 def _(mo):
+    """Detect script vs interactive mode."""
+    is_script_mode = mo.app_meta().mode == "script"
+    return (is_script_mode,)
+
+
+@app.cell
+def _(mo):
     """Display notebook title."""
     mo.md("# Neural Network Weight Visualizer")
     return
@@ -40,9 +47,9 @@ def _(MODELS_DIR):
     """Detect model files in models/ directory."""
     model_files = {}
     if MODELS_DIR.exists():
-        for f in sorted(MODELS_DIR.iterdir()):
-            if f.suffix in (".onnx", ".pt"):
-                model_files[f.name] = str(f)
+        for _f in sorted(MODELS_DIR.iterdir()):
+            if _f.suffix in (".onnx", ".pt"):
+                model_files[_f.name] = str(_f)
     return (model_files,)
 
 
@@ -60,7 +67,7 @@ def _(mo, model_files):
 
 
 @app.cell
-def _(mo, model_selector, np):
+def _(is_script_mode, mo, model_files, model_selector, np):
     """Load selected model and extract layer/tensor info."""
     import torch
 
@@ -258,40 +265,26 @@ def _(mo, model_selector, np):
             "tensor_data": tensor_data,
         }
 
-    _model_data = None
-    _load_error = None
-
-    if model_selector.value:
+    if is_script_mode:
+        # Use first available model file in script mode
+        _path = next(iter(model_files.values()), None)
+    else:
         _path = model_selector.value
-        try:
-            with mo.status.spinner(title="Loading model..."):
-                if _path.endswith(".onnx"):
-                    _model_data = _load_onnx_model(_path)
-                elif _path.endswith(".pt"):
-                    _model_data = _load_pytorch_model(_path)
-        except Exception as e:
-            _load_error = str(e)
 
-    model_data = _model_data
-    load_error = _load_error
-    return load_error, model_data
-
-
-@app.cell
-def _(load_error, mo):
-    """Display load error if any."""
-    mo.md(f"**Error loading model:** {load_error}").callout(
-        kind="danger"
-    ) if load_error else None
-    return
+    with mo.status.spinner(title="Loading model..."):
+        if _path and _path.endswith(".onnx"):
+            model_data = _load_onnx_model(_path)
+        elif _path and _path.endswith(".pt"):
+            model_data = _load_pytorch_model(_path)
+        else:
+            model_data = {"format": "none", "layers": {}, "is_quantized": False, "tensor_data": {}}
+    return (model_data,)
 
 
 @app.cell
 def _(mo, model_data):
     """Layer selection dropdown."""
-    _layer_options = {}
-    if model_data:
-        _layer_options = {name: name for name in sorted(model_data["layers"].keys())}
+    _layer_options = {name: name for name in sorted(model_data["layers"].keys())}
 
     layer_selector = mo.ui.dropdown(
         options=_layer_options,
@@ -305,12 +298,8 @@ def _(mo, model_data):
 @app.cell
 def _(layer_selector, mo, model_data):
     """Tensor type selection dropdown."""
-    _tensor_options = {}
-    if model_data and layer_selector.value:
-        _layer_info = model_data["layers"].get(layer_selector.value, {})
-        for _t in ["weight", "bias"]:
-            if _t in _layer_info:
-                _tensor_options[_t] = _t
+    _layer_info = model_data["layers"].get(layer_selector.value, {})
+    _tensor_options = {_t: _t for _t in ["weight", "bias"] if _t in _layer_info}
 
     tensor_selector = mo.ui.dropdown(
         options=_tensor_options,
@@ -325,12 +314,9 @@ def _(layer_selector, mo, model_data):
 @app.cell
 def _(layer_selector, model_data, tensor_selector):
     """Look up pre-extracted tensor data."""
-    tensor_entry = None
-
-    if model_data and layer_selector.value and tensor_selector.value:
-        _td = model_data.get("tensor_data", {})
-        _layer_td = _td.get(layer_selector.value, {})
-        tensor_entry = _layer_td.get(tensor_selector.value)
+    _td = model_data.get("tensor_data", {})
+    _layer_td = _td.get(layer_selector.value, {})
+    tensor_entry = _layer_td.get(tensor_selector.value)
     return (tensor_entry,)
 
 
@@ -360,68 +346,60 @@ def _(mo, tensor_entry):
 @app.cell
 def _(bins_slider, go, mo, quant_view, tensor_entry):
     """Plotly histogram of weight distribution."""
-    _fig = None
+    _is_q = tensor_entry.get("is_quantized", False)
+    if _is_q and quant_view.value == "int":
+        _data = tensor_entry["int_values"]
+        _x_title = "Value (int8/uint8)"
+        _title = "Weight Distribution (Quantized Integer Values)"
+    else:
+        _data = tensor_entry["values"]
+        _x_title = "Value"
+        _title = "Weight Distribution"
 
-    if tensor_entry is not None:
-        _is_q = tensor_entry.get("is_quantized", False)
-        if _is_q and quant_view.value == "int":
-            _data = tensor_entry["int_values"]
-            _x_title = "Value (int8/uint8)"
-            _title = "Weight Distribution (Quantized Integer Values)"
-        else:
-            _data = tensor_entry["values"]
-            _x_title = "Value"
-            _title = "Weight Distribution"
-
-        _fig = go.Figure()
-        _fig.add_trace(
-            go.Histogram(
-                x=_data,
-                nbinsx=bins_slider.value,
-                marker_color="steelblue",
-                opacity=0.85,
-                name="all",
-                histnorm="percent",
-                hovertemplate="Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>",
-            )
+    _fig = go.Figure()
+    _fig.add_trace(
+        go.Histogram(
+            x=_data,
+            nbinsx=bins_slider.value,
+            marker_color="steelblue",
+            opacity=0.85,
+            name="all",
+            histnorm="percent",
+            hovertemplate="Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>",
         )
-        _fig.update_layout(
-            title=_title,
-            xaxis_title=_x_title,
-            yaxis_title="Percentage (%)",
-            bargap=0.05,
-            height=450,
-            template="plotly_white",
-        )
+    )
+    _fig.update_layout(
+        title=_title,
+        xaxis_title=_x_title,
+        yaxis_title="Percentage (%)",
+        bargap=0.05,
+        height=450,
+        template="plotly_white",
+    )
 
-    histogram_fig = _fig
-    mo.ui.plotly(histogram_fig) if histogram_fig else None
+    mo.ui.plotly(_fig)
     return
 
 
 @app.cell
 def _(mo, np, quant_view, tensor_entry):
     """Value range analysis inputs."""
-    _default_min = ""
-    _default_max = ""
-
-    if tensor_entry is not None:
-        _is_q = tensor_entry.get("is_quantized", False)
-        if _is_q and quant_view.value == "int":
-            _data = tensor_entry["int_values"]
-        else:
-            _data = tensor_entry["values"]
-        _std = float(np.std(_data))
-        _mean = float(np.mean(_data))
-        _default_min = f"{_mean - _std:.6f}"
-        _default_max = f"{_mean + _std:.6f}"
+    _is_q = tensor_entry.get("is_quantized", False)
+    if _is_q and quant_view.value == "int":
+        _data = tensor_entry["int_values"]
+    else:
+        _data = tensor_entry["values"]
+    _std = float(np.std(_data))
+    _mean = float(np.mean(_data))
+    _default_min = f"{_mean - _std:.6f}"
+    _default_max = f"{_mean + _std:.6f}"
 
     range_min_input = mo.ui.text(value=_default_min, label="Min")
     range_max_input = mo.ui.text(value=_default_max, label="Max")
     apply_button = mo.ui.run_button(label="Apply Range")
     mo.hstack(
         [range_min_input, range_max_input, apply_button], justify="start", gap=1
-    ) if tensor_entry is not None else None
+    )
     return apply_button, range_max_input, range_min_input
 
 
@@ -438,116 +416,107 @@ def _(
     tensor_entry,
 ):
     """Value range analysis results and highlighted histogram."""
-    _range_display = None
+    mo.stop(not apply_button.value)
 
-    if tensor_entry is not None and apply_button.value:
-        try:
-            _r_min = float(range_min_input.value)
-            _r_max = float(range_max_input.value)
-        except (ValueError, TypeError):
-            _range_display = mo.md("**Invalid min/max values.**").callout(kind="danger")
-        else:
-            _is_q = tensor_entry.get("is_quantized", False)
-            if _is_q and quant_view.value == "int":
-                _data = tensor_entry["int_values"]
-                _x_title = "Value (int8/uint8)"
-            else:
-                _data = tensor_entry["values"]
-                _x_title = "Value"
+    _r_min = float(range_min_input.value)
+    _r_max = float(range_max_input.value)
 
-            _in_range = (_data >= _r_min) & (_data <= _r_max)
-            _count_in = int(np.sum(_in_range))
-            _total = len(_data)
-            _pct = _count_in / _total * 100 if _total > 0 else 0.0
+    _is_q = tensor_entry.get("is_quantized", False)
+    if _is_q and quant_view.value == "int":
+        _data = tensor_entry["int_values"]
+        _x_title = "Value (int8/uint8)"
+    else:
+        _data = tensor_entry["values"]
+        _x_title = "Value"
 
-            _nbins = bins_slider.value
-            _counts_all, _bin_edges = np.histogram(_data, bins=_nbins)
-            _counts_in, _ = np.histogram(_data[_in_range], bins=_bin_edges)
-            _counts_out = _counts_all - _counts_in
-            _pct_in = _counts_in / _total * 100
-            _pct_out = _counts_out / _total * 100
-            _bin_centers = (_bin_edges[:-1] + _bin_edges[1:]) / 2
-            _bin_width = _bin_edges[1] - _bin_edges[0]
+    _in_range = (_data >= _r_min) & (_data <= _r_max)
+    _count_in = int(np.sum(_in_range))
+    _total = len(_data)
+    _pct = _count_in / _total * 100 if _total > 0 else 0.0
 
-            _fig = go.Figure()
-            _fig.add_trace(
-                go.Bar(
-                    x=_bin_centers,
-                    y=_pct_out,
-                    width=_bin_width * 0.95,
-                    marker_color="lightgray",
-                    opacity=0.7,
-                    name="outside range",
-                    hovertemplate=("Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"),
-                )
-            )
-            _fig.add_trace(
-                go.Bar(
-                    x=_bin_centers,
-                    y=_pct_in,
-                    width=_bin_width * 0.95,
-                    marker_color="orange",
-                    opacity=0.85,
-                    name="in range",
-                    hovertemplate=("Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>"),
-                )
-            )
-            _fig.update_layout(
-                title="Weight Distribution (Range Highlighted)",
-                xaxis_title=_x_title,
-                yaxis_title="Percentage (%)",
-                barmode="stack",
-                bargap=0.05,
-                height=450,
-                template="plotly_white",
-            )
+    _nbins = bins_slider.value
+    _counts_all, _bin_edges = np.histogram(_data, bins=_nbins)
+    _counts_in, _ = np.histogram(_data[_in_range], bins=_bin_edges)
+    _counts_out = _counts_all - _counts_in
+    _pct_in = _counts_in / _total * 100
+    _pct_out = _counts_out / _total * 100
+    _bin_centers = (_bin_edges[:-1] + _bin_edges[1:]) / 2
+    _bin_width = _bin_edges[1] - _bin_edges[0]
 
-            _range_md = f"""**Selected Range:** [{_r_min:.6f}, {_r_max:.6f}]
+    _fig = go.Figure()
+    _fig.add_trace(
+        go.Bar(
+            x=_bin_centers,
+            y=_pct_out,
+            width=_bin_width * 0.95,
+            marker_color="lightgray",
+            opacity=0.7,
+            name="outside range",
+            hovertemplate="Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>",
+        )
+    )
+    _fig.add_trace(
+        go.Bar(
+            x=_bin_centers,
+            y=_pct_in,
+            width=_bin_width * 0.95,
+            marker_color="orange",
+            opacity=0.85,
+            name="in range",
+            hovertemplate="Range: %{x}<br>Percent: %{y:.2f}%<extra></extra>",
+        )
+    )
+    _fig.update_layout(
+        title="Weight Distribution (Range Highlighted)",
+        xaxis_title=_x_title,
+        yaxis_title="Percentage (%)",
+        barmode="stack",
+        bargap=0.05,
+        height=450,
+        template="plotly_white",
+    )
+
+    _range_md = f"""**Selected Range:** [{_r_min:.6f}, {_r_max:.6f}]
 
     **Count in range:** {_count_in} / {_total}
 
     **Percentage:** {_pct:.2f}%"""
 
-            _range_display = mo.vstack(
-                [
-                    mo.ui.plotly(_fig),
-                    mo.md(_range_md).callout(kind="info"),
-                ]
-            )
-
-    _range_display
+    mo.vstack(
+        [
+            mo.ui.plotly(_fig),
+            mo.md(_range_md).callout(kind="info"),
+        ]
+    )
     return
 
 
 @app.cell
 def _(mo, np, tensor_entry):
     """Statistics panel."""
-    if tensor_entry is not None:
-        _vals = tensor_entry["values"]
-        _shape = tensor_entry["shape"]
-        _min = float(np.min(_vals))
-        _max = float(np.max(_vals))
-        _mean = float(np.mean(_vals))
-        _std = float(np.std(_vals))
-        _total = int(np.prod(_shape))
+    _vals = tensor_entry["values"]
+    _shape = tensor_entry["shape"]
+    _min = float(np.min(_vals))
+    _max = float(np.max(_vals))
+    _mean = float(np.mean(_vals))
+    _std = float(np.std(_vals))
+    _total = int(np.prod(_shape))
 
-        _stats_lines = [
-            f"**Min:** {_min:.6f} &nbsp;&nbsp; **Max:** {_max:.6f}",
-            f"**Mean:** {_mean:.6f} &nbsp;&nbsp; **Std:** {_std:.6f}",
-            f"**Shape:** {_shape} &nbsp;&nbsp; **Total params:** {_total:,}",
-        ]
-        if tensor_entry.get("is_quantized", False):
-            _scale = tensor_entry.get("scale")
-            _zp = tensor_entry.get("zero_point")
-            _scale_str = f"{_scale:.6f}" if _scale is not None else "N/A"
-            _zp_str = f"{_zp:.1f}" if _zp is not None else "N/A"
-            _stats_lines.append(
-                f"**Scale:** {_scale_str} &nbsp;&nbsp; **Zero Point:** {_zp_str}"
-            )
+    _stats_lines = [
+        f"**Min:** {_min:.6f} &nbsp;&nbsp; **Max:** {_max:.6f}",
+        f"**Mean:** {_mean:.6f} &nbsp;&nbsp; **Std:** {_std:.6f}",
+        f"**Shape:** {_shape} &nbsp;&nbsp; **Total params:** {_total:,}",
+    ]
+    if tensor_entry.get("is_quantized", False):
+        _scale = tensor_entry.get("scale")
+        _zp = tensor_entry.get("zero_point")
+        _scale_str = f"{_scale:.6f}" if _scale is not None else "N/A"
+        _zp_str = f"{_zp:.1f}" if _zp is not None else "N/A"
+        _stats_lines.append(
+            f"**Scale:** {_scale_str} &nbsp;&nbsp; **Zero Point:** {_zp_str}"
+        )
 
-        mo.md("\n\n".join(_stats_lines)).callout(kind="neutral")
-    else:
-        None
+    mo.md("\n\n".join(_stats_lines)).callout(kind="neutral")
     return
 
 

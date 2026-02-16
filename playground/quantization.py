@@ -12,11 +12,6 @@ app = marimo.App()
 
 @app.cell
 def _():
-    return
-
-
-@app.cell
-def _():
     """Import dependencies."""
     import sys
     from pathlib import Path
@@ -47,8 +42,16 @@ def _():
 
 
 @app.cell
-def _():
-    """Display notebook header and instructions."""
+def _(mo):
+    """Detect script vs interactive mode."""
+    is_script_mode = mo.app_meta().mode == "script"
+    return (is_script_mode,)
+
+
+@app.cell
+def _(mo):
+    """Display notebook header."""
+    mo.md("# Quantization Playground")
     return
 
 
@@ -62,93 +65,55 @@ def _(mo, project_root):
         label="Select any model file to load the folder",
         filetypes=[".onnx", ".pt"],
     )
+    folder_picker
     return (folder_picker,)
 
 
 @app.cell
-def _(folder_picker):
-    """Display folder picker."""
-    folder_picker
-    return
-
-
-@app.cell
-def _(Path, folder_picker, get_model_summary, load_model_variants, mo):
-    """Load models from selected folder with spinner."""
-    models = None
-    models_summary = None
-    load_error = None
-    selected_folder = None
-
-    if folder_picker.value:
-        try:
-            selected_folder = Path(folder_picker.path(0)).parent
-            with mo.status.spinner(title="Loading models..."):
-                models = load_model_variants(selected_folder)
-                models_summary = get_model_summary(models)
-        except Exception as e:
-            load_error = str(e)
-    return load_error, models, models_summary, selected_folder
-
-
-@app.cell
-def _(folder_picker, load_error, mo, models_summary, selected_folder):
-    """Display model loading status and summary."""
-    if not folder_picker.value:
-        # Initial state - show instructions
-        display = mo.md("**Select a model file to load the folder**").callout(
-            kind="info"
-        )
-    elif load_error:
-        # Error state - show error message
-        display = mo.md(f"**Error loading models:** {load_error}").callout(
-            kind="danger"
-        )
-    elif models_summary and models_summary["total_loaded"] > 0:
-        # Success state - show summary
-        onnx_avail = models_summary["onnx_available"]
-        pytorch_avail = models_summary["pytorch_available"]
-        onnx_list = ", ".join(onnx_avail) if onnx_avail else "None"
-        pytorch_list = ", ".join(pytorch_avail) if pytorch_avail else "None"
-
-        summary_text = f"""
-        **Models loaded successfully!**
-
-        **Folder:** `{selected_folder}`
-
-        **Total models:** {models_summary["total_loaded"]}
-
-        **ONNX variants:** {onnx_list}
-
-        **PyTorch variants:** {pytorch_list}
-        """
-        display = mo.md(summary_text).callout(kind="success")
+def _(Path, folder_picker, get_model_summary, is_script_mode, load_model_variants, mo, project_root):
+    """Load models from selected folder."""
+    if is_script_mode:
+        selected_folder = project_root / "models"
     else:
-        # No models found
-        display = mo.md(f"**No models found in:** `{selected_folder}`").callout(
-            kind="warn"
-        )
-    return (display,)
+        selected_folder = Path(folder_picker.path(0)).parent
+
+    with mo.status.spinner(title="Loading models..."):
+        models = load_model_variants(selected_folder)
+        models_summary = get_model_summary(models)
+    return models, models_summary, selected_folder
 
 
 @app.cell
-def _(display):
-    """Render the display."""
-    display
+def _(mo, models_summary, selected_folder):
+    """Display model loading status and summary."""
+    onnx_avail = models_summary["onnx_available"]
+    pytorch_avail = models_summary["pytorch_available"]
+    onnx_list = ", ".join(onnx_avail) if onnx_avail else "None"
+    pytorch_list = ", ".join(pytorch_avail) if pytorch_avail else "None"
+
+    summary_text = f"""
+    **Models loaded successfully!**
+
+    **Folder:** `{selected_folder}`
+
+    **Total models:** {models_summary["total_loaded"]}
+
+    **ONNX variants:** {onnx_list}
+
+    **PyTorch variants:** {pytorch_list}
+    """
+    mo.md(summary_text).callout(kind="success") if models_summary["total_loaded"] > 0 else mo.md(
+        f"**No models found in:** `{selected_folder}`"
+    ).callout(kind="warn")
     return
 
 
 @app.cell
 def _(get_all_layer_names, models):
     """Extract layer names from loaded models."""
-    layer_data = None
-    layer_names = []
-    layer_source = None
-
-    if models:
-        layer_data = get_all_layer_names(models)
-        layer_names = layer_data.get("layer_names", [])
-        layer_source = layer_data.get("source")
+    layer_data = get_all_layer_names(models)
+    layer_names = layer_data.get("layer_names", [])
+    layer_source = layer_data.get("source")
     return layer_names, layer_source
 
 
@@ -156,59 +121,38 @@ def _(get_all_layer_names, models):
 def _(layer_names, mo):
     """Layer selection dropdown."""
     layer_selector = mo.ui.dropdown(
-        options=layer_names if layer_names else ["Select a layer..."],
+        options=layer_names,
         value=None,
         allow_select_none=True,
         label="Layer to analyze",
     )
-    return (layer_selector,)
-
-
-@app.cell
-def _(layer_selector):
-    """Display layer selector."""
     layer_selector
-    return
+    return (layer_selector,)
 
 
 @app.cell
 def _(get_layer_type, layer_selector, layer_source, mo, models):
     """Display layer information (reactive to dropdown selection)."""
-    layer_info_display = None
+    selected_layer = layer_selector.value
 
-    if not layer_selector.value:
-        # No selection - show placeholder
-        layer_info_display = mo.md(
-            "**Select a layer from the dropdown above to view details.**"
-        ).callout(kind="neutral")
-    else:
-        # Layer selected - show info
-        selected_layer = layer_selector.value
+    layer_type = None
+    if layer_source:
+        valid = ["onnx", "pytorch"]
+        model_key = f"{layer_source}_float" if layer_source in valid else None
+        if model_key and models.get(model_key):
+            layer_type = get_layer_type(models[model_key], selected_layer)
 
-        # Get layer type
-        layer_type = None
-        if models and layer_source:
-            valid = ["onnx", "pytorch"]
-            model_key = f"{layer_source}_float" if layer_source in valid else None
-            if model_key and models.get(model_key):
-                layer_type = get_layer_type(models[model_key], selected_layer)
+    type_text = f" ({layer_type})" if layer_type else ""
 
-        type_text = f" ({layer_type})" if layer_type else ""
+    layer_info_text = f"""
+    **Layer:** `{selected_layer}`{type_text}
 
-        layer_info_text = f"""
-        **Layer:** `{selected_layer}`{type_text}
+    **Source:** {layer_source.upper() if layer_source else "Unknown"}
+    """
 
-        **Source:** {layer_source.upper() if layer_source else "Unknown"}
-        """
-
-        layer_info_display = mo.md(layer_info_text).callout(kind="info")
-    return (layer_info_display,)
-
-
-@app.cell
-def _(layer_info_display):
-    """Render layer info display."""
-    layer_info_display
+    mo.md(layer_info_text).callout(kind="info") if selected_layer else mo.md(
+        "**Select a layer from the dropdown above to view details.**"
+    ).callout(kind="neutral")
     return
 
 
