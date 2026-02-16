@@ -87,7 +87,7 @@
 - [x] **HW-02**: Hardware pseudocode (C-style) with exact bit-widths for each operation
 - [x] **HW-03**: Verification test vectors from ResNet8 for hardware validation
 
-## v1.4 Requirements (Current Milestone)
+## v1.4 Requirements (Paused)
 
 ### Notebook Foundation
 
@@ -116,6 +116,15 @@
 - [ ] **MOD-01**: User can modify scale/zero-point values via UI
 - [ ] **MOD-02**: User can re-run inference with modified parameters
 - [ ] **MOD-03**: User can compare original vs modified outputs
+
+## v1.5 Requirements (Current Milestone)
+
+### Intermediate Values
+
+- [ ] **INTM-01**: User can select an input source (CIFAR-10 sample by index or random input) for inference
+- [ ] **INTM-02**: User can run inference through a loaded PyTorch model and capture intermediate activations at each layer using forward hooks
+- [ ] **INTM-03**: User can select a layer and view intermediate activation histogram and statistics (shape, min, max, mean, std)
+- [ ] **INTM-04**: User can toggle between weight view and intermediate activation view for the same layer
 
 ## Future Requirements
 
@@ -217,14 +226,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOD-02 | Phase 17 | Pending |
 | MOD-03 | Phase 17 | Pending |
 
+| INTM-01 | TBD | Pending |
+| INTM-02 | TBD | Pending |
+| INTM-03 | TBD | Pending |
+| INTM-04 | TBD | Pending |
+
 **Coverage:**
 - v1.0 requirements: 6 total (Complete)
 - v1.1 requirements: 5 total (Complete)
 - v1.2 requirements: 12 total (Complete)
 - v1.3 requirements: 14 total (Complete)
-- v1.4 requirements: 16 total (Pending)
-- Mapped to phases: 53/53 (100% coverage)
+- v1.4 requirements: 16 total (Paused)
+- v1.5 requirements: 4 total (Pending)
+- Mapped to phases: 53/57 (v1.5 TBD)
 
 ---
 *Requirements defined: 2025-01-27*
-*Last updated: 2026-02-05 with v1.4 phase mappings*
+*Last updated: 2026-02-16 with v1.5 requirements*
