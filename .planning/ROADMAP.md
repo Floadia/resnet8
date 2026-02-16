@@ -6,8 +6,8 @@
 - ✅ **v1.1 PyTorch Evaluation** - Phases 3-4 (shipped 2026-01-27)
 - ✅ **v1.2 PTQ Evaluation** - Phases 5-8 (shipped 2026-01-28)
 - ✅ **v1.3 Quantized Operations Documentation** - Phases 9-13 (shipped 2026-02-05)
-- 🚧 **v1.4 Quantization Playground** - Phases 14-17 (paused)
-- 🎯 **v1.5 Intermediate Value Visualizer** - Phase 18 (current)
+- ✅ **v1.4 Quantization Playground** - Phase 14 (shipped 2026-02-06, Phases 15-17 cancelled)
+- 🎯 **v1.5 Intermediate Value Visualizer** - Phase 15 (current)
 
 ## Phases
 
@@ -227,9 +227,11 @@ Plans:
 </details>
 
 <details>
-<summary>⏸️ v1.4 Quantization Playground (Phases 14-17) - PAUSED</summary>
+<summary>✅ v1.4 Quantization Playground (Phase 14) - SHIPPED 2026-02-06</summary>
 
-**Milestone Goal:** Interactive Marimo notebook for inspecting and experimenting with quantization parameters, enabling users to understand how scale/zero-point choices affect model accuracy.
+**Milestone Goal:** Interactive Marimo notebook for inspecting and experimenting with quantization parameters.
+
+**Note:** Phases 15-17 (Parameter Inspection, Inference/Value Capture, Interactive Modification) were cancelled. Phase 14 (Notebook Foundation) shipped successfully.
 
 #### Phase 14: Notebook Foundation
 **Goal**: Users can launch Marimo notebook and load quantized models with proper caching for interactive experimentation
@@ -246,57 +248,15 @@ Plans:
 - [x] 14-01-PLAN.md — Notebook skeleton with cached model loading utilities
 - [x] 14-02-PLAN.md — Layer inspection utilities and complete UI wiring
 
-#### Phase 15: Parameter Inspection
-**Goal**: Users can explore all quantization parameters (scales, zero-points, weights) with comparison to FP32 values
-**Depends on**: Phase 14 (needs model loading infrastructure)
-**Requirements**: INSP-01, INSP-02, INSP-03, INSP-04, INSP-05
-**Success Criteria** (what must be TRUE):
-  1. User can view scale and zero-point values for any selected layer in a formatted table
-  2. User can view weight tensor shapes and dtypes (INT8 vs FP32) for selected layer
-  3. User can navigate full model structure via tree or list view and drill into any layer
-  4. User can see FP32 vs quantized weight values side-by-side for selected layer
-  5. User can view activation histogram showing distribution of values per layer
-**Plans**: TBD
-
-Plans:
-- [ ] TBD
-
-#### Phase 16: Inference and Value Capture
-**Goal**: Users can run inference and capture intermediate activations to understand quantization effects at each layer
-**Depends on**: Phase 15 (needs parameter inspection to contextualize captured values)
-**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04
-**Success Criteria** (what must be TRUE):
-  1. User can select a CIFAR-10 sample image and run inference through the quantized model
-  2. User can capture and view intermediate activation tensors at any layer during inference
-  3. User can see SQNR (Signal-to-Quantization-Noise Ratio) metric for each layer comparing quantized vs FP32 activations
-  4. User can see per-layer accuracy contribution analysis showing which layers degrade accuracy most
-**Plans**: TBD
-
-Plans:
-- [ ] TBD
-
-#### Phase 17: Interactive Modification
-**Goal**: Users can modify quantization parameters and immediately observe the effect on inference outputs
-**Depends on**: Phase 16 (needs inference and value capture to compare before/after)
-**Requirements**: MOD-01, MOD-02, MOD-03
-**Success Criteria** (what must be TRUE):
-  1. User can modify scale and/or zero-point values for a selected layer via slider or input field
-  2. User can trigger re-inference with modified parameters and see updated outputs
-  3. User can compare original vs modified outputs (activations, final predictions) side-by-side
-**Plans**: TBD
-
-Plans:
-- [ ] TBD
-
 </details>
 
 ### 🎯 v1.5 Intermediate Value Visualizer (Current Milestone)
 
 **Milestone Goal:** Add intermediate activation capture and visualization to playground/weight_visualizer.py, enabling users to inspect activation distributions across layers during inference.
 
-- [ ] **Phase 18: Intermediate Activation Capture** - Add inference and layer activation visualization to weight_visualizer notebook
+- [ ] **Phase 15: Intermediate Activation Capture** - Add inference and layer activation visualization to weight_visualizer notebook
 
-### Phase 18: Intermediate Activation Capture
+### Phase 15: Intermediate Activation Capture
 **Goal**: Users can run inference and visualize intermediate activations alongside weights in the weight_visualizer notebook
 **Depends on**: Phase 14 (needs PyTorch model loading infrastructure from weight_visualizer.py)
 **Requirements**: INTM-01, INTM-02, INTM-03, INTM-04
@@ -314,7 +274,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -332,11 +292,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Architecture Documentation | v1.3 | 2/2 | Complete | 2026-02-03 |
 | 13. Hardware Implementation Guide | v1.3 | 1/1 | Complete | 2026-02-05 |
 | 14. Notebook Foundation | v1.4 | 2/2 | Complete | 2026-02-06 |
-| 15. Parameter Inspection | v1.4 | 0/TBD | Paused | - |
-| 16. Inference and Value Capture | v1.4 | 0/TBD | Paused | - |
-| 17. Interactive Modification | v1.4 | 0/TBD | Paused | - |
-| 18. Intermediate Activation Capture | v1.5 | 0/TBD | Not started | - |
+| 15. Intermediate Activation Capture | v1.5 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-02-16 with v1.5 Phase 18*
+*Last updated: 2026-02-16 — removed v1.4 Phases 15-17 (cancelled), renumbered v1.5 Phase 18→15*
