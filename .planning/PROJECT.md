@@ -8,16 +8,15 @@ Multi-framework evaluation of ResNet8 for CIFAR-10, converted from the MLCommons
 
 Accurate model conversion across frameworks — converted models must produce equivalent results to the original Keras model (>85% accuracy on CIFAR-10).
 
-## Current Milestone: v1.4 Quantization Playground
+## Current Milestone: v1.5 Intermediate Value Visualizer
 
-**Goal:** Interactive Marimo notebook environment to experiment with quantization and inspect all values
+**Goal:** Add intermediate activation capture and visualization to weight_visualizer.py
 
 **Target features:**
-- Load and visualize quantized model structure (ONNX and PyTorch)
-- Inspect all quantization parameters (scale, zero-point per layer)
-- Run inference and capture intermediate values at each layer
-- Modify parameters interactively and re-run experiments
-- Compare original vs modified outputs
+- Run inference with a CIFAR-10 sample or random input through PyTorch models
+- Capture intermediate activations at each layer using forward hooks
+- Visualize activation distributions (histograms) and statistics per layer
+- Compare activations across layers
 
 ## Requirements
 
@@ -41,12 +40,10 @@ Accurate model conversion across frameworks — converted models must produce eq
 
 ### Active
 
-- [ ] Marimo notebook setup for quantization experiments
-- [ ] Model loading utilities (ONNX and PyTorch quantized models)
-- [ ] Quantization parameter inspection (scale, zero-point per layer)
-- [ ] Intermediate value capture during inference
-- [ ] Interactive parameter modification and re-evaluation
-- [ ] Comparison visualization (original vs modified)
+- [ ] Intermediate activation capture using PyTorch forward hooks in weight_visualizer.py
+- [ ] Input selection (CIFAR-10 sample or random input) for inference
+- [ ] Activation distribution visualization (histograms, statistics) per layer
+- [ ] Integration with existing weight/bias visualization
 
 ### Out of Scope
 
@@ -95,4 +92,4 @@ Accurate model conversion across frameworks — converted models must produce eq
 | onnx2torch for ONNX→PyTorch | Leverage existing ONNX model | — Pending |
 
 ---
-*Last updated: 2026-02-05 after v1.4 milestone start*
+*Last updated: 2026-02-16 after v1.5 milestone start*
