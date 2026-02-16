@@ -1,4 +1,5 @@
 {
+  "mode": "interactive",
   "depth": "standard",
   "parallelization": true,
   "commit_docs": true,
