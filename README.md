@@ -208,13 +208,12 @@ marimo edit playground/quantization.py
 
 ### Agent Team (Codex Multi-Agent)
 
-This repo includes a starter multi-agent setup inspired by harness engineering patterns:
+This repo includes:
 
-- `explorer`: mapping and scoping (read-only)
-- `implementer`: implementation (workspace-write)
-- `reviewer`: regression/test-gap review (read-only)
+- General-purpose engineering agents (`explorer`, `implementer`, `reviewer`)
+- OPSX workflow agents for OpenSpec (`opsx_explore`, `opsx_new`, `opsx_continue`, `opsx_ff`, `opsx_apply`, `opsx_verify`, `opsx_sync`, `opsx_archive`, `opsx_bulk_archive`, `opsx_onboard`)
 
-See `docs/AGENT_TEAM.md` for usage prompts and workflow.
+See `docs/AGENT_TEAM.md` for flow mapping and usage guidance.
 
 ## License
 

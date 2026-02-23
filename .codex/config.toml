@@ -18,3 +18,43 @@ config_file = ".codex/agents/implementer.toml"
 [agents.reviewer]
 description = "Read-only reviewer focused on regressions and missing tests."
 config_file = ".codex/agents/reviewer.toml"
+
+[agents.opsx_explore]
+description = "OPSX explore mode: investigate and reason without implementation edits."
+config_file = ".codex/agents/opsx_explore.toml"
+
+[agents.opsx_new]
+description = "OPSX new change flow: scaffold a change and show first artifact instructions."
+config_file = ".codex/agents/opsx_new.toml"
+
+[agents.opsx_continue]
+description = "OPSX continue flow: create the next ready artifact for an existing change."
+config_file = ".codex/agents/opsx_continue.toml"
+
+[agents.opsx_ff]
+description = "OPSX fast-forward flow: create all pending artifacts to reach implementation-ready."
+config_file = ".codex/agents/opsx_ff.toml"
+
+[agents.opsx_apply]
+description = "OPSX apply flow: implement tasks from a change and update progress."
+config_file = ".codex/agents/opsx_apply.toml"
+
+[agents.opsx_verify]
+description = "OPSX verify flow: validate implementation against artifacts and tasks."
+config_file = ".codex/agents/opsx_verify.toml"
+
+[agents.opsx_sync]
+description = "OPSX sync flow: merge delta specs from a change into main OpenSpec specs."
+config_file = ".codex/agents/opsx_sync.toml"
+
+[agents.opsx_archive]
+description = "OPSX archive flow: archive a completed change with optional spec sync."
+config_file = ".codex/agents/opsx_archive.toml"
+
+[agents.opsx_bulk_archive]
+description = "OPSX bulk-archive flow: archive multiple completed changes in one pass."
+config_file = ".codex/agents/opsx_bulk_archive.toml"
+
+[agents.opsx_onboard]
+description = "OPSX onboarding flow: guided, narrated first end-to-end OpenSpec cycle."
+config_file = ".codex/agents/opsx_onboard.toml"
