@@ -206,6 +206,16 @@ uv sync
 marimo edit playground/quantization.py
 ```
 
+### Agent Team (Codex Multi-Agent)
+
+This repo includes a starter multi-agent setup inspired by harness engineering patterns:
+
+- `explorer`: mapping and scoping (read-only)
+- `implementer`: implementation (workspace-write)
+- `reviewer`: regression/test-gap review (read-only)
+
+See `docs/AGENT_TEAM.md` for usage prompts and workflow.
+
 ## License
 
 This project uses the ResNet8 model from [MLCommons TinyMLPerf](https://github.com/mlcommons/tiny), which is licensed under Apache 2.0.
