@@ -1,0 +1,20 @@
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 4
+
+[agents.default]
+description = "General development tasks in this repository."
+
+[agents.explorer]
+description = "Read-only scout for codebase mapping and impact analysis."
+config_file = ".codex/agents/explorer.toml"
+
+[agents.implementer]
+description = "Implements scoped changes with minimal, testable patches."
+config_file = ".codex/agents/implementer.toml"
+
+[agents.reviewer]
+description = "Read-only reviewer focused on regressions and missing tests."
+config_file = ".codex/agents/reviewer.toml"
