@@ -1,0 +1,22 @@
+## ADDED Requirements
+
+### Requirement: Unified evaluation pipeline contract
+The system SHALL provide a shared evaluation pipeline used by both ONNX and PyTorch evaluation entry points for CIFAR-10 test loading, prediction aggregation, and metric computation.
+
+#### Scenario: ONNX and PyTorch use the same evaluation flow
+- **WHEN** a user runs ONNX and PyTorch evaluation commands against the same CIFAR-10 test set
+- **THEN** both commands MUST execute the same shared data-loading and metric-computation path, with backend-specific logic isolated to inference adapters
+
+### Requirement: Deterministic evaluation report schema
+The system SHALL emit a deterministic report schema containing overall accuracy, per-class accuracy, sample counts, and execution metadata (backend and model path).
+
+#### Scenario: Evaluation output keys are stable
+- **WHEN** evaluation completes successfully
+- **THEN** the produced report MUST include stable field names for overall metrics, per-class metrics, and metadata so downstream tooling can parse it without backend-specific branching
+
+### Requirement: Explicit preprocessing consistency
+The system MUST centralize and document preprocessing rules used by evaluation so ONNX and PyTorch backends apply identical input representation semantics.
+
+#### Scenario: Shared preprocessing source of truth
+- **WHEN** preprocessing logic is updated
+- **THEN** both evaluation backends MUST automatically inherit the change from the shared preprocessing implementation and must not duplicate preprocessing logic in backend scripts

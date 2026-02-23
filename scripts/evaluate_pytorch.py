@@ -1,144 +1,26 @@
 #!/usr/bin/env python3
 """Evaluate PyTorch ResNet8 model on CIFAR-10 test set."""
 
+from __future__ import annotations
+
 import argparse
-import os
-import pickle
+import sys
+from pathlib import Path
 
-import numpy as np
-import torch
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-
-def load_cifar10_test(data_dir: str) -> tuple[np.ndarray, np.ndarray, list[str]]:
-    """Load CIFAR-10 test batch and class names.
-
-    Args:
-        data_dir: Path to cifar-10-batches-py directory
-
-    Returns:
-        Tuple of (images, labels, class_names)
-        - images: float32 array of shape (10000, 32, 32, 3)
-          with raw pixel values (0-255)
-        - labels: int array of shape (10000,)
-        - class_names: list of 10 class name strings
-    """
-    # Load test batch
-    test_path = os.path.join(data_dir, "test_batch")
-    with open(test_path, "rb") as f:
-        test_data = pickle.load(f, encoding="bytes")
-
-    # Extract data using byte-string keys (Python 3 pickle with encoding='bytes')
-    raw_images = test_data[b"data"]  # Shape: (10000, 3072)
-    labels = np.array(test_data[b"labels"])  # Shape: (10000,)
-
-    # Reshape: (10000, 3072) -> (10000, 3, 32, 32) -> (10000, 32, 32, 3)
-    images = raw_images.reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
-
-    # Convert to float32 WITHOUT normalizing - model expects raw pixel values (0-255)
-    images = images.astype(np.float32)
-
-    # Load class names from batches.meta
-    meta_path = os.path.join(data_dir, "batches.meta")
-    with open(meta_path, "rb") as f:
-        meta = pickle.load(f, encoding="bytes")
-
-    # Decode byte strings to regular strings
-    class_names = [name.decode("utf-8") for name in meta[b"label_names"]]
-
-    return images, labels, class_names
+from resnet8.evaluation import (  # noqa: E402
+    DEFAULT_CIFAR10_DATA_DIR,
+    PyTorchAdapter,
+    evaluate_dataset,
+    format_report_text,
+    write_report_json,
+)
 
 
-def load_pytorch_model(model_path: str) -> torch.nn.Module:
-    """Load PyTorch model from checkpoint or TorchScript.
-
-    Supports two formats:
-    1. Checkpoint dict with 'model' key (standard format)
-    2. TorchScript model (saved with torch.jit.save or traced_model.save)
-
-    Args:
-        model_path: Path to .pt model file
-
-    Returns:
-        PyTorch model in eval mode
-    """
-    # Try loading as TorchScript first (for FX-quantized models)
-    try:
-        model = torch.jit.load(model_path, map_location="cpu")
-        model.eval()
-        return model
-    except RuntimeError:
-        # Not a TorchScript model, try loading as checkpoint dict
-        pass
-
-    # Load as checkpoint dict
-    checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-    model = checkpoint["model"]
-    model.eval()
-    return model
-
-
-def evaluate_model(
-    model: torch.nn.Module, images: np.ndarray, labels: np.ndarray
-) -> np.ndarray:
-    """Run inference on images using PyTorch model.
-
-    Args:
-        model: PyTorch model in eval mode
-        images: float32 array of shape (N, 32, 32, 3)
-        labels: int array of shape (N,)
-
-    Returns:
-        Predicted class indices array of shape (N,)
-    """
-    # Convert numpy array to torch tensor
-    images_tensor = torch.from_numpy(images)
-
-    print(f"Test images tensor shape: {tuple(images_tensor.shape)}")
-
-    # Run inference
-    with torch.no_grad():
-        outputs = model(images_tensor)
-        logits = outputs.numpy()  # Shape: (N, 10)
-
-    # Get predicted classes
-    predictions = np.argmax(logits, axis=1)
-
-    return predictions
-
-
-def compute_accuracy(
-    predictions: np.ndarray, labels: np.ndarray, class_names: list[str]
-) -> tuple[float, dict[str, tuple[int, int, float]]]:
-    """Compute overall and per-class accuracy.
-
-    Args:
-        predictions: Predicted class indices
-        labels: Ground truth labels
-        class_names: List of class name strings
-
-    Returns:
-        Tuple of (overall_accuracy, per_class_dict)
-        - overall_accuracy: float in [0, 1]
-        - per_class_dict: {class_name: (correct, total, accuracy)}
-    """
-    # Overall accuracy
-    correct = np.sum(predictions == labels)
-    total = len(labels)
-    overall_acc = correct / total
-
-    # Per-class accuracy using boolean masking
-    per_class = {}
-    for class_idx, class_name in enumerate(class_names):
-        mask = labels == class_idx
-        class_total = np.sum(mask)
-        class_correct = np.sum(predictions[mask] == class_idx)
-        class_acc = class_correct / class_total if class_total > 0 else 0.0
-        per_class[class_name] = (int(class_correct), int(class_total), class_acc)
-
-    return overall_acc, per_class
-
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Evaluate PyTorch ResNet8 model on CIFAR-10 test set"
     )
@@ -149,52 +31,40 @@ def main():
     )
     parser.add_argument(
         "--data-dir",
-        default="/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py",
+        default=DEFAULT_CIFAR10_DATA_DIR,
         help="Path to cifar-10-batches-py directory",
+    )
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Evaluate only first N test samples",
+    )
+    parser.add_argument(
+        "--output-json",
+        default=None,
+        help="Optional path to write canonical evaluation report JSON",
     )
     args = parser.parse_args()
 
-    # Load CIFAR-10 test data
     print(f"Loading CIFAR-10 test data from: {args.data_dir}")
-    images, labels, class_names = load_cifar10_test(args.data_dir)
-    print(f"Loaded {len(labels)} test images")
-    print(f"Classes: {', '.join(class_names)}")
-    print()
-
-    # Load PyTorch model
     print(f"Loading PyTorch model from: {args.model}")
-    model = load_pytorch_model(args.model)
+
+    adapter = PyTorchAdapter(args.model)
     print("Model loaded and set to eval mode")
+
+    report = evaluate_dataset(
+        adapter=adapter,
+        data_dir=args.data_dir,
+        max_samples=args.max_samples,
+    )
+
     print()
+    print(format_report_text(report, title="EVALUATION RESULTS (PyTorch)"))
 
-    # Run evaluation
-    predictions = evaluate_model(model, images, labels)
-    print()
-
-    # Compute accuracy
-    overall_acc, per_class = compute_accuracy(predictions, labels, class_names)
-
-    # Print results
-    print("=" * 50)
-    print("EVALUATION RESULTS (PyTorch)")
-    print("=" * 50)
-    print()
-
-    # Overall accuracy
-    correct = int(overall_acc * len(labels))
-    print(f"Overall Accuracy: {correct}/{len(labels)} = {overall_acc * 100:.2f}%")
-    print()
-
-    # Per-class accuracy
-    print("Per-Class Accuracy:")
-    print("-" * 40)
-    for class_name in class_names:
-        class_correct, class_total, class_acc = per_class[class_name]
-        print(
-            f"  {class_name:12s}: {class_correct:4d}/{class_total:4d} = "
-            f"{class_acc * 100:5.2f}%"
-        )
-    print("-" * 40)
+    if args.output_json:
+        write_report_json(report, args.output_json)
+        print(f"Wrote JSON report: {args.output_json}")
 
 
 if __name__ == "__main__":

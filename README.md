@@ -35,14 +35,15 @@ resnet8/
 │   ├── quantize_onnx.py        # ONNX Runtime PTQ
 │   ├── quantize_pytorch.py     # PyTorch PTQ
 │   └── calibration_utils.py    # Calibration data utilities
+├── resnet8/evaluation/         # Shared evaluation pipeline + backend adapters
+├── tests/                      # Evaluation/visualization regression tests
 ├── models/                     # Converted and quantized models
 │   ├── resnet8.onnx           # FP32 ONNX baseline
 │   ├── resnet8.pt             # FP32 PyTorch baseline
 │   ├── resnet8_int8.onnx      # ONNX Runtime int8
 │   ├── resnet8_uint8.onnx     # ONNX Runtime uint8
 │   └── resnet8_int8.pt        # PyTorch int8
-├── docs/                       # Analysis documents
-│   └── QUANTIZATION_ANALYSIS.md
+├── docs/                       # Analysis and migration documents
 ├── logs/                       # Conversion and evaluation logs
 └── .planning/                  # Project planning artifacts
 ```
@@ -85,9 +86,32 @@ Outputs: `models/resnet8.onnx`
 
 ```bash
 uv run python scripts/evaluate.py \
-    models/resnet8.onnx \
-    /path/to/cifar-10-batches-py
+    --model models/resnet8.onnx \
+    --data-dir /path/to/cifar-10-batches-py \
+    --max-samples 1000 \
+    --output-json logs/eval_onnx.json
 ```
+
+### Evaluate PyTorch Model
+
+```bash
+uv run python scripts/evaluate_pytorch.py \
+    --model models/resnet8.pt \
+    --data-dir /path/to/cifar-10-batches-py \
+    --max-samples 1000 \
+    --output-json logs/eval_pytorch.json
+```
+
+### Evaluation Output Schema
+
+`--output-json` writes a canonical schema for both backends:
+
+- `schema_version`
+- `backend`
+- `model_path`
+- `data_dir`
+- `overall` (`correct`, `total`, `accuracy`)
+- `per_class[]` (`class_name`, `correct`, `total`, `accuracy`)
 
 ### Quantize with ONNX Runtime
 
@@ -112,14 +136,6 @@ uv run python scripts/convert_pytorch.py \
 ```
 
 Outputs: `models/resnet8.pt`
-
-### Evaluate PyTorch Model
-
-```bash
-uv run python scripts/evaluate_pytorch.py \
-    models/resnet8.pt \
-    /path/to/cifar-10-batches-py
-```
 
 ### Quantize with PyTorch
 
@@ -206,6 +222,21 @@ uv sync
 marimo edit playground/quantization.py
 ```
 
+### Evaluation + Visualizer Migration
+
+Refactor boundary and rollback notes are documented in:
+
+- `docs/refactor-evaluation-visualization-migration.md`
+
+### CLI Compatibility Notes
+
+- Existing entry points are unchanged: `scripts/evaluate.py`, `scripts/evaluate_pytorch.py`.
+- Existing `--model` and `--data-dir` flags remain supported.
+- Additive flags were introduced:
+  - `--max-samples` for fast subset evaluation.
+  - `--output-json` for deterministic machine-readable reports.
+- Weight visualizer behavior is preserved at UI level while extraction logic now lives in shared utilities under `playground/utils/tensor_extractors.py`.
+
 ### Agent Team (Codex Multi-Agent)
 
 This repo includes:
@@ -222,4 +253,4 @@ This project uses the ResNet8 model from [MLCommons TinyMLPerf](https://github.c
 ---
 
 *Project version: 1.2.0*
-*Last updated: 2026-01-28*
+*Last updated: 2026-02-23*

@@ -9,6 +9,30 @@ Interactive Marimo notebooks for exploring and analyzing ResNet8 quantization.
 | `quantization.py` | Quantization parameter explorer |
 | `weight_visualizer.py` | Weight distribution visualizer |
 
+## Weight Visualizer Workflow
+
+`weight_visualizer.py` now uses shared extraction utilities from
+`playground/utils/tensor_extractors.py`. The notebook remains the presentation
+layer and consumes normalized metadata with this structure:
+
+- `format`: `onnx` / `pytorch` / `none`
+- `layers`: layer-to-tensor-name mapping
+- `is_quantized`: model-level quantization signal
+- `tensor_data`: per-layer tensor entries with:
+  - `values`, `shape`, `is_quantized`
+  - optional quantization fields: `int_values`, `scale`, `zero_point`,
+    `scale_values`, `zero_point_values`
+
+### Supported model behavior
+
+- `.pt` models: FP32 checkpoints and quantized TorchScript/packed-params models
+  are both supported.
+- `.onnx` models: initializer-driven weight/bias extraction is supported; when
+  quantization ops are present, raw integer values and dequantized values are
+  both available for rendering.
+- Missing files or unsupported extensions resolve to an empty index (`format:
+  none`) instead of failing notebook startup.
+
 ## Usage
 
 ```bash
