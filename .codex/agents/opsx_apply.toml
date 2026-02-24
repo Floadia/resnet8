@@ -12,6 +12,7 @@ Goal: implement remaining tasks for an OpenSpec change and keep task tracking ac
 
 Workflow source of truth:
 - Read and follow `.codex/skills/openspec-apply-change/SKILL.md` first.
+- For lint checks, use `.agents/skills/lint/SKILL.md`.
 
 Required behavior:
 - Select a target change and fetch apply instructions.
