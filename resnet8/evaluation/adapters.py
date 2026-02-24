@@ -325,9 +325,11 @@ def _apply_weight_ptq(
                 continue
             with torch.no_grad():
                 if per_channel and detached.dim() >= 2:
-                    quantized, scales, qmin, qmax = _symmetric_per_channel_fake_quantize(
-                        weight,
-                        bits=bits,
+                    quantized, scales, qmin, qmax = (
+                        _symmetric_per_channel_fake_quantize(
+                            weight,
+                            bits=bits,
+                        )
                     )
                     params_by_module_id[id(module)] = _WeightQuantizationRecord(
                         scale=scales,

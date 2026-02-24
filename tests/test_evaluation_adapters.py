@@ -147,7 +147,9 @@ def test_pytorch_adapter_weight_quantization_per_channel_metadata(tmp_path):
     with torch.no_grad():
         linear = model[0]
         assert isinstance(linear, torch.nn.Linear)
-        linear.weight.copy_(torch.tensor([[10.0, 0.0], [0.5, 0.0]], dtype=torch.float32))
+        linear.weight.copy_(
+            torch.tensor([[10.0, 0.0], [0.5, 0.0]], dtype=torch.float32)
+        )
 
     model_path = tmp_path / "ptq-model-per-channel.pt"
     torch.save({"model": model}, model_path)
