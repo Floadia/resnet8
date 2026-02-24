@@ -241,8 +241,12 @@ Refactor boundary and rollback notes are documented in:
 
 This repo includes:
 
-- General-purpose engineering agents (`explorer`, `implementer`, `reviewer`)
+- General-purpose engineering agents (`explorer`, `researcher`, `implementer`, `reviewer`)
 - OPSX workflow agents for OpenSpec (`opsx_explore`, `opsx_new`, `opsx_continue`, `opsx_ff`, `opsx_apply`, `opsx_verify`, `opsx_sync`, `opsx_archive`, `opsx_bulk_archive`, `opsx_onboard`)
+
+Flow choices:
+- Standard: use canonical OPSX flow directly.
+- Paper-driven: run `researcher` first, then hand off to OPSX for implementation (`opsx_apply`) and verification (`opsx_verify`).
 
 See `docs/AGENT_TEAM.md` for flow mapping and usage guidance.
 
@@ -253,4 +257,4 @@ This project uses the ResNet8 model from [MLCommons TinyMLPerf](https://github.c
 ---
 
 *Project version: 1.2.0*
-*Last updated: 2026-02-23*
+*Last updated: 2026-02-24*

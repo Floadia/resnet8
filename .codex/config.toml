@@ -11,6 +11,10 @@ description = "General development tasks in this repository."
 description = "Read-only scout for codebase mapping and impact analysis."
 config_file = ".codex/agents/explorer.toml"
 
+[agents.researcher]
+description = "Read-only NN-paper researcher for sourced findings and implementation guidance."
+config_file = ".codex/agents/researcher.toml"
+
 [agents.implementer]
 description = "Implements scoped changes with minimal, testable patches."
 config_file = ".codex/agents/implementer.toml"

@@ -17,6 +17,7 @@ Workflow source of truth:
 Required behavior:
 - Select a target change and fetch apply instructions.
 - Read all context files listed by OpenSpec.
+- If paper-derived constraints exist (from `researcher` output), treat them as implementation acceptance inputs.
 - Implement pending tasks with minimal, testable patches.
 - Mark completed task checkboxes immediately.
 - Continue until all tasks are done or a blocker requires user input.

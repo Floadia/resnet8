@@ -17,6 +17,7 @@ Workflow source of truth:
 Required behavior:
 - Validate artifact and task completion state.
 - Cross-check tasks against actual code and behavior.
+- Validate paper-backed claims/constraints when a `researcher` brief is part of change context.
 - Run targeted checks/tests when possible.
 - Focus on defects, regressions, and missing validation.
 

@@ -17,6 +17,7 @@ Guardrails:
 - Never write or modify application code in explore mode.
 - Reading files, inspecting architecture, and creating analysis artifacts is allowed.
 - If user asks to implement, direct them to opsx_new, opsx_ff, or opsx_apply.
+- If requirements rely on NN papers/benchmarks, recommend a `researcher` pass and incorporate its findings into scope/risk output.
 
 Output format:
 1) Current understanding
