@@ -55,6 +55,10 @@ class PyTorchAdapter:
         calibration_images: np.ndarray | None = None,
     ):
         self.model_path = str(model_path)
+        self._weight_bits = weight_bits
+        self._activation_bits = activation_bits
+        self._activation_scheme = activation_scheme
+        self._calibrate = calibrate
         _validate_bit_width(weight_bits, "weight_bits")
         _validate_bit_width(activation_bits, "activation_bits")
         _validate_activation_scheme(activation_scheme)
@@ -68,11 +72,16 @@ class PyTorchAdapter:
         base_model = load_pytorch_model(self.model_path)
         self._model = base_model
         self._activation_quantizer: _ActivationQuantizer | None = None
+        self._weight_params_by_module_id: dict[int, _QuantizationParams] = {}
+        self._activation_params_by_module_id: dict[int, _QuantizationParams] = {}
 
         if weight_bits is not None or activation_bits is not None:
             self._model = copy.deepcopy(base_model)
             if weight_bits is not None:
-                _apply_weight_ptq(self._model, weight_bits)
+                self._weight_params_by_module_id = _apply_weight_ptq(
+                    self._model,
+                    weight_bits,
+                )
             if activation_bits is not None:
                 params_by_module_id: dict[int, _QuantizationParams] | None = None
                 if calibrate and calibration_images is not None:
@@ -83,6 +92,7 @@ class PyTorchAdapter:
                         bits=activation_bits,
                         scheme=activation_scheme,
                     )
+                self._activation_params_by_module_id = params_by_module_id or {}
                 self._activation_quantizer = _ActivationQuantizer(
                     self._model,
                     activation_bits,
@@ -100,6 +110,63 @@ class PyTorchAdapter:
 
         msg = "PyTorch model output is not a Tensor"
         raise TypeError(msg)
+
+    def describe_quantization(self) -> list[dict[str, object]]:
+        if self._weight_bits is None and self._activation_bits is None:
+            return []
+
+        rows: list[dict[str, object]] = []
+        module_index = 0
+        for module_name, module in self._model.named_modules():
+            display_name = module_name if module_name else "<root>"
+            layer_type = type(module).__name__
+
+            if self._weight_bits is not None:
+                weight = getattr(module, "weight", None)
+                if isinstance(weight, torch.nn.Parameter):
+                    params = self._weight_params_by_module_id.get(id(module))
+                    rows.append(
+                        {
+                            "layer": display_name,
+                            "layer_type": layer_type,
+                            "tensor": "weight",
+                            "bits": self._weight_bits,
+                            "scheme": "symmetric",
+                            "scale": params.scale if params is not None else None,
+                            "zero_point": (
+                                params.zero_point if params is not None else None
+                            ),
+                            "qmin": params.qmin if params is not None else None,
+                            "qmax": params.qmax if params is not None else None,
+                            "calibrated": False,
+                            "order": module_index,
+                        }
+                    )
+
+            if (
+                self._activation_bits is not None
+                and layer_type in _ACTIVATION_TARGET_TYPES
+            ):
+                params = self._activation_params_by_module_id.get(id(module))
+                rows.append(
+                    {
+                        "layer": display_name,
+                        "layer_type": layer_type,
+                        "tensor": "activation",
+                        "bits": self._activation_bits,
+                        "scheme": self._activation_scheme,
+                        "scale": params.scale if params is not None else None,
+                        "zero_point": params.zero_point if params is not None else None,
+                        "qmin": params.qmin if params is not None else None,
+                        "qmax": params.qmax if params is not None else None,
+                        "calibrated": bool(params is not None and self._calibrate),
+                        "order": module_index,
+                    }
+                )
+
+            module_index += 1
+
+        return rows
 
 
 def load_pytorch_model(model_path: str | Path) -> torch.nn.Module:
@@ -206,12 +273,23 @@ def _fake_quantize_tensor_with_params(
     return (quantized - params.zero_point) * params.scale
 
 
-def _apply_weight_ptq(model: torch.nn.Module, bits: int) -> None:
+def _apply_weight_ptq(
+    model: torch.nn.Module,
+    bits: int,
+) -> dict[int, _QuantizationParams]:
+    params_by_module_id: dict[int, _QuantizationParams] = {}
     for module in model.modules():
         weight = getattr(module, "weight", None)
         if isinstance(weight, torch.nn.Parameter):
+            detached = weight.detach()
+            if detached.numel() == 0:
+                continue
+            max_abs = float(detached.abs().max().item())
+            params = _symmetric_params_from_max_abs(max_abs=max_abs, bits=bits)
+            params_by_module_id[id(module)] = params
             with torch.no_grad():
-                weight.copy_(_symmetric_fake_quantize_tensor(weight, bits))
+                weight.copy_(_fake_quantize_tensor_with_params(weight, params))
+    return params_by_module_id
 
 
 def _quantize_output(output: object, bits: int) -> object:
