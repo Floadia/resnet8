@@ -1,0 +1,73 @@
+{
+  "backend": "pytorch",
+  "data_dir": "/mnt/ext1/references/tiny/benchmark/training/image_classification/cifar-10-batches-py",
+  "model_path": "models/resnet8.pt",
+  "overall": {
+    "accuracy": 0.8699,
+    "correct": 8699,
+    "total": 10000
+  },
+  "per_class": [
+    {
+      "accuracy": 0.873,
+      "class_name": "airplane",
+      "correct": 873,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.949,
+      "class_name": "automobile",
+      "correct": 949,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.837,
+      "class_name": "bird",
+      "correct": 837,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.723,
+      "class_name": "cat",
+      "correct": 723,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.871,
+      "class_name": "deer",
+      "correct": 871,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.739,
+      "class_name": "dog",
+      "correct": 739,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.947,
+      "class_name": "frog",
+      "correct": 947,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.906,
+      "class_name": "horse",
+      "correct": 906,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.926,
+      "class_name": "ship",
+      "correct": 926,
+      "total": 1000
+    },
+    {
+      "accuracy": 0.928,
+      "class_name": "truck",
+      "correct": 928,
+      "total": 1000
+    }
+  ],
+  "schema_version": "1.0"
+}
