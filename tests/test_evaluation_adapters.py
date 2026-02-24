@@ -140,3 +140,30 @@ def test_resolve_torch_device_explicit_cuda_without_cuda_raises(monkeypatch):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     with pytest.raises(ValueError, match="CUDA device requested"):
         _resolve_torch_device("cuda")
+
+
+def test_pytorch_adapter_weight_quantization_per_channel_metadata(tmp_path):
+    model = torch.nn.Sequential(torch.nn.Linear(2, 2, bias=False))
+    with torch.no_grad():
+        linear = model[0]
+        assert isinstance(linear, torch.nn.Linear)
+        linear.weight.copy_(torch.tensor([[10.0, 0.0], [0.5, 0.0]], dtype=torch.float32))
+
+    model_path = tmp_path / "ptq-model-per-channel.pt"
+    torch.save({"model": model}, model_path)
+
+    adapter = PyTorchAdapter(
+        model_path,
+        weight_bits=8,
+        per_channel=True,
+    )
+    rows = adapter.describe_quantization()
+    weight_rows = [row for row in rows if row["tensor"] == "weight"]
+
+    assert weight_rows
+    row = weight_rows[0]
+    assert row["scheme"] == "symmetric-per-channel"
+    assert isinstance(row["scale"], list)
+    assert len(row["scale"]) == 2
+    assert row["scale"][0] != row["scale"][1]
+    assert row["zero_point"] == [0, 0]
