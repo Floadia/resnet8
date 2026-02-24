@@ -352,9 +352,7 @@ class _ActivationQuantizer:
         return _quantize_output_with_scheme(output, self._bits, self._scheme)
 
 
-def _quantize_output_with_params(
-    output: object, params: _QuantizationParams
-) -> object:
+def _quantize_output_with_params(output: object, params: _QuantizationParams) -> object:
     if isinstance(output, torch.Tensor):
         return _fake_quantize_tensor_with_params(output, params)
     if isinstance(output, tuple):
