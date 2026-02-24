@@ -14,6 +14,11 @@ aggregation, and metric computation.
 - **WHEN** a user runs ONNX and PyTorch evaluation commands against the same CIFAR-10 test set
 - **THEN** both commands MUST execute the same shared data-loading and metric-computation path, with backend-specific logic isolated to inference adapters
 
+#### Scenario: PyTorch evaluation supports PTQ bit-width overrides
+- **WHEN** a user runs `scripts/evaluate_pytorch.py` with `--wq` and/or `--aq`
+- **THEN** the PyTorch adapter MUST apply PTQ simulation using the provided bit-width settings during inference
+- **AND** existing evaluation reporting and metric computation MUST remain unchanged
+
 ### Requirement: Deterministic evaluation report schema
 The system SHALL emit a deterministic report schema containing overall accuracy,
 per-class accuracy, sample counts, and execution metadata (backend and model
@@ -30,3 +35,7 @@ so ONNX and PyTorch backends apply identical input representation semantics.
 #### Scenario: Shared preprocessing source of truth
 - **WHEN** preprocessing logic is updated
 - **THEN** both evaluation backends MUST automatically inherit the change from the shared preprocessing implementation and must not duplicate preprocessing logic in backend scripts
+
+#### Scenario: Quantized PyTorch evaluation preserves shared preprocessing
+- **WHEN** PTQ simulation is enabled for PyTorch evaluation
+- **THEN** CIFAR-10 data loading and preprocessing MUST continue to use the shared evaluation pipeline without backend-specific duplication
