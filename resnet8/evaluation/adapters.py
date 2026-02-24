@@ -54,12 +54,14 @@ class PyTorchAdapter:
         calibrate: bool = False,
         calibration_images: np.ndarray | None = None,
         device: Literal["auto", "cpu", "cuda"] = "auto",
+        per_channel: bool = False,
     ):
         self.model_path = str(model_path)
         self._weight_bits = weight_bits
         self._activation_bits = activation_bits
         self._activation_scheme = activation_scheme
         self._calibrate = calibrate
+        self._per_channel = per_channel
         self.device = _resolve_torch_device(device)
         _validate_bit_width(weight_bits, "weight_bits")
         _validate_bit_width(activation_bits, "activation_bits")
@@ -74,7 +76,7 @@ class PyTorchAdapter:
         base_model = load_pytorch_model(self.model_path)
         self._model = base_model.to(self.device)
         self._activation_quantizer: _ActivationQuantizer | None = None
-        self._weight_params_by_module_id: dict[int, _QuantizationParams] = {}
+        self._weight_params_by_module_id: dict[int, _WeightQuantizationRecord] = {}
         self._activation_params_by_module_id: dict[int, _QuantizationParams] = {}
 
         if weight_bits is not None or activation_bits is not None:
@@ -83,6 +85,7 @@ class PyTorchAdapter:
                 self._weight_params_by_module_id = _apply_weight_ptq(
                     self._model,
                     weight_bits,
+                    per_channel=per_channel,
                 )
             if activation_bits is not None:
                 params_by_module_id: dict[int, _QuantizationParams] | None = None
@@ -134,7 +137,15 @@ class PyTorchAdapter:
                             "layer_type": layer_type,
                             "tensor": "weight",
                             "bits": self._weight_bits,
-                            "scheme": "symmetric",
+                            "scheme": (
+                                params.scheme
+                                if params is not None
+                                else (
+                                    "symmetric-per-channel"
+                                    if self._per_channel
+                                    else "symmetric-per-tensor"
+                                )
+                            ),
                             "scale": params.scale if params is not None else None,
                             "zero_point": (
                                 params.zero_point if params is not None else None
@@ -229,6 +240,15 @@ class _QuantizationParams:
     qmax: int
 
 
+@dataclass(frozen=True)
+class _WeightQuantizationRecord:
+    scale: float | list[float]
+    zero_point: int | list[int]
+    qmin: int
+    qmax: int
+    scheme: Literal["symmetric-per-tensor", "symmetric-per-channel"]
+
+
 def _symmetric_fake_quantize_tensor(tensor: torch.Tensor, bits: int) -> torch.Tensor:
     if not torch.is_floating_point(tensor):
         return tensor
@@ -293,20 +313,73 @@ def _fake_quantize_tensor_with_params(
 def _apply_weight_ptq(
     model: torch.nn.Module,
     bits: int,
-) -> dict[int, _QuantizationParams]:
-    params_by_module_id: dict[int, _QuantizationParams] = {}
+    *,
+    per_channel: bool = False,
+) -> dict[int, _WeightQuantizationRecord]:
+    params_by_module_id: dict[int, _WeightQuantizationRecord] = {}
     for module in model.modules():
         weight = getattr(module, "weight", None)
         if isinstance(weight, torch.nn.Parameter):
             detached = weight.detach()
             if detached.numel() == 0:
                 continue
-            max_abs = float(detached.abs().max().item())
-            params = _symmetric_params_from_max_abs(max_abs=max_abs, bits=bits)
-            params_by_module_id[id(module)] = params
             with torch.no_grad():
-                weight.copy_(_fake_quantize_tensor_with_params(weight, params))
+                if per_channel and detached.dim() >= 2:
+                    quantized, scales, qmin, qmax = (
+                        _symmetric_per_channel_fake_quantize(
+                            weight,
+                            bits=bits,
+                        )
+                    )
+                    params_by_module_id[id(module)] = _WeightQuantizationRecord(
+                        scale=scales,
+                        zero_point=[0] * len(scales),
+                        qmin=qmin,
+                        qmax=qmax,
+                        scheme="symmetric-per-channel",
+                    )
+                    weight.copy_(quantized)
+                else:
+                    max_abs = float(detached.abs().max().item())
+                    params = _symmetric_params_from_max_abs(max_abs=max_abs, bits=bits)
+                    params_by_module_id[id(module)] = _WeightQuantizationRecord(
+                        scale=params.scale,
+                        zero_point=params.zero_point,
+                        qmin=params.qmin,
+                        qmax=params.qmax,
+                        scheme="symmetric-per-tensor",
+                    )
+                    weight.copy_(_fake_quantize_tensor_with_params(weight, params))
     return params_by_module_id
+
+
+def _symmetric_per_channel_fake_quantize(
+    tensor: torch.Tensor,
+    *,
+    bits: int,
+    axis: int = 0,
+) -> tuple[torch.Tensor, list[float], int, int]:
+    if not torch.is_floating_point(tensor):
+        return tensor, [], 0, 0
+    if tensor.numel() == 0:
+        return tensor, [], 0, 0
+
+    qmax = (1 << (bits - 1)) - 1
+    qmin = -(1 << (bits - 1))
+    moved = tensor.movedim(axis, 0)
+    reshaped = moved.detach().abs().reshape(moved.shape[0], -1)
+    max_abs = reshaped.max(dim=1).values
+    scales = max_abs / float(qmax)
+    scale_shape = [moved.shape[0]] + [1] * (moved.dim() - 1)
+    scale_broadcast = scales.reshape(scale_shape)
+    safe_scale = torch.where(
+        scale_broadcast > 0,
+        scale_broadcast,
+        torch.ones_like(scale_broadcast),
+    )
+    quantized = torch.round(moved / safe_scale).clamp(qmin, qmax) * safe_scale
+    quantized = torch.where(scale_broadcast > 0, quantized, moved)
+    return quantized.movedim(0, axis), scales.tolist(), qmin, qmax
 
 
 def _quantize_output(output: object, bits: int) -> object:
