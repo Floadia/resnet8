@@ -45,12 +45,33 @@ def main() -> None:
         default=None,
         help="Optional path to write canonical evaluation report JSON",
     )
+    parser.add_argument(
+        "--wq",
+        type=int,
+        default=None,
+        help="Optional PTQ weight bit-width (2-16)",
+    )
+    parser.add_argument(
+        "--aq",
+        type=int,
+        default=None,
+        help="Optional PTQ activation bit-width (2-16)",
+    )
     args = parser.parse_args()
 
     print(f"Loading CIFAR-10 test data from: {args.data_dir}")
     print(f"Loading PyTorch model from: {args.model}")
+    if args.wq is not None or args.aq is not None:
+        print(f"Applying PTQ simulation: wq={args.wq}, aq={args.aq}")
 
-    adapter = PyTorchAdapter(args.model)
+    try:
+        adapter = PyTorchAdapter(
+            args.model,
+            weight_bits=args.wq,
+            activation_bits=args.aq,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     print("Model loaded and set to eval mode")
 
     report = evaluate_dataset(
