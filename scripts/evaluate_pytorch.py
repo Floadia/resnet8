@@ -16,6 +16,7 @@ from resnet8.evaluation import (  # noqa: E402
     PyTorchAdapter,
     evaluate_dataset,
     format_report_text,
+    load_cifar10_test,
     write_report_json,
 )
 
@@ -57,18 +58,46 @@ def main() -> None:
         default=None,
         help="Optional PTQ activation bit-width (2-16)",
     )
+    parser.add_argument(
+        "--aq-scheme",
+        choices=("symmetric", "asymmetric"),
+        default="symmetric",
+        help="Activation quantization scheme (default: symmetric)",
+    )
+    parser.add_argument(
+        "--calib",
+        action="store_true",
+        help=(
+            "Use calibration-derived quantization parameters from "
+            "<data-dir>/test_batch for PTQ simulation"
+        ),
+    )
     args = parser.parse_args()
+    if args.calib and args.wq is None and args.aq is None:
+        parser.error("--calib requires --wq and/or --aq")
 
     print(f"Loading CIFAR-10 test data from: {args.data_dir}")
     print(f"Loading PyTorch model from: {args.model}")
     if args.wq is not None or args.aq is not None:
-        print(f"Applying PTQ simulation: wq={args.wq}, aq={args.aq}")
+        print(
+            "Applying PTQ simulation: "
+            f"wq={args.wq}, aq={args.aq}, aq_scheme={args.aq_scheme}"
+        )
+    if args.calib:
+        print(f"Calibrating PTQ parameters from: {Path(args.data_dir) / 'test_batch'}")
+
+    calibration_images = None
+    if args.calib:
+        calibration_images, _, _ = load_cifar10_test(args.data_dir)
 
     try:
         adapter = PyTorchAdapter(
             args.model,
             weight_bits=args.wq,
             activation_bits=args.aq,
+            activation_scheme=args.aq_scheme,
+            calibrate=args.calib,
+            calibration_images=calibration_images,
         )
     except ValueError as exc:
         parser.error(str(exc))

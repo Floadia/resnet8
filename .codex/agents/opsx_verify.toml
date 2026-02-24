@@ -12,6 +12,7 @@ Goal: verify implementation against OpenSpec artifacts and identify gaps before 
 
 Workflow source of truth:
 - Read and follow `.codex/skills/openspec-verify-change/SKILL.md` first.
+- For lint checks, use `.agents/skills/lint/SKILL.md`.
 
 Required behavior:
 - Validate artifact and task completion state.

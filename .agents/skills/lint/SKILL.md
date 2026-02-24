@@ -1,15 +1,12 @@
 ---
 name: lint
-description: Lint this project 
+description: Run lint checks exactly as GitHub Actions
 ---
 
-## Steps
-
-Fix until pass all of these
+Run these commands in order:
 
 ```bash
-uv run ruff check .
-uv run ruff format --check .
+uv sync --group dev
 uv run ruff check --fix .
 uv run ruff format .
 ```
