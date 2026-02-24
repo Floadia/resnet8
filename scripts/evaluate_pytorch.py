@@ -21,6 +21,47 @@ from resnet8.evaluation import (  # noqa: E402
 )
 
 
+def _format_quant_value(value: object) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, float):
+        return f"{value:.8g}"
+    return str(value)
+
+
+def _print_quantization_summary(adapter: PyTorchAdapter) -> None:
+    rows = adapter.describe_quantization()
+    if not rows:
+        return
+
+    print("Layer quantization parameters:")
+    print(
+        "layer | type | tensor | bits | scheme | calibrated | "
+        "scale | zero_point | qmin | qmax"
+    )
+    print(
+        "----- | ---- | ------ | ---- | ------ | ---------- | "
+        "----- | ---------- | ---- | ----"
+    )
+    for row in rows:
+        print(
+            " | ".join(
+                [
+                    str(row["layer"]),
+                    str(row["layer_type"]),
+                    str(row["tensor"]),
+                    str(row["bits"]),
+                    str(row["scheme"]),
+                    str(row["calibrated"]),
+                    _format_quant_value(row["scale"]),
+                    _format_quant_value(row["zero_point"]),
+                    _format_quant_value(row["qmin"]),
+                    _format_quant_value(row["qmax"]),
+                ]
+            )
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Evaluate PyTorch ResNet8 model on CIFAR-10 test set"
@@ -102,6 +143,7 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
     print("Model loaded and set to eval mode")
+    _print_quantization_summary(adapter)
 
     report = evaluate_dataset(
         adapter=adapter,
