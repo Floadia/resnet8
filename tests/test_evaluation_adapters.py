@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import torch
 
 from resnet8.evaluation.adapters import (
@@ -10,6 +11,7 @@ from resnet8.evaluation.adapters import (
     _asymmetric_params_from_min_max,
     _collect_activation_params,
     _fake_quantize_tensor_with_params,
+    _resolve_torch_device,
     _symmetric_fake_quantize_tensor,
 )
 
@@ -45,6 +47,7 @@ def test_collect_asymmetric_activation_params_from_calibration_data():
         model,
         calibration_images,
         _ACTIVATION_TARGET_TYPES,
+        device="cpu",
         bits=2,
         scheme="asymmetric",
         batch_size=1,
@@ -121,3 +124,19 @@ def test_pytorch_adapter_describe_quantization_includes_scales_and_zero_points(
     assert any(row["layer"] == "1" for row in activation_rows)
     assert any(row["scale"] is not None for row in activation_rows)
     assert any(row["zero_point"] is not None for row in activation_rows)
+
+
+def test_resolve_torch_device_auto_falls_back_to_cpu(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert _resolve_torch_device("auto") == "cpu"
+
+
+def test_resolve_torch_device_explicit_cpu(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert _resolve_torch_device("cpu") == "cpu"
+
+
+def test_resolve_torch_device_explicit_cuda_without_cuda_raises(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    with pytest.raises(ValueError, match="CUDA device requested"):
+        _resolve_torch_device("cuda")

@@ -53,12 +53,14 @@ class PyTorchAdapter:
         activation_scheme: Literal["symmetric", "asymmetric"] = "symmetric",
         calibrate: bool = False,
         calibration_images: np.ndarray | None = None,
+        device: Literal["auto", "cpu", "cuda"] = "auto",
     ):
         self.model_path = str(model_path)
         self._weight_bits = weight_bits
         self._activation_bits = activation_bits
         self._activation_scheme = activation_scheme
         self._calibrate = calibrate
+        self.device = _resolve_torch_device(device)
         _validate_bit_width(weight_bits, "weight_bits")
         _validate_bit_width(activation_bits, "activation_bits")
         _validate_activation_scheme(activation_scheme)
@@ -70,7 +72,7 @@ class PyTorchAdapter:
             raise ValueError(msg)
 
         base_model = load_pytorch_model(self.model_path)
-        self._model = base_model
+        self._model = base_model.to(self.device)
         self._activation_quantizer: _ActivationQuantizer | None = None
         self._weight_params_by_module_id: dict[int, _QuantizationParams] = {}
         self._activation_params_by_module_id: dict[int, _QuantizationParams] = {}
@@ -89,6 +91,7 @@ class PyTorchAdapter:
                         self._model,
                         calibration_images,
                         _ACTIVATION_TARGET_TYPES,
+                        device=self.device,
                         bits=activation_bits,
                         scheme=activation_scheme,
                     )
@@ -101,7 +104,7 @@ class PyTorchAdapter:
                 )
 
     def predict_logits(self, images: np.ndarray) -> np.ndarray:
-        images_tensor = torch.from_numpy(images)
+        images_tensor = torch.from_numpy(images).to(self.device)
         with torch.no_grad():
             outputs = self._model(images_tensor)
 
@@ -202,6 +205,20 @@ def _validate_activation_scheme(value: str) -> None:
     if value not in {"symmetric", "asymmetric"}:
         msg = f"activation_scheme must be 'symmetric' or 'asymmetric', got {value!r}"
         raise ValueError(msg)
+
+
+def _resolve_torch_device(requested: str) -> str:
+    if requested == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    if requested == "cpu":
+        return "cpu"
+    if requested == "cuda":
+        if not torch.cuda.is_available():
+            msg = "CUDA device requested but torch.cuda.is_available() is false"
+            raise ValueError(msg)
+        return "cuda"
+    msg = f"device must be 'auto', 'cpu', or 'cuda', got {requested!r}"
+    raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -344,6 +361,7 @@ def _collect_activation_params(
     calibration_images: np.ndarray,
     target_types: set[str],
     *,
+    device: str,
     bits: int,
     scheme: Literal["symmetric", "asymmetric"],
     batch_size: int = 256,
@@ -377,7 +395,7 @@ def _collect_activation_params(
         with torch.no_grad():
             for start in range(0, calibration_images.shape[0], batch_size):
                 stop = min(start + batch_size, calibration_images.shape[0])
-                batch = torch.from_numpy(calibration_images[start:stop])
+                batch = torch.from_numpy(calibration_images[start:stop]).to(device)
                 model(batch)
     finally:
         for handle in handles:

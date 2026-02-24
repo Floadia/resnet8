@@ -113,6 +113,12 @@ def main() -> None:
             "<data-dir>/test_batch for PTQ simulation"
         ),
     )
+    parser.add_argument(
+        "--device",
+        choices=("auto", "cpu", "cuda"),
+        default="auto",
+        help="Execution device: auto (default), cpu, or cuda",
+    )
     args = parser.parse_args()
     if args.calib and args.wq is None and args.aq is None:
         parser.error("--calib requires --wq and/or --aq")
@@ -126,6 +132,7 @@ def main() -> None:
         )
     if args.calib:
         print(f"Calibrating PTQ parameters from: {Path(args.data_dir) / 'test_batch'}")
+    print(f"Requested device: {args.device}")
 
     calibration_images = None
     if args.calib:
@@ -139,9 +146,11 @@ def main() -> None:
             activation_scheme=args.aq_scheme,
             calibrate=args.calib,
             calibration_images=calibration_images,
+            device=args.device,
         )
     except ValueError as exc:
         parser.error(str(exc))
+    print(f"Using device: {adapter.device}")
     print("Model loaded and set to eval mode")
     _print_quantization_summary(adapter)
 
