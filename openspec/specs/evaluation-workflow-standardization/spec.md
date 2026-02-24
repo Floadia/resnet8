@@ -19,6 +19,23 @@ aggregation, and metric computation.
 - **THEN** the PyTorch adapter MUST apply PTQ simulation using the provided bit-width settings during inference
 - **AND** existing evaluation reporting and metric computation MUST remain unchanged
 
+#### Scenario: PyTorch evaluation supports calibrated PTQ mode
+- **WHEN** a user runs `scripts/evaluate_pytorch.py` with `--wq` and/or `--aq` and `--calib`
+- **THEN** the PyTorch adapter MUST derive quantization parameters from calibration data loaded from `<data-dir>/test_batch`
+- **AND** those calibrated parameters MUST be applied during inference-time PTQ simulation
+- **AND** evaluation reporting and metric computation MUST remain unchanged
+
+#### Scenario: PyTorch evaluation selects activation quantization scheme
+- **WHEN** a user runs `scripts/evaluate_pytorch.py` with `--aq` and `--aq-scheme asymmetric`
+- **THEN** the PyTorch adapter MUST apply asymmetric fake quantization for activation tensors
+- **AND** weight PTQ behavior MUST remain symmetric
+- **AND** existing evaluation reporting and metric computation MUST remain unchanged
+
+#### Scenario: Calibrated asymmetric activation quantization
+- **WHEN** a user enables `--calib` with `--aq-scheme asymmetric`
+- **THEN** activation quantization parameters MUST be derived from calibration activation ranges
+- **AND** those fixed parameters MUST be used during inference PTQ simulation
+
 ### Requirement: Deterministic evaluation report schema
 The system SHALL emit a deterministic report schema containing overall accuracy,
 per-class accuracy, sample counts, and execution metadata (backend and model
@@ -39,3 +56,12 @@ so ONNX and PyTorch backends apply identical input representation semantics.
 #### Scenario: Quantized PyTorch evaluation preserves shared preprocessing
 - **WHEN** PTQ simulation is enabled for PyTorch evaluation
 - **THEN** CIFAR-10 data loading and preprocessing MUST continue to use the shared evaluation pipeline without backend-specific duplication
+
+#### Scenario: Calibrated PTQ uses shared CIFAR preprocessing semantics
+- **WHEN** calibrated PTQ mode is enabled
+- **THEN** calibration input parsing and tensor layout handling MUST match evaluation pipeline expectations for CIFAR-10 test data
+- **AND** non-calibrated evaluation behavior MUST remain backward compatible
+
+#### Scenario: Asymmetric activation mode preserves shared preprocessing
+- **WHEN** asymmetric activation quantization is enabled
+- **THEN** CIFAR-10 loading and preprocessing MUST continue to use the shared evaluation pipeline
