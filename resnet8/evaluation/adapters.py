@@ -55,6 +55,7 @@ class PyTorchAdapter:
         calibration_images: np.ndarray | None = None,
         device: Literal["auto", "cpu", "cuda"] = "auto",
         per_channel: bool = False,
+        weight_bias_correction: bool = False,
     ):
         self.model_path = str(model_path)
         self._weight_bits = weight_bits
@@ -62,6 +63,7 @@ class PyTorchAdapter:
         self._activation_scheme = activation_scheme
         self._calibrate = calibrate
         self._per_channel = per_channel
+        self._weight_bias_correction = weight_bias_correction
         self.device = _resolve_torch_device(device)
         _validate_bit_width(weight_bits, "weight_bits")
         _validate_bit_width(activation_bits, "activation_bits")
@@ -72,12 +74,19 @@ class PyTorchAdapter:
                 "calibrate=True and activation_bits is set"
             )
             raise ValueError(msg)
+        if weight_bias_correction and weight_bits is None:
+            msg = "weight_bias_correction=True requires weight_bits to be set"
+            raise ValueError(msg)
+        if weight_bias_correction and calibration_images is None:
+            msg = "calibration_images must be provided when weight_bias_correction=True"
+            raise ValueError(msg)
 
         base_model = load_pytorch_model(self.model_path)
         self._model = base_model.to(self.device)
         self._activation_quantizer: _ActivationQuantizer | None = None
         self._weight_params_by_module_id: dict[int, _WeightQuantizationRecord] = {}
         self._activation_params_by_module_id: dict[int, _QuantizationParams] = {}
+        self._bias_corrected_module_ids: set[int] = set()
 
         if weight_bits is not None or activation_bits is not None:
             self._model = copy.deepcopy(base_model)
@@ -87,6 +96,15 @@ class PyTorchAdapter:
                     weight_bits,
                     per_channel=per_channel,
                 )
+                if weight_bias_correction and calibration_images is not None:
+                    self._bias_corrected_module_ids = (
+                        _apply_empirical_weight_bias_correction(
+                            fp32_model=base_model,
+                            quantized_model=self._model,
+                            calibration_images=calibration_images,
+                            device=self.device,
+                        )
+                    )
             if activation_bits is not None:
                 params_by_module_id: dict[int, _QuantizationParams] | None = None
                 if calibrate and calibration_images is not None:
@@ -131,28 +149,31 @@ class PyTorchAdapter:
                 weight = getattr(module, "weight", None)
                 if isinstance(weight, torch.nn.Parameter):
                     params = self._weight_params_by_module_id.get(id(module))
+                    scheme = (
+                        params.scheme
+                        if params is not None
+                        else (
+                            "symmetric-per-channel"
+                            if self._per_channel
+                            else "symmetric-per-tensor"
+                        )
+                    )
+                    if id(module) in self._bias_corrected_module_ids:
+                        scheme = f"{scheme}+dfq-bias-corr"
                     rows.append(
                         {
                             "layer": display_name,
                             "layer_type": layer_type,
                             "tensor": "weight",
                             "bits": self._weight_bits,
-                            "scheme": (
-                                params.scheme
-                                if params is not None
-                                else (
-                                    "symmetric-per-channel"
-                                    if self._per_channel
-                                    else "symmetric-per-tensor"
-                                )
-                            ),
+                            "scheme": scheme,
                             "scale": params.scale if params is not None else None,
                             "zero_point": (
                                 params.zero_point if params is not None else None
                             ),
                             "qmin": params.qmin if params is not None else None,
                             "qmax": params.qmax if params is not None else None,
-                            "calibrated": False,
+                            "calibrated": id(module) in self._bias_corrected_module_ids,
                             "order": module_index,
                         }
                     )
@@ -351,6 +372,169 @@ def _apply_weight_ptq(
                     )
                     weight.copy_(_fake_quantize_tensor_with_params(weight, params))
     return params_by_module_id
+
+
+def _apply_empirical_weight_bias_correction(
+    *,
+    fp32_model: torch.nn.Module,
+    quantized_model: torch.nn.Module,
+    calibration_images: np.ndarray,
+    device: str,
+    batch_size: int = 256,
+) -> set[int]:
+    fp32_modules = _named_weight_modules(fp32_model)
+    quantized_modules = _named_weight_modules(quantized_model)
+
+    candidate_names: list[str] = []
+    for name, quantized_module in quantized_modules.items():
+        if name not in fp32_modules:
+            continue
+        bias = getattr(quantized_module, "bias", None)
+        if not isinstance(bias, torch.nn.Parameter):
+            continue
+        if bias.numel() == 0:
+            continue
+        candidate_names.append(name)
+
+    if not candidate_names:
+        return set()
+
+    fp32_means = _collect_module_channel_means(
+        fp32_model,
+        set(candidate_names),
+        calibration_images,
+        device=device,
+        batch_size=batch_size,
+    )
+
+    corrected_module_ids: set[int] = set()
+    with torch.no_grad():
+        for name in candidate_names:
+            fp32_mean = fp32_means.get(name)
+            quantized_mean = _collect_module_channel_means(
+                quantized_model,
+                {name},
+                calibration_images,
+                device=device,
+                batch_size=batch_size,
+            ).get(name)
+            if fp32_mean is None or quantized_mean is None:
+                continue
+
+            module = quantized_modules[name]
+            bias = getattr(module, "bias", None)
+            if not isinstance(bias, torch.nn.Parameter):
+                continue
+            if (
+                fp32_mean.numel() != bias.numel()
+                or quantized_mean.numel() != bias.numel()
+            ):
+                continue
+
+            mean_error = quantized_mean - fp32_mean
+            bias.sub_(mean_error.to(device=bias.device, dtype=bias.dtype))
+            corrected_module_ids.add(id(module))
+
+    return corrected_module_ids
+
+
+def _named_weight_modules(model: torch.nn.Module) -> dict[str, torch.nn.Module]:
+    modules: dict[str, torch.nn.Module] = {}
+    for name, module in model.named_modules():
+        weight = getattr(module, "weight", None)
+        if isinstance(weight, torch.nn.Parameter):
+            modules[name] = module
+    return modules
+
+
+def _collect_module_channel_means(
+    model: torch.nn.Module,
+    module_names: set[str],
+    calibration_images: np.ndarray,
+    *,
+    device: str,
+    batch_size: int = 256,
+) -> dict[str, torch.Tensor]:
+    if not module_names:
+        return {}
+
+    output_sums: dict[str, torch.Tensor] = {}
+    output_counts: dict[str, int] = {}
+    handles: list[torch.utils.hooks.RemovableHandle] = []
+    named_modules = dict(model.named_modules())
+
+    def _make_collector(module_name: str):
+        def _collector(
+            _module: torch.nn.Module,
+            _inputs: tuple[object, ...],
+            output: object,
+        ) -> object:
+            tensor_output = _first_tensor_output(output)
+            if tensor_output is None:
+                return output
+            if not torch.is_floating_point(tensor_output):
+                return output
+            if tensor_output.dim() < 2 or tensor_output.numel() == 0:
+                return output
+
+            reduce_dims = tuple(dim for dim in range(tensor_output.dim()) if dim != 1)
+            channel_sum = (
+                tensor_output.detach().sum(dim=reduce_dims).to(torch.float64).cpu()
+            )
+            channel_count = tensor_output.numel() // tensor_output.shape[1]
+
+            if module_name in output_sums:
+                output_sums[module_name] += channel_sum
+            else:
+                output_sums[module_name] = channel_sum
+            output_counts[module_name] = (
+                output_counts.get(module_name, 0) + channel_count
+            )
+            return output
+
+        return _collector
+
+    for module_name in module_names:
+        module = named_modules.get(module_name)
+        if module is None:
+            continue
+        handles.append(module.register_forward_hook(_make_collector(module_name)))
+
+    try:
+        with torch.no_grad():
+            for start in range(0, calibration_images.shape[0], batch_size):
+                stop = min(start + batch_size, calibration_images.shape[0])
+                batch = torch.from_numpy(calibration_images[start:stop]).to(device)
+                model(batch)
+    finally:
+        for handle in handles:
+            handle.remove()
+
+    means: dict[str, torch.Tensor] = {}
+    for module_name, output_sum in output_sums.items():
+        count = output_counts.get(module_name, 0)
+        if count <= 0:
+            continue
+        means[module_name] = output_sum / float(count)
+    return means
+
+
+def _first_tensor_output(output: object) -> torch.Tensor | None:
+    if isinstance(output, torch.Tensor):
+        return output
+    if isinstance(output, tuple):
+        for item in output:
+            tensor = _first_tensor_output(item)
+            if tensor is not None:
+                return tensor
+        return None
+    if isinstance(output, list):
+        for item in output:
+            tensor = _first_tensor_output(item)
+            if tensor is not None:
+                return tensor
+        return None
+    return None
 
 
 def _symmetric_per_channel_fake_quantize(

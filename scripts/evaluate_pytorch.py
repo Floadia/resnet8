@@ -121,6 +121,14 @@ def main() -> None:
         help="Use per-channel weight quantization when --wq is set",
     )
     parser.add_argument(
+        "--dfq-bias-corr",
+        action="store_true",
+        help=(
+            "Apply empirical bias correction from Data-Free Quantization "
+            "(arXiv:1906.04721) after weight PTQ"
+        ),
+    )
+    parser.add_argument(
         "--device",
         choices=("auto", "cpu", "cuda"),
         default="auto",
@@ -129,6 +137,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.calib and args.wq is None and args.aq is None:
         parser.error("--calib requires --wq and/or --aq")
+    if args.dfq_bias_corr and args.wq is None:
+        parser.error("--dfq-bias-corr requires --wq")
 
     print(f"Loading CIFAR-10 test data from: {args.data_dir}")
     print(f"Loading PyTorch model from: {args.model}")
@@ -136,14 +146,16 @@ def main() -> None:
         print(
             "Applying PTQ simulation: "
             f"wq={args.wq}, aq={args.aq}, aq_scheme={args.aq_scheme}, "
-            f"weight_mode={'per-channel' if args.per_channel else 'per-tensor'}"
+            f"weight_mode={'per-channel' if args.per_channel else 'per-tensor'}, "
+            f"dfq_bias_corr={args.dfq_bias_corr}"
         )
-    if args.calib:
-        print(f"Calibrating PTQ parameters from: {Path(args.data_dir) / 'test_batch'}")
+    if args.calib or args.dfq_bias_corr:
+        calibration_path = Path(args.data_dir) / "test_batch"
+        print(f"Loading PTQ calibration data from: {calibration_path}")
     print(f"Requested device: {args.device}")
 
     calibration_images = None
-    if args.calib:
+    if args.calib or args.dfq_bias_corr:
         calibration_images, _, _ = load_cifar10_test(args.data_dir)
 
     try:
@@ -156,6 +168,7 @@ def main() -> None:
             calibration_images=calibration_images,
             device=args.device,
             per_channel=args.per_channel,
+            weight_bias_correction=args.dfq_bias_corr,
         )
     except ValueError as exc:
         parser.error(str(exc))
