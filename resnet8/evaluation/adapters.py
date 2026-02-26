@@ -226,6 +226,7 @@ class PyTorchAdapter:
         input_shape: tuple[int, int, int, int] = (1, 32, 32, 3),
         dynamic_batch: bool = False,
         simplify: bool = True,
+        constant_propagation: bool = True,
     ) -> str:
         """Export the current eval model (including PTQ behavior) to ONNX."""
         if len(input_shape) != 4:
@@ -252,11 +253,17 @@ class PyTorchAdapter:
             if dynamic_batch
             else None
         )
+        export_model: torch.nn.Module | torch.jit.ScriptModule = model
+        if constant_propagation:
+            export_model = _prepare_model_for_constant_propagation(
+                model=model,
+                example_input=example_input,
+            )
 
         try:
             with torch.no_grad():
                 torch.onnx.export(
-                    model,
+                    export_model,
                     example_input,
                     str(out_path),
                     export_params=True,
@@ -306,6 +313,28 @@ def _try_simplify_onnx_model(path: Path) -> None:
             RuntimeWarning,
             stacklevel=2,
         )
+
+
+def _prepare_model_for_constant_propagation(
+    *,
+    model: torch.nn.Module,
+    example_input: torch.Tensor,
+) -> torch.nn.Module | torch.jit.ScriptModule:
+    try:
+        with torch.no_grad():
+            traced = torch.jit.trace(model, example_input, strict=False)
+            frozen = torch.jit.freeze(traced.eval())
+            torch._C._jit_pass_inline(frozen.graph)
+            torch._C._jit_pass_constant_propagation(frozen.graph)
+            return frozen
+    except Exception as exc:
+        warnings.warn(
+            "Constant propagation before ONNX export failed; "
+            f"falling back to direct export ({exc})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return model
 
 
 def load_pytorch_model(model_path: str | Path) -> torch.nn.Module:

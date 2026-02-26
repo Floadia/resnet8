@@ -188,6 +188,15 @@ def main() -> None:
             "(default: enabled)"
         ),
     )
+    parser.add_argument(
+        "--export-const-prop",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Run TorchScript constant propagation before ONNX export "
+            "(default: enabled)"
+        ),
+    )
     args = parser.parse_args()
     if args.calib and args.wq is None and args.aq is None:
         parser.error("--calib requires --wq and/or --aq")
@@ -253,6 +262,7 @@ def main() -> None:
             opset_version=args.export_opset,
             dynamic_batch=False,
             simplify=args.export_simplify,
+            constant_propagation=args.export_const_prop,
         )
         print(f"Exported eval graph ONNX: {export_path}")
 
