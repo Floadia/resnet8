@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import numpy as np
+import onnx
 import onnxruntime as ort
 import torch
+from onnxsim import simplify
 
 
 class InferenceAdapter(Protocol):
@@ -285,9 +287,6 @@ class PyTorchAdapter:
 
 
 def _try_simplify_onnx_model(path: Path) -> None:
-    import onnx
-    from onnxsim import simplify
-
     model = onnx.load(str(path))
     simplified_model, ok = simplify(model)
     if not ok:
