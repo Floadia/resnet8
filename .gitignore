@@ -32,3 +32,5 @@ __marimo__/
 
 # Temporary verification reports (canonical ones in .planning/)
 PHASE_*_VERIFICATION_REPORT.md
+
+logs
