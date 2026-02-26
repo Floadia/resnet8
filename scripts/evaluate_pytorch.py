@@ -7,6 +7,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -61,6 +63,23 @@ def _print_quantization_summary(adapter: PyTorchAdapter) -> None:
                 ]
             )
         )
+
+
+def _compute_unit_batch_accuracy(
+    adapter: PyTorchAdapter | OnnxRuntimeAdapter,
+    *,
+    data_dir: str,
+    max_samples: int | None,
+) -> float:
+    images, labels, _ = load_cifar10_test(data_dir, max_samples=max_samples)
+    correct = 0
+    total = int(labels.shape[0])
+    for index in range(total):
+        logits = adapter.predict_logits(images[index : index + 1])
+        prediction = int(np.argmax(logits, axis=1)[0])
+        if prediction == int(labels[index]):
+            correct += 1
+    return (correct / total) if total > 0 else 0.0
 
 
 def main() -> None:
@@ -160,6 +179,15 @@ def main() -> None:
         default=17,
         help="ONNX opset version used for --export-onnx (default: 17)",
     )
+    parser.add_argument(
+        "--export-simplify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Try to simplify exported ONNX graph with onnxsim "
+            "(default: enabled)"
+        ),
+    )
     args = parser.parse_args()
     if args.calib and args.wq is None and args.aq is None:
         parser.error("--calib requires --wq and/or --aq")
@@ -223,17 +251,38 @@ def main() -> None:
         export_path = adapter.export_onnx(
             args.export_onnx,
             opset_version=args.export_opset,
+            dynamic_batch=False,
+            simplify=args.export_simplify,
         )
         print(f"Exported eval graph ONNX: {export_path}")
 
         if args.verify_exported_onnx:
-            onnx_report = evaluate_dataset(
-                adapter=OnnxRuntimeAdapter(export_path),
-                data_dir=args.data_dir,
-                max_samples=args.max_samples,
+            onnx_adapter = OnnxRuntimeAdapter(export_path)
+            input_shape = onnx_adapter.input_shape
+            static_batch_one = bool(
+                input_shape
+                and isinstance(input_shape[0], int)
+                and input_shape[0] == 1
             )
-            pytorch_accuracy = float(report["overall"]["accuracy"])
-            onnx_accuracy = float(onnx_report["overall"]["accuracy"])
+            if static_batch_one:
+                pytorch_accuracy = _compute_unit_batch_accuracy(
+                    adapter,
+                    data_dir=args.data_dir,
+                    max_samples=args.max_samples,
+                )
+                onnx_accuracy = _compute_unit_batch_accuracy(
+                    onnx_adapter,
+                    data_dir=args.data_dir,
+                    max_samples=args.max_samples,
+                )
+            else:
+                onnx_report = evaluate_dataset(
+                    adapter=onnx_adapter,
+                    data_dir=args.data_dir,
+                    max_samples=args.max_samples,
+                )
+                pytorch_accuracy = float(report["overall"]["accuracy"])
+                onnx_accuracy = float(onnx_report["overall"]["accuracy"])
             delta = abs(onnx_accuracy - pytorch_accuracy)
             print(
                 "Exported ONNX parity: "

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -35,8 +36,22 @@ class OnnxRuntimeAdapter:
         self.input_shape = input_info.shape
 
     def predict_logits(self, images: np.ndarray) -> np.ndarray:
+        if self._uses_static_batch_one() and images.shape[0] != 1:
+            outputs: list[np.ndarray] = []
+            for index in range(images.shape[0]):
+                sample = images[index : index + 1]
+                sample_outputs = self._session.run(None, {self.input_name: sample})
+                outputs.append(np.asarray(sample_outputs[0]))
+            return np.concatenate(outputs, axis=0)
+
         outputs = self._session.run(None, {self.input_name: images})
         return np.asarray(outputs[0])
+
+    def _uses_static_batch_one(self) -> bool:
+        if not self.input_shape:
+            return False
+        batch_dim = self.input_shape[0]
+        return isinstance(batch_dim, int) and batch_dim == 1
 
 
 class PyTorchAdapter:
@@ -209,7 +224,8 @@ class PyTorchAdapter:
         *,
         opset_version: int = 17,
         input_shape: tuple[int, int, int, int] = (1, 32, 32, 3),
-        dynamic_batch: bool = True,
+        dynamic_batch: bool = False,
+        simplify: bool = True,
     ) -> str:
         """Export the current eval model (including PTQ behavior) to ONNX."""
         if len(input_shape) != 4:
@@ -255,7 +271,41 @@ class PyTorchAdapter:
             if was_training:
                 model.train()
 
+        if simplify:
+            _try_simplify_onnx_model(out_path)
+
         return str(out_path)
+
+
+def _try_simplify_onnx_model(path: Path) -> None:
+    try:
+        import onnx
+        from onnxsim import simplify
+    except Exception:
+        warnings.warn(
+            "onnxsim is unavailable; skipping ONNX simplification",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
+
+    try:
+        model = onnx.load(str(path))
+        simplified_model, ok = simplify(model)
+        if not ok:
+            warnings.warn(
+                "onnxsim simplify check failed; keeping original ONNX export",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+        onnx.save(simplified_model, str(path))
+    except Exception as exc:
+        warnings.warn(
+            f"ONNX simplification failed; keeping original export ({exc})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
 
 def load_pytorch_model(model_path: str | Path) -> torch.nn.Module:

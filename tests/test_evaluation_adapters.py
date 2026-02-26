@@ -9,6 +9,7 @@ import torch
 
 from resnet8.evaluation.adapters import (
     _ACTIVATION_TARGET_TYPES,
+    OnnxRuntimeAdapter,
     PyTorchAdapter,
     _ActivationQuantizer,
     _apply_empirical_weight_bias_correction,
@@ -266,8 +267,11 @@ def test_pytorch_adapter_can_export_eval_graph_to_onnx(tmp_path):
     pytorch_logits = adapter.predict_logits(test_images)
 
     session = ort.InferenceSession(written_path)
-    input_name = session.get_inputs()[0].name
-    onnx_logits = np.asarray(session.run(None, {input_name: test_images})[0])
+    input_shape = session.get_inputs()[0].shape
+    assert input_shape[0] == 1
+
+    onnx_adapter = OnnxRuntimeAdapter(written_path)
+    onnx_logits = onnx_adapter.predict_logits(test_images)
 
     assert onnx_logits.shape == pytorch_logits.shape
     np.testing.assert_allclose(onnx_logits, pytorch_logits, rtol=1e-4, atol=1e-4)
