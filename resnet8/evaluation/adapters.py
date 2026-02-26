@@ -12,7 +12,11 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
-from onnxsim import simplify
+
+try:
+    from onnxsim import simplify as _onnxsim_simplify
+except Exception:  # pragma: no cover - depends on environment packaging
+    _onnxsim_simplify = None
 
 
 class InferenceAdapter(Protocol):
@@ -287,10 +291,23 @@ class PyTorchAdapter:
 
 
 def _try_simplify_onnx_model(path: Path) -> None:
+    if _onnxsim_simplify is None:
+        warnings.warn(
+            "onnxsim is not available; keeping original ONNX export",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
+
     model = onnx.load(str(path))
-    simplified_model, ok = simplify(model)
+    simplified_model, ok = _onnxsim_simplify(model)
     if not ok:
-        raise RuntimeError("onnxsim simplify check failed")
+        warnings.warn(
+            "onnxsim simplify check failed; keeping original ONNX export",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
     onnx.save(simplified_model, str(path))
 
 
