@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
+import onnxruntime as ort
 import pytest
 import torch
 
@@ -230,3 +233,41 @@ def test_empirical_weight_bias_correction_reduces_output_mean_shift():
 
     assert corrected_module_ids
     assert error_after < error_before
+
+
+def test_pytorch_adapter_can_export_eval_graph_to_onnx(tmp_path):
+    model = torch.nn.Sequential(
+        torch.nn.Flatten(),
+        torch.nn.Linear(32 * 32 * 3, 10),
+    )
+    model_path = tmp_path / "ptq-export-model.pt"
+    torch.save({"model": model}, model_path)
+
+    calibration_images = np.random.default_rng(7).random(
+        (4, 32, 32, 3),
+        dtype=np.float32,
+    )
+    adapter = PyTorchAdapter(
+        model_path,
+        weight_bits=6,
+        activation_bits=7,
+        calibrate=True,
+        calibration_images=calibration_images,
+    )
+
+    export_path = tmp_path / "export" / "eval_quantized.onnx"
+    written_path = adapter.export_onnx(export_path)
+    assert Path(written_path).exists()
+
+    test_images = np.random.default_rng(9).random(
+        (3, 32, 32, 3),
+        dtype=np.float32,
+    )
+    pytorch_logits = adapter.predict_logits(test_images)
+
+    session = ort.InferenceSession(written_path)
+    input_name = session.get_inputs()[0].name
+    onnx_logits = np.asarray(session.run(None, {input_name: test_images})[0])
+
+    assert onnx_logits.shape == pytorch_logits.shape
+    np.testing.assert_allclose(onnx_logits, pytorch_logits, rtol=1e-4, atol=1e-4)

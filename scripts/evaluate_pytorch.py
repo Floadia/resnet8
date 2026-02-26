@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from resnet8.evaluation import (  # noqa: E402
     DEFAULT_CIFAR10_DATA_DIR,
+    OnnxRuntimeAdapter,
     PyTorchAdapter,
     evaluate_dataset,
     format_report_text,
@@ -134,11 +135,40 @@ def main() -> None:
         default="auto",
         help="Execution device: auto (default), cpu, or cuda",
     )
+    parser.add_argument(
+        "--export-onnx",
+        default=None,
+        help="Optional path to export eval-time graph as ONNX",
+    )
+    parser.add_argument(
+        "--verify-exported-onnx",
+        action="store_true",
+        help=(
+            "After export, evaluate the ONNX file and compare accuracy with "
+            "PyTorch evaluation"
+        ),
+    )
+    parser.add_argument(
+        "--onnx-score-tol",
+        type=float,
+        default=0.02,
+        help="Allowed absolute accuracy delta for exported ONNX parity check",
+    )
+    parser.add_argument(
+        "--export-opset",
+        type=int,
+        default=17,
+        help="ONNX opset version used for --export-onnx (default: 17)",
+    )
     args = parser.parse_args()
     if args.calib and args.wq is None and args.aq is None:
         parser.error("--calib requires --wq and/or --aq")
     if args.dfq_bias_corr and args.wq is None:
         parser.error("--dfq-bias-corr requires --wq")
+    if args.verify_exported_onnx and args.export_onnx is None:
+        parser.error("--verify-exported-onnx requires --export-onnx")
+    if args.onnx_score_tol < 0:
+        parser.error("--onnx-score-tol must be >= 0")
 
     print(f"Loading CIFAR-10 test data from: {args.data_dir}")
     print(f"Loading PyTorch model from: {args.model}")
@@ -188,6 +218,35 @@ def main() -> None:
     if args.output_json:
         write_report_json(report, args.output_json)
         print(f"Wrote JSON report: {args.output_json}")
+
+    if args.export_onnx:
+        export_path = adapter.export_onnx(
+            args.export_onnx,
+            opset_version=args.export_opset,
+        )
+        print(f"Exported eval graph ONNX: {export_path}")
+
+        if args.verify_exported_onnx:
+            onnx_report = evaluate_dataset(
+                adapter=OnnxRuntimeAdapter(export_path),
+                data_dir=args.data_dir,
+                max_samples=args.max_samples,
+            )
+            pytorch_accuracy = float(report["overall"]["accuracy"])
+            onnx_accuracy = float(onnx_report["overall"]["accuracy"])
+            delta = abs(onnx_accuracy - pytorch_accuracy)
+            print(
+                "Exported ONNX parity: "
+                f"pytorch={pytorch_accuracy:.6f}, "
+                f"onnx={onnx_accuracy:.6f}, "
+                f"abs_delta={delta:.6f}, "
+                f"tol={args.onnx_score_tol:.6f}"
+            )
+            if delta > args.onnx_score_tol:
+                raise SystemExit(
+                    "Exported ONNX parity check failed: "
+                    f"abs_delta={delta:.6f} exceeds tol={args.onnx_score_tol:.6f}"
+                )
 
 
 if __name__ == "__main__":
