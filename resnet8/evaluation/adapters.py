@@ -285,34 +285,14 @@ class PyTorchAdapter:
 
 
 def _try_simplify_onnx_model(path: Path) -> None:
-    try:
-        import onnx
-        from onnxsim import simplify
-    except Exception:
-        warnings.warn(
-            "onnxsim is unavailable; skipping ONNX simplification",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return
+    import onnx
+    from onnxsim import simplify
 
-    try:
-        model = onnx.load(str(path))
-        simplified_model, ok = simplify(model)
-        if not ok:
-            warnings.warn(
-                "onnxsim simplify check failed; keeping original ONNX export",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            return
-        onnx.save(simplified_model, str(path))
-    except Exception as exc:
-        warnings.warn(
-            f"ONNX simplification failed; keeping original export ({exc})",
-            RuntimeWarning,
-            stacklevel=2,
-        )
+    model = onnx.load(str(path))
+    simplified_model, ok = simplify(model)
+    if not ok:
+        raise RuntimeError("onnxsim simplify check failed")
+    onnx.save(simplified_model, str(path))
 
 
 def _prepare_model_for_constant_propagation(
