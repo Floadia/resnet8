@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import copy
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
 import numpy as np
+import onnx
 import onnxruntime as ort
 import torch
+
+try:
+    from onnxsim import simplify as _onnxsim_simplify
+except Exception:  # pragma: no cover - depends on environment packaging
+    _onnxsim_simplify = None
 
 
 class InferenceAdapter(Protocol):
@@ -35,8 +42,22 @@ class OnnxRuntimeAdapter:
         self.input_shape = input_info.shape
 
     def predict_logits(self, images: np.ndarray) -> np.ndarray:
+        if self._uses_static_batch_one() and images.shape[0] != 1:
+            outputs: list[np.ndarray] = []
+            for index in range(images.shape[0]):
+                sample = images[index : index + 1]
+                sample_outputs = self._session.run(None, {self.input_name: sample})
+                outputs.append(np.asarray(sample_outputs[0]))
+            return np.concatenate(outputs, axis=0)
+
         outputs = self._session.run(None, {self.input_name: images})
         return np.asarray(outputs[0])
+
+    def _uses_static_batch_one(self) -> bool:
+        if not self.input_shape:
+            return False
+        batch_dim = self.input_shape[0]
+        return isinstance(batch_dim, int) and batch_dim == 1
 
 
 class PyTorchAdapter:
@@ -203,6 +224,112 @@ class PyTorchAdapter:
 
         return rows
 
+    def export_onnx(
+        self,
+        output_path: str | Path,
+        *,
+        opset_version: int = 17,
+        input_shape: tuple[int, int, int, int] = (1, 32, 32, 3),
+        dynamic_batch: bool = False,
+        simplify: bool = True,
+        constant_propagation: bool = True,
+    ) -> str:
+        """Export the current eval model (including PTQ behavior) to ONNX."""
+        if len(input_shape) != 4:
+            msg = f"input_shape must be rank-4 NHWC, got {input_shape}"
+            raise ValueError(msg)
+
+        out_path = Path(output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        model = self._model
+        was_training = model.training
+        model.eval()
+        first_param = next(model.parameters(), None)
+        model_device = (
+            first_param.device if first_param is not None else torch.device(self.device)
+        )
+        example_input = torch.zeros(
+            input_shape,
+            dtype=torch.float32,
+            device=model_device,
+        )
+        dynamic_axes = (
+            {"input": {0: "batch"}, "logits": {0: "batch"}} if dynamic_batch else None
+        )
+        export_model: torch.nn.Module | torch.jit.ScriptModule = model
+        if constant_propagation:
+            export_model = _prepare_model_for_constant_propagation(
+                model=model,
+                example_input=example_input,
+            )
+
+        try:
+            with torch.no_grad():
+                torch.onnx.export(
+                    export_model,
+                    example_input,
+                    str(out_path),
+                    export_params=True,
+                    do_constant_folding=True,
+                    input_names=["input"],
+                    output_names=["logits"],
+                    dynamic_axes=dynamic_axes,
+                    opset_version=opset_version,
+                    dynamo=False,
+                )
+        finally:
+            if was_training:
+                model.train()
+
+        if simplify:
+            _try_simplify_onnx_model(out_path)
+
+        return str(out_path)
+
+
+def _try_simplify_onnx_model(path: Path) -> None:
+    if _onnxsim_simplify is None:
+        warnings.warn(
+            "onnxsim is not available; keeping original ONNX export",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
+
+    model = onnx.load(str(path))
+    simplified_model, ok = _onnxsim_simplify(model)
+    if not ok:
+        warnings.warn(
+            "onnxsim simplify check failed; keeping original ONNX export",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
+    onnx.save(simplified_model, str(path))
+
+
+def _prepare_model_for_constant_propagation(
+    *,
+    model: torch.nn.Module,
+    example_input: torch.Tensor,
+) -> torch.nn.Module | torch.jit.ScriptModule:
+    try:
+        with torch.no_grad():
+            traced = torch.jit.trace(model, example_input, strict=False)
+            frozen = torch.jit.freeze(traced.eval())
+            torch._C._jit_pass_inline(frozen.graph)
+            torch._C._jit_pass_constant_propagation(frozen.graph)
+            return frozen
+    except Exception as exc:
+        warnings.warn(
+            "Constant propagation before ONNX export failed; "
+            f"falling back to direct export ({exc})",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return model
+
 
 def load_pytorch_model(model_path: str | Path) -> torch.nn.Module:
     """Load PyTorch model from checkpoint dict or TorchScript."""
@@ -274,12 +401,14 @@ def _symmetric_fake_quantize_tensor(tensor: torch.Tensor, bits: int) -> torch.Te
     if not torch.is_floating_point(tensor):
         return tensor
 
-    max_abs = tensor.detach().abs().max()
-    if float(max_abs.item()) == 0.0:
-        return tensor
-
-    params = _symmetric_params_from_max_abs(max_abs=float(max_abs.item()), bits=bits)
-    return _fake_quantize_tensor_with_params(tensor, params)
+    qmax = (1 << (bits - 1)) - 1
+    qmin = -(1 << (bits - 1))
+    max_abs = tensor.detach().abs().amax()
+    scale = max_abs / float(qmax)
+    safe_scale = torch.where(scale > 0, scale, torch.ones_like(scale))
+    quantized = torch.round(tensor / safe_scale).clamp(qmin, qmax)
+    dequantized = quantized * safe_scale
+    return torch.where(scale > 0, dequantized, tensor)
 
 
 def _symmetric_params_from_max_abs(*, max_abs: float, bits: int) -> _QuantizationParams:
@@ -724,16 +853,25 @@ def _quantize_output_with_scheme(
         if output.numel() == 0:
             return output
         if scheme == "asymmetric":
-            min_value = float(output.detach().min().item())
-            max_value = float(output.detach().max().item())
-            if max_value <= min_value:
-                return output
-            params = _asymmetric_params_from_min_max(
-                min_value=min_value,
-                max_value=max_value,
-                bits=bits,
+            qmin = 0
+            qmax = (1 << bits) - 1
+            min_value = output.detach().amin()
+            max_value = output.detach().amax()
+            value_range = max_value - min_value
+            scale = value_range / float(qmax - qmin)
+            safe_scale = torch.where(scale > 0, scale, torch.ones_like(scale))
+            zero_point = torch.round(
+                torch.tensor(
+                    float(qmin),
+                    device=output.device,
+                    dtype=output.dtype,
+                )
+                - (min_value / safe_scale)
             )
-            return _fake_quantize_tensor_with_params(output, params)
+            zero_point = zero_point.clamp(float(qmin), float(qmax))
+            quantized = torch.round(output / safe_scale + zero_point).clamp(qmin, qmax)
+            dequantized = (quantized - zero_point) * safe_scale
+            return torch.where(scale > 0, dequantized, output)
         return _symmetric_fake_quantize_tensor(output, bits)
     if isinstance(output, tuple):
         return tuple(

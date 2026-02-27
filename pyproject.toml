@@ -14,6 +14,7 @@ dependencies = [
     "torch>=2.0.0",
     "torchvision>=0.15.0",
     "onnx2torch>=1.5.15",
+    "onnxsim>=0.4.36",
     "marimo>=0.15.5",
     "plotly>=5.0.0",
 ]
