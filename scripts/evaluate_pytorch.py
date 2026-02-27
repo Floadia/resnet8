@@ -252,9 +252,7 @@ def main() -> None:
             onnx_adapter = OnnxRuntimeAdapter(export_path)
             input_shape = onnx_adapter.input_shape
             static_batch_one = bool(
-                input_shape
-                and isinstance(input_shape[0], int)
-                and input_shape[0] == 1
+                input_shape and isinstance(input_shape[0], int) and input_shape[0] == 1
             )
             if static_batch_one:
                 pytorch_accuracy = _compute_unit_batch_accuracy(

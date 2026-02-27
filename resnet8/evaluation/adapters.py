@@ -246,8 +246,8 @@ class PyTorchAdapter:
         was_training = model.training
         model.eval()
         first_param = next(model.parameters(), None)
-        model_device = first_param.device if first_param is not None else torch.device(
-            self.device
+        model_device = (
+            first_param.device if first_param is not None else torch.device(self.device)
         )
         example_input = torch.zeros(
             input_shape,
@@ -255,9 +255,7 @@ class PyTorchAdapter:
             device=model_device,
         )
         dynamic_axes = (
-            {"input": {0: "batch"}, "logits": {0: "batch"}}
-            if dynamic_batch
-            else None
+            {"input": {0: "batch"}, "logits": {0: "batch"}} if dynamic_batch else None
         )
         export_model: torch.nn.Module | torch.jit.ScriptModule = model
         if constant_propagation:
